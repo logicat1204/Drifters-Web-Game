@@ -1,0 +1,24 @@
+// Manual browser regression fixture using the production simulation and renderers.
+import {CARS,TRACKS,makeTrack,createRace,updateRace,rivalCar,toggleHeadlights,repositionRace} from '../js/sim.mjs';
+import {activateFocus} from '../js/focus.mjs';
+import {Renderer} from '../js/renderer.js';
+import {Cockpit} from '../js/cockpit.js';
+import {CornerEffects} from '../js/effects.js';
+import {driverInput} from './helpers/reference-driver.mjs';
+const $=id=>document.getElementById(id),track=makeTrack(TRACKS[0]),r=createRace(CARS[0],track,{mode:'time'});
+r.countdown=0;r.lateral=0;
+for(let i=0;i<900*120&&(r.skill.level<3||r.focus.charge<60)&&!r.finished;i++)updateRace(r,driverInput(r),1/120);
+r.mode='battle';r.rivalS=r.s-24;r.rivalSpeed=r.speed;r.rivalLateral=1.25;
+r.opponent=createRace(rivalCar(r.rival),track,{mode:'time'});Object.assign(r.opponent,{countdown:0,s:r.rivalS,speed:r.speed,lateral:1.25,timeLeft:10000});
+const renderer=new Renderer($('world')),cockpit=new Cockpit($('cockpit')),effects=new CornerEffects($('race-fx'));
+renderer.setTrack(track);renderer.setCar(r.car);renderer.setRival(r.rival);renderer.cameraMode=3;
+let playing=false,day=false,motion=true,previous=performance.now(),acc=0;
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'Pausar simulación':'Reanudar simulación';};
+$('lights').onclick=()=>{$('lights').textContent=toggleHeadlights(r)?'Faros ON':'Faros OFF';};
+$('day').onclick=()=>{day=!day;r.night=!day;$('day').textContent=day?'Cambiar a noche':'Cambiar a día';};
+$('focus').onclick=()=>activateFocus(r);$('reset').onclick=()=>repositionRace(r);
+$('motion').onclick=()=>{motion=!motion;$('motion').textContent=motion?'Efectos ON':'Efectos OFF';};
+function frame(now){const dt=Math.min(.05,(now-previous)/1000);previous=now;if(playing){acc+=dt;while(acc>=1/120){updateRace(r,driverInput(r),1/120);acc-=1/120;}}else acc=0;
+  renderer.render(r,'race',dt,{day,shake:false});cockpit.draw(r,true,dt,{mirror:renderer.mirrorReady?renderer.mirrorCanvas:null});effects.draw(r,true,playing?dt:0,motion);
+  $('status').textContent=['','CLEAN LINE','APEX FLOW','FUJIWARA ZONE'][r.skill.level]+' · '+Math.round(r.speed*3.6)+' km/h · '+Math.floor(r.skill.points)+' pts · CONCENTRACIÓN '+Math.floor(r.focus.charge)+'% · '+r.focus.remaining.toFixed(1)+' s';requestAnimationFrame(frame);
+}requestAnimationFrame(frame);

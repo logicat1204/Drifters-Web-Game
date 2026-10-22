@@ -1,0 +1,16 @@
+import { test,before,after } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdir,writeFile,rm } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { server } from '../server.mjs';
+const folder=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../songs',`__qa-${process.pid}`);
+const filename='Noche & 曲 #01.wav';
+let base;
+before(async()=>{await mkdir(folder,{recursive:true});await writeFile(path.join(folder,filename),Buffer.from(Array.from({length:256},(_,i)=>i)));await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;});
+after(async()=>{await new Promise(resolve=>server.close(resolve));await rm(folder,{recursive:true,force:true});});
+test('serves the game and JavaScript modules with correct MIME',async()=>{const response=await fetch(base);assert.equal(response.status,200);assert.match(await response.text(),/TOUGE/);const js=await fetch(base+'/js/game.js');assert.match(js.headers.get('content-type'),/javascript/);});
+test('discovers nested audio and safely encodes filenames',async()=>{const response=await fetch(base+'/api/songs');const data=await response.json();const song=data.songs.find(s=>s.name==='Noche & 曲 #01');assert.ok(song);const audio=await fetch(base+song.url);assert.equal(audio.status,200);assert.equal((await audio.arrayBuffer()).byteLength,256);});
+test('music directory is scanned again without restarting',async()=>{await writeFile(path.join(folder,'Nueva.mp3'),Buffer.from([1,2,3]));const data=await (await fetch(base+'/api/songs')).json();assert.ok(data.songs.some(s=>s.name==='Nueva'));});
+test('supports byte ranges and rejects invalid ranges',async()=>{const url=base+'/songs/'+path.basename(folder)+'/'+encodeURIComponent(filename);const response=await fetch(url,{headers:{Range:'bytes=10-19'}});assert.equal(response.status,206);assert.equal(response.headers.get('content-range'),'bytes 10-19/256');assert.deepEqual([...new Uint8Array(await response.arrayBuffer())],[10,11,12,13,14,15,16,17,18,19]);const suffix=await fetch(url,{headers:{Range:'bytes=-4'}});assert.deepEqual([...new Uint8Array(await suffix.arrayBuffer())],[252,253,254,255]);assert.equal((await fetch(url,{headers:{Range:'bytes=999-1000'}})).status,416);});
+test('rejects traversal, hidden files, unsupported methods and missing audio',async()=>{assert.equal((await fetch(base+'/%2e%2e%5cpackage.json')).status,403);assert.equal((await fetch(base+'/.git/config')).status,403);assert.equal((await fetch(base+'/api/songs',{method:'POST'})).status,405);assert.equal((await fetch(base+'/songs/missing.mp3')).status,404);});

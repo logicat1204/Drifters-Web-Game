@@ -1,0 +1,5 @@
+Coloca aqui tus canciones: MP3, OGG, WAV, M4A, AAC, FLAC, OPUS o WEBM.
+Se admiten subcarpetas. No hace falta editar ningun archivo ni reiniciar el servidor.
+Abre MUSICA en el juego para elegir una cancion antes de salir a la pista.
+El navegador debe ser compatible con el codec del archivo.
+No se incluyen canciones comerciales. El juego incluye una pista sintetizada original.
