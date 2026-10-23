@@ -4,7 +4,13 @@ Juego 3D de carreras de montaña para navegador inspirado en el ambiente y la co
 
 ## Jugar
 
+<<<<<<< HEAD
 1. Con **Node.js 24 LTS** instalado, abre **JUGAR.bat**. También puedes ejecutar `npm start` en esta carpeta.
+=======
+Para jugar directamente accede tambien a https://drifters-web-game.onrender.com/
+
+1. Con Node.js 18 o superior instalado, abre **JUGAR.bat**. También puedes ejecutar `npm start` en esta carpeta.
+>>>>>>> f2e37f3b2efb4a925ae527483027dabad09538fa
 2. Entra en **http://127.0.0.1:4173**. Mantén la ventana del servidor abierta mientras juegas.
 3. Crea un usuario o inicia sesión. La primera vez confirma tu nombre visible y elige foto o personaliza un avatar.
 4. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, nivel del rival, asfalto, hora y resolución.
