@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: touge-after-hours
+    runtime: node
+    plan: 0.5c-512mb
+    numInstances: 1
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: PUBLIC_URL
+        sync: false
+    disk:
+      name: touge-data
+      mountPath: /var/data
+      sizeGB: 1

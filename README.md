@@ -4,19 +4,32 @@ Juego 3D de carreras de montaña para navegador inspirado en el ambiente y la co
 
 ## Jugar
 
-1. Con Node.js 18 o superior instalado, abre **JUGAR.bat**. También puedes ejecutar `npm start` en esta carpeta.
+1. Con **Node.js 24 LTS** instalado, abre **JUGAR.bat**. También puedes ejecutar `npm start` en esta carpeta.
 2. Entra en **http://127.0.0.1:4173**. Mantén la ventana del servidor abierta mientras juegas.
-3. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, nivel del rival, asfalto, hora y resolución.
+3. Crea un usuario o inicia sesión. La primera vez confirma tu nombre visible y elige foto o personaliza un avatar.
+4. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, nivel del rival, asfalto, hora y resolución.
 
-El servidor usa la biblioteca WebSocket `ws`. Ejecuta `npm ci` la primera vez si falta `node_modules/`; JUGAR.bat la instala automáticamente. Después, el modo individual funciona sin conexión a Internet. Necesita un navegador con WebGL y aceleración gráfica. Para detener el servidor pulsa Ctrl+C en su ventana. Si el puerto está ocupado, usa `$env:PORT=4174; npm start` desde PowerShell y abre el puerto indicado.
+El servidor usa la biblioteca WebSocket `ws` y SQLite incluido en Node.js. Ejecuta `npm ci --omit=dev` la primera vez si falta `node_modules/`; JUGAR.bat instala `ws` automáticamente. Después puedes jugar contra este servidor local sin conexión a Internet: el servidor sigue siendo necesario para las cuentas, música y guardado de récords. Necesita un navegador con WebGL y aceleración gráfica. Para detener el servidor pulsa Ctrl+C en su ventana. Si el puerto está ocupado, usa `$env:PORT=4174; npm start` desde PowerShell y abre el puerto indicado.
+
+## Tu licencia de piloto
+
+El usuario puede tener entre 3 y 24 letras y números, por ejemplo `TakumiFX24` o `Alvaroo`. El registro comprueba si está libre; las mayúsculas no crean otra cuenta con el mismo nombre. La contraseña debe tener al menos ocho caracteres. No se necesita correo electrónico. El nombre visible del piloto se puede editar por separado.
+
+En tu licencia, accesible mediante el retrato de la cabecera, puedes elegir **foto** o **avatar**. Hay dos bases con rostro y silueta propios y catálogos independientes de hombre y mujer: cada una tiene cuatro cabellos, tres tipos de ojos y labios, tres prendas y tres accesorios, además de seis tonos de piel y colores. Las piezas solo se equipan en su base; las cuentas anteriores se adaptan automáticamente conservando colores y el tipo de ropa. La combinación del avatar se conserva aunque uses una foto. Los siete coches están disponibles desde el principio; el coche elegido en Garaje se guarda como predeterminado del usuario.
+
+La pestaña **RÉCORDS** de la licencia muestra tus puntos de conducción, estadísticas, marcas personales y al mejor piloto de cada curso. La clasificación permite elegir curso, coche, individual/online, asfalto, hora y transmisión. Los resultados están ligados al usuario en SQLite. Las carreras individuales se verifican reproduciendo los controles en el servidor; las online usan su simulación autoritativa. Las marcas locales anteriores no se atribuyen a una cuenta nueva.
+
+La base se crea en `data/touge.sqlite`, o en la ruta indicada por `DATA_DIR` / `DB_PATH`, y está excluida de Git. Los puntos aún no son moneda para compras. El catálogo y el inventario por usuario dejan preparada la futura tienda de cosméticos.
+
+Detalles de almacenamiento, sesiones, copias y Render: [docs/ACCOUNTS-DEPLOY.md](docs/ACCOUNTS-DEPLOY.md). Plantilla, capas PNG/SVG y guía para nuevos cosméticos: [docs/AVATAR-ASSETS.md](docs/AVATAR-ASSETS.md).
 
 ## Multijugador online
 
-La pestaña **02 ONLINE**, junto a **01 CORRER**, tiene salas privadas de **2 a 4 jugadores**.
+La pestaña **02 ONLINE**, junto a **01 CORRER**, tiene salas públicas y privadas de **2 a 4 jugadores**, con tres opciones:
 
-1. Escribe tu nombre, elige cualquiera de los siete coches y pulsa **CREAR SALA**.
-2. El anfitrión elige circuito, hora y asfalto. Pulsa **COPIAR** para compartir el enlace de invitación.
-3. Los invitados abren el enlace, escriben su nombre, eligen coche y pulsan **UNIRME A LA SALA**. También pueden pegar el enlace o su código de ocho caracteres en la pestaña Online del mismo servidor.
+1. **SALAS PÚBLICAS** muestra las partidas públicas abiertas y con plazas disponibles; pulsa **UNIRME**. Se actualiza cada cinco segundos y con **ACTUALIZAR**.
+2. **SALA PRIVADA** permite pegar un enlace o código de ocho caracteres y pulsar **INGRESAR**.
+3. **CREAR SALA** permite elegir circuito, hora y asfalto y marcar si será pública. Sin marcar, será privada y no aparecerá en el listado. El anfitrión puede **COPIAR** su invitación. Los pilotos entran con el nombre, retrato y coche predeterminado de su cuenta; para cambiarlo usa Garaje antes de marcar listo.
 4. Todos, incluido el anfitrión, pulsan **ESTOY LISTO**. Solo el anfitrión puede pulsar **INICIAR CARRERA**. El botón se habilita con al menos dos jugadores y todos listos.
 5. Al iniciar, la sala queda cerrada, incluso durante los tres segundos de cuenta atrás: nadie más puede entrar ni cambiar de coche. Después de los resultados el anfitrión puede **ABRIR REVANCHA**, que vuelve al lobby y exige confirmar listo de nuevo.
 
@@ -91,7 +104,7 @@ Esta versión usa una nueva tabla local de mejores tiempos por el cambio de fís
 - Los nuevos interiores incluyen instrumentación angular y volante MR2 en el SW20, velocidad digital y tacómetro de barras naranja en el S2000, relojes analógicos y volante Silvia en el S13, y consola curva con tres relojes y volante Toyota en el Supra. Comparten componentes de dibujo y conservan el retrovisor 3D y los controles reactivos.
 - Faros, niebla, humo, guardarraíles, vegetación, edificios en Atami, colores otoñales en Irohazaka y referencias al puente de Usui y huertos de Tsukuba.
 - HUD con tiempo, posición, ventaja en metros, navegación, tacómetro y combo de derrape.
-- Resultados y mejores tiempos guardados localmente por circuito, coche, transmisión y clima.
+- Resultados, puntuaciones y mejores tiempos guardados en SQLite por usuario, circuito, coche, transmisión, hora, asfalto y modalidad; récord del curso con el nombre y retrato del mejor piloto.
 
 ## Garaje: siete coches, tres perfiles
 

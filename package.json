@@ -7,12 +7,18 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check server.mjs && node --check js/game.js && node --check js/renderer.js && node --check js/sim.mjs && node --check js/cockpit.js && node --check js/courses.mjs && node --check js/scenery.mjs && node --check js/skill.mjs && node --check js/effects.js && node --check server/online.mjs && node --check js/online.js && node --check js/focus.mjs"
+    "check": "node --check server.mjs && node --check js/game.js && node --check js/renderer.js && node --check js/sim.mjs && node --check js/cockpit.js && node --check js/courses.mjs && node --check js/scenery.mjs && node --check js/skill.mjs && node --check js/effects.js && node --check server/online.mjs && node --check js/online.js && node --check js/focus.mjs && node --check server/store.mjs && node --check server/accounts.mjs && node --check server/runs.mjs && node --check js/account.js && node --check js/avatar.mjs && node --check js/replay.mjs",
+    "assets:avatars": "node scripts/build-avatar-assets.mjs",
+    "test:ui": "node tests/ui-flow.mjs"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=24.0.0 <25"
   },
   "dependencies": {
     "ws": "8.22.0"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "sharp": "0.35.5"
   }
 }

@@ -1,0 +1,749 @@
+{
+  "version": 2,
+  "canvas": {
+    "width": 512,
+    "height": 640
+  },
+  "rigs": {
+    "male": {
+      "id": "portrait-v2-male",
+      "face": [
+        256,
+        224
+      ],
+      "neck": [
+        256,
+        365
+      ],
+      "shoulders": [
+        [
+          140,
+          392
+        ],
+        [
+          372,
+          392
+        ]
+      ]
+    },
+    "female": {
+      "id": "portrait-v2-female",
+      "face": [
+        256,
+        220
+      ],
+      "neck": [
+        256,
+        373
+      ],
+      "shoulders": [
+        [
+          176,
+          394
+        ],
+        [
+          336,
+          394
+        ]
+      ]
+    }
+  },
+  "items": [
+    {
+      "id": "male.hair.short",
+      "slot": "hair",
+      "key": "short",
+      "name": "Corto",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.spiked",
+      "slot": "hair",
+      "key": "spiked",
+      "name": "Puntas",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.swept",
+      "slot": "hair",
+      "key": "swept",
+      "name": "Flequillo recto",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.long",
+      "slot": "hair",
+      "key": "long",
+      "name": "Largo",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.eyes.calm",
+      "slot": "eyes",
+      "key": "calm",
+      "name": "Serenos",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.eyes.sharp",
+      "slot": "eyes",
+      "key": "sharp",
+      "name": "Intensos",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.eyes.round",
+      "slot": "eyes",
+      "key": "round",
+      "name": "Abiertos",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.mouth.neutral",
+      "slot": "mouth",
+      "key": "neutral",
+      "name": "Natural",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.mouth.smile",
+      "slot": "mouth",
+      "key": "smile",
+      "name": "Sonrisa",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.mouth.full",
+      "slot": "mouth",
+      "key": "full",
+      "name": "Labios definidos",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.shirt",
+      "slot": "outfit",
+      "key": "shirt",
+      "name": "Camiseta recta",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.jacket",
+      "slot": "outfit",
+      "key": "jacket",
+      "name": "Chaqueta de piloto",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.hoodie",
+      "slot": "outfit",
+      "key": "hoodie",
+      "name": "Chompa amplia",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.none",
+      "slot": "accessory",
+      "key": "none",
+      "name": "Sin accesorio",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.glasses",
+      "slot": "accessory",
+      "key": "glasses",
+      "name": "Gafas rectangulares",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.stud",
+      "slot": "accessory",
+      "key": "stud",
+      "name": "Pendiente metálico",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.cap",
+      "slot": "accessory",
+      "key": "cap",
+      "name": "Gorra",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "female.hair.bob",
+      "slot": "hair",
+      "key": "bob",
+      "name": "Media melena",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.long",
+      "slot": "hair",
+      "key": "long",
+      "name": "Largo en capas",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.ponytail",
+      "slot": "hair",
+      "key": "ponytail",
+      "name": "Cola alta",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.wavy",
+      "slot": "hair",
+      "key": "wavy",
+      "name": "Ondulado",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.eyes.almond",
+      "slot": "eyes",
+      "key": "almond",
+      "name": "Almendrados",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.eyes.defined",
+      "slot": "eyes",
+      "key": "defined",
+      "name": "Mirada intensa",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.eyes.soft",
+      "slot": "eyes",
+      "key": "soft",
+      "name": "Mirada abierta",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.mouth.natural",
+      "slot": "mouth",
+      "key": "natural",
+      "name": "Natural",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.mouth.smile",
+      "slot": "mouth",
+      "key": "smile",
+      "name": "Sonrisa suave",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.mouth.defined",
+      "slot": "mouth",
+      "key": "defined",
+      "name": "Labios definidos",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.shirt",
+      "slot": "outfit",
+      "key": "shirt",
+      "name": "Camiseta entallada",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.jacket",
+      "slot": "outfit",
+      "key": "jacket",
+      "name": "Cazadora corta",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.hoodie",
+      "slot": "outfit",
+      "key": "hoodie",
+      "name": "Chompa con cordones",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.none",
+      "slot": "accessory",
+      "key": "none",
+      "name": "Sin accesorio",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.glasses",
+      "slot": "accessory",
+      "key": "glasses",
+      "name": "Gafas redondeadas",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.earrings",
+      "slot": "accessory",
+      "key": "earrings",
+      "name": "Aros dorados",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.headband",
+      "slot": "accessory",
+      "key": "headband",
+      "name": "Diadema",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    }
+  ],
+  "options": {
+    "male": {
+      "base": [
+        [
+          "male",
+          "Hombre"
+        ],
+        [
+          "female",
+          "Mujer"
+        ]
+      ],
+      "skin": [
+        [
+          "#f0d1b0",
+          "Claro"
+        ],
+        [
+          "#dcb28c",
+          "Cálido"
+        ],
+        [
+          "#c18e68",
+          "Medio"
+        ],
+        [
+          "#a66e4f",
+          "Bronce"
+        ],
+        [
+          "#805039",
+          "Oscuro"
+        ],
+        [
+          "#57382e",
+          "Profundo"
+        ]
+      ],
+      "hair": [
+        [
+          "short",
+          "Corto"
+        ],
+        [
+          "spiked",
+          "Puntas"
+        ],
+        [
+          "swept",
+          "Flequillo recto"
+        ],
+        [
+          "long",
+          "Largo"
+        ]
+      ],
+      "hairColor": [
+        [
+          "#242730",
+          "Negro"
+        ],
+        [
+          "#543a30",
+          "Castaño"
+        ],
+        [
+          "#9b653e",
+          "Cobrizo"
+        ],
+        [
+          "#d6b76c",
+          "Rubio"
+        ],
+        [
+          "#afb9c4",
+          "Plata"
+        ]
+      ],
+      "eyes": [
+        [
+          "calm",
+          "Serenos"
+        ],
+        [
+          "sharp",
+          "Intensos"
+        ],
+        [
+          "round",
+          "Abiertos"
+        ]
+      ],
+      "mouth": [
+        [
+          "neutral",
+          "Natural"
+        ],
+        [
+          "smile",
+          "Sonrisa"
+        ],
+        [
+          "full",
+          "Labios definidos"
+        ]
+      ],
+      "outfit": [
+        [
+          "shirt",
+          "Camiseta recta"
+        ],
+        [
+          "jacket",
+          "Chaqueta de piloto"
+        ],
+        [
+          "hoodie",
+          "Chompa amplia"
+        ]
+      ],
+      "outfitColor": [
+        [
+          "#e0dfd4",
+          "Marfil"
+        ],
+        [
+          "#344750",
+          "Azul noche"
+        ],
+        [
+          "#b14d3c",
+          "Rojo"
+        ],
+        [
+          "#69816c",
+          "Verde"
+        ],
+        [
+          "#514658",
+          "Violeta"
+        ]
+      ],
+      "accessory": [
+        [
+          "none",
+          "Sin accesorio"
+        ],
+        [
+          "glasses",
+          "Gafas rectangulares"
+        ],
+        [
+          "stud",
+          "Pendiente metálico"
+        ],
+        [
+          "cap",
+          "Gorra"
+        ]
+      ]
+    },
+    "female": {
+      "base": [
+        [
+          "male",
+          "Hombre"
+        ],
+        [
+          "female",
+          "Mujer"
+        ]
+      ],
+      "skin": [
+        [
+          "#f0d1b0",
+          "Claro"
+        ],
+        [
+          "#dcb28c",
+          "Cálido"
+        ],
+        [
+          "#c18e68",
+          "Medio"
+        ],
+        [
+          "#a66e4f",
+          "Bronce"
+        ],
+        [
+          "#805039",
+          "Oscuro"
+        ],
+        [
+          "#57382e",
+          "Profundo"
+        ]
+      ],
+      "hair": [
+        [
+          "bob",
+          "Media melena"
+        ],
+        [
+          "long",
+          "Largo en capas"
+        ],
+        [
+          "ponytail",
+          "Cola alta"
+        ],
+        [
+          "wavy",
+          "Ondulado"
+        ]
+      ],
+      "hairColor": [
+        [
+          "#242730",
+          "Negro"
+        ],
+        [
+          "#543a30",
+          "Castaño"
+        ],
+        [
+          "#9b653e",
+          "Cobrizo"
+        ],
+        [
+          "#d6b76c",
+          "Rubio"
+        ],
+        [
+          "#afb9c4",
+          "Plata"
+        ]
+      ],
+      "eyes": [
+        [
+          "almond",
+          "Almendrados"
+        ],
+        [
+          "defined",
+          "Mirada intensa"
+        ],
+        [
+          "soft",
+          "Mirada abierta"
+        ]
+      ],
+      "mouth": [
+        [
+          "natural",
+          "Natural"
+        ],
+        [
+          "smile",
+          "Sonrisa suave"
+        ],
+        [
+          "defined",
+          "Labios definidos"
+        ]
+      ],
+      "outfit": [
+        [
+          "shirt",
+          "Camiseta entallada"
+        ],
+        [
+          "jacket",
+          "Cazadora corta"
+        ],
+        [
+          "hoodie",
+          "Chompa con cordones"
+        ]
+      ],
+      "outfitColor": [
+        [
+          "#e0dfd4",
+          "Marfil"
+        ],
+        [
+          "#344750",
+          "Azul noche"
+        ],
+        [
+          "#b14d3c",
+          "Rojo"
+        ],
+        [
+          "#69816c",
+          "Verde"
+        ],
+        [
+          "#514658",
+          "Violeta"
+        ]
+      ],
+      "accessory": [
+        [
+          "none",
+          "Sin accesorio"
+        ],
+        [
+          "glasses",
+          "Gafas redondeadas"
+        ],
+        [
+          "earrings",
+          "Aros dorados"
+        ],
+        [
+          "headband",
+          "Diadema"
+        ]
+      ]
+    }
+  }
+}

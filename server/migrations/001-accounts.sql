@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,username TEXT NOT NULL COLLATE NOCASE UNIQUE,password_hash TEXT NOT NULL,salt TEXT NOT NULL,created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS profiles(user_id TEXT PRIMARY KEY REFERENCES users(id),display_name TEXT NOT NULL,avatar TEXT NOT NULL,photo BLOB,photo_mime TEXT,photo_version INTEGER NOT NULL DEFAULT 0,portrait_mode TEXT NOT NULL DEFAULT 'avatar',default_car TEXT NOT NULL DEFAULT 'ae86',arcade_stage INTEGER NOT NULL DEFAULT 0,onboarded INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),csrf TEXT NOT NULL,expires_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+      CREATE TABLE IF NOT EXISTS cosmetics(id TEXT PRIMARY KEY,slot TEXT NOT NULL,rig TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS inventory(user_id TEXT NOT NULL REFERENCES users(id),item_id TEXT NOT NULL REFERENCES cosmetics(id),acquired_at INTEGER NOT NULL,PRIMARY KEY(user_id,item_id));
+      CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),track TEXT NOT NULL,car TEXT NOT NULL,source TEXT NOT NULL,mode TEXT NOT NULL,manual INTEGER NOT NULL,wet INTEGER NOT NULL,night INTEGER NOT NULL,handling TEXT NOT NULL,elapsed REAL NOT NULL,points INTEGER NOT NULL,drift INTEGER NOT NULL,completed INTEGER NOT NULL,won INTEGER NOT NULL,created_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS runs_course ON runs(handling,track,source,wet,night,manual,completed,elapsed);
+      CREATE INDEX IF NOT EXISTS runs_user ON runs(user_id,created_at);
+      PRAGMA user_version=1;

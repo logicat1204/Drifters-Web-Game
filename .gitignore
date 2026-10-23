@@ -1,2 +1,9 @@
 node_modules/
 *.log
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+.env
+test-results/

@@ -1,0 +1,394 @@
+{
+  "version": 1,
+  "rig": "portrait-v1",
+  "canvas": {
+    "width": 512,
+    "height": 640
+  },
+  "anchors": {
+    "face": [
+      256,
+      224
+    ],
+    "neck": [
+      256,
+      365
+    ],
+    "shoulders": [
+      [
+        140,
+        392
+      ],
+      [
+        372,
+        392
+      ]
+    ]
+  },
+  "items": [
+    {
+      "id": "hair.short",
+      "slot": "hair",
+      "key": "short",
+      "name": "Corto",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "hair.spiked",
+      "slot": "hair",
+      "key": "spiked",
+      "name": "Puntas",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "hair.bob",
+      "slot": "hair",
+      "key": "bob",
+      "name": "Media melena",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "hair.long",
+      "slot": "hair",
+      "key": "long",
+      "name": "Largo",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "eyes.calm",
+      "slot": "eyes",
+      "key": "calm",
+      "name": "Serenos",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "eyes.sharp",
+      "slot": "eyes",
+      "key": "sharp",
+      "name": "Intensos",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "eyes.round",
+      "slot": "eyes",
+      "key": "round",
+      "name": "Abiertos",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "mouth.neutral",
+      "slot": "mouth",
+      "key": "neutral",
+      "name": "Natural",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "mouth.smile",
+      "slot": "mouth",
+      "key": "smile",
+      "name": "Sonrisa",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "mouth.full",
+      "slot": "mouth",
+      "key": "full",
+      "name": "Labios definidos",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "outfit.shirt",
+      "slot": "outfit",
+      "key": "shirt",
+      "name": "Camiseta",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "outfit.jacket",
+      "slot": "outfit",
+      "key": "jacket",
+      "name": "Chaqueta",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "outfit.hoodie",
+      "slot": "outfit",
+      "key": "hoodie",
+      "name": "Chompa",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "accessory.none",
+      "slot": "accessory",
+      "key": "none",
+      "name": "Sin accesorio",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "accessory.glasses",
+      "slot": "accessory",
+      "key": "glasses",
+      "name": "Gafas",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "accessory.earrings",
+      "slot": "accessory",
+      "key": "earrings",
+      "name": "Pendientes",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    },
+    {
+      "id": "accessory.cap",
+      "slot": "accessory",
+      "key": "cap",
+      "name": "Gorra",
+      "starter": true,
+      "bases": [
+        "male",
+        "female"
+      ],
+      "rig": "portrait-v1"
+    }
+  ],
+  "options": {
+    "base": [
+      [
+        "male",
+        "Hombre"
+      ],
+      [
+        "female",
+        "Mujer"
+      ]
+    ],
+    "skin": [
+      [
+        "#f0d1b0",
+        "Claro"
+      ],
+      [
+        "#dcb28c",
+        "Cálido"
+      ],
+      [
+        "#c18e68",
+        "Medio"
+      ],
+      [
+        "#a66e4f",
+        "Bronce"
+      ],
+      [
+        "#805039",
+        "Oscuro"
+      ],
+      [
+        "#57382e",
+        "Profundo"
+      ]
+    ],
+    "hair": [
+      [
+        "short",
+        "Corto"
+      ],
+      [
+        "spiked",
+        "Puntas"
+      ],
+      [
+        "bob",
+        "Media melena"
+      ],
+      [
+        "long",
+        "Largo"
+      ]
+    ],
+    "hairColor": [
+      [
+        "#242730",
+        "Negro"
+      ],
+      [
+        "#543a30",
+        "Castaño"
+      ],
+      [
+        "#9b653e",
+        "Cobrizo"
+      ],
+      [
+        "#d6b76c",
+        "Rubio"
+      ],
+      [
+        "#afb9c4",
+        "Plata"
+      ]
+    ],
+    "eyes": [
+      [
+        "calm",
+        "Serenos"
+      ],
+      [
+        "sharp",
+        "Intensos"
+      ],
+      [
+        "round",
+        "Abiertos"
+      ]
+    ],
+    "mouth": [
+      [
+        "neutral",
+        "Natural"
+      ],
+      [
+        "smile",
+        "Sonrisa"
+      ],
+      [
+        "full",
+        "Labios definidos"
+      ]
+    ],
+    "outfit": [
+      [
+        "shirt",
+        "Camiseta"
+      ],
+      [
+        "jacket",
+        "Chaqueta"
+      ],
+      [
+        "hoodie",
+        "Chompa"
+      ]
+    ],
+    "outfitColor": [
+      [
+        "#e0dfd4",
+        "Marfil"
+      ],
+      [
+        "#344750",
+        "Azul noche"
+      ],
+      [
+        "#b14d3c",
+        "Rojo"
+      ],
+      [
+        "#69816c",
+        "Verde"
+      ],
+      [
+        "#514658",
+        "Violeta"
+      ]
+    ],
+    "accessory": [
+      [
+        "none",
+        "Sin accesorio"
+      ],
+      [
+        "glasses",
+        "Gafas"
+      ],
+      [
+        "earrings",
+        "Pendientes"
+      ],
+      [
+        "cap",
+        "Gorra"
+      ]
+    ]
+  }
+}

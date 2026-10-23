@@ -5,9 +5,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {networkInterfaces} from 'node:os';
 import {attachOnline} from './server/online.mjs';
+import {Store} from './server/store.mjs';
+import {Accounts} from './server/accounts.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const songsRoot = path.join(root, 'songs');
+export const store=new Store();
+export const accounts=new Accounts(store);
+let onlineService;
 const audio = new Set(['.mp3', '.ogg', '.wav', '.m4a', '.aac', '.flac', '.opus', '.webm']);
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg', '.webm': 'audio/webm', '.ico': 'image/x-icon' };
 async function listSongs(dir = songsRoot) {
@@ -27,6 +32,8 @@ async function listSongs(dir = songsRoot) {
 }
 export const server = http.createServer(async (req, res) => {
   try {
+    const requestUrl=new URL(req.url,'http://localhost');
+    if(await accounts.handle(req,res,requestUrl,onlineService))return;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
     if(pathname==='/api/online'){
@@ -41,6 +48,7 @@ export const server = http.createServer(async (req, res) => {
       res.end(req.method === 'HEAD' ? undefined : json); return;
     }
     const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
+    if(!['index.html','style.css'].includes(relative)&&!['js/','assets/','songs/',...(process.env.NODE_ENV==='production'?[]:['tests/'])].some(prefix=>relative.startsWith(prefix))){res.writeHead(403).end('Forbidden');return;}
     const target = path.resolve(root, relative);
     if (!target.startsWith(root + path.sep) || relative.split(/[\\/]/).some(p => p.startsWith('.')) || !types[path.extname(target).toLowerCase()]) { res.writeHead(403).end('Forbidden'); return; }
     const info = await stat(target);
@@ -61,7 +69,7 @@ export const server = http.createServer(async (req, res) => {
     else createReadStream(target, { start, end }).on('error', () => res.destroy()).pipe(res);
   } catch { res.writeHead(404).end('Not found'); }
 });
-export const online=attachOnline(server);
+export const online=onlineService=attachOnline(server,{accounts,store});
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || 4173;
   server.listen(port, process.env.HOST||'0.0.0.0', () => console.log(`\n  TOUGE / AFTER HOURS\n  Juega en http://127.0.0.1:${port}\n  Online: WebSocket /online · hasta 4 jugadores\n  Musica: ${songsRoot}\n  Ctrl+C para detener.\n`));

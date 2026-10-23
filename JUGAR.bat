@@ -2,7 +2,13 @@
 cd /d "%~dp0"
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Necesitas Node.js 18 o superior: https://nodejs.org
+  echo Necesitas Node.js 24 LTS: https://nodejs.org
+  pause
+  exit /b 1
+)
+node -e "if(Number(process.versions.node.split('.')[0]) !== 24) process.exit(1)"
+if errorlevel 1 (
+  echo Actualiza a Node.js 24 LTS para usar SQLite y las cuentas de piloto.
   pause
   exit /b 1
 )
