@@ -16,6 +16,15 @@ export const AVATAR_CATALOGS={
     accessory:[['none','Sin accesorio'],['glasses','Gafas redondeadas'],['earrings','Aros dorados'],['headband','Diadema']]
   }
 };
+const additions={
+ male:{hair:[['undercut','Degradado de piloto',280],['racer-cap','Gorra de piloto',400],['braids','Trenzas recogidas',450]],eyes:[['focused','Concentrados',220],['bright','Mirada cristalina',300]],outfit:[['racer','Mono de piloto',420],['f1','Mono de fórmula',900],['rally','Chaqueta de rally',650],['champion','Piloto nocturno · Legendario',1200]],accessory:[['glasses-blue','Gafas azules',140],['glasses-red','Gafas rojas',140],['glasses-gold','Gafas doradas',220]],makeup:[['none','Sin maquillaje',0],['warpaint','Marcas de equipo',180]]},
+ female:{hair:[['pixie','Corto asimétrico',280],['racer-cap','Gorra de piloto',400],['twinbun','Moños dobles',450],['silk','Largo de seda · Legendario',700]],eyes:[['cat','Mirada felina',240],['starlight','Destellos',320]],outfit:[['racer','Mono de piloto',420],['dress','Vestido de noche',650],['sundress','Vestido de verano',450],['bikini','Bikini deportivo',400],['sapphire','Vestido zafiro · Legendario',1200]],accessory:[['glasses-blue','Gafas celestes',140],['glasses-red','Gafas rosas',140],['glasses-gold','Gafas doradas',220]],makeup:[['none','Sin maquillaje',0],['blush','Rubor suave',160],['eyeliner','Delineado',220],['gloss','Brillo de labios',200]]}
+};
+const cosmeticPrices=new Map();
+for(const [base,slots]of Object.entries(additions))for(const [slot,items]of Object.entries(slots)){
+ AVATAR_CATALOGS[base][slot]??=[];
+ for(const [key,name,price]of items){AVATAR_CATALOGS[base][slot].push([key,name]);cosmeticPrices.set(`${base}.${slot}.${key}`,price);}
+}
 const palettes={
   base:[['male','Hombre'],['female','Mujer']],
   skin:[['#f0d1b0','Claro'],['#dcb28c','Cálido'],['#c18e68','Medio'],['#a66e4f','Bronce'],['#805039','Oscuro'],['#57382e','Profundo']],
@@ -24,25 +33,26 @@ const palettes={
 };
 export function avatarOptions(base='male'){
   const c=AVATAR_CATALOGS[base];if(!c)throw Error('Base de avatar inválida.');
-  return {base:palettes.base,skin:palettes.skin,hair:c.hair,hairColor:palettes.hairColor,eyes:c.eyes,mouth:c.mouth,outfit:c.outfit,outfitColor:palettes.outfitColor,accessory:c.accessory};
+  return {base:palettes.base,skin:palettes.skin,hair:c.hair,hairColor:palettes.hairColor,eyes:c.eyes,mouth:c.mouth,outfit:c.outfit,outfitColor:palettes.outfitColor,accessory:c.accessory,makeup:c.makeup};
 }
 export const AVATAR_OPTIONS=avatarOptions();
 export function defaultAvatar(base='male'){
   if(!AVATAR_CATALOGS[base])throw Error('Base de avatar inválida.');
-  return {version:AVATAR_VERSION,base,skin:'#dcb28c',hair:base==='male'?'short':'bob',hairColor:'#242730',eyes:base==='male'?'calm':'almond',mouth:base==='male'?'neutral':'natural',outfit:'jacket',outfitColor:'#344750',accessory:'none'};
+  return {version:AVATAR_VERSION,base,skin:'#dcb28c',hair:base==='male'?'short':'bob',hairColor:'#242730',eyes:base==='male'?'calm':'almond',mouth:base==='male'?'neutral':'natural',outfit:'jacket',outfitColor:'#344750',accessory:'none',makeup:'none'};
 }
 export const DEFAULT_AVATAR=defaultAvatar();
 export function validateAvatar(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||value.version!==AVATAR_VERSION)throw Error('Versión de avatar inválida.');
   const result={version:AVATAR_VERSION};
   for(const [key,items] of Object.entries(avatarOptions(value.base))){
-    if(!items.some(([id])=>id===value[key]))throw Error('Elige una opción válida para '+key+'.');
-    result[key]=value[key];
+    const selected=key==='makeup'&&value[key]===undefined?'none':value[key];
+    if(!items.some(([id])=>id===selected))throw Error('Elige una opción válida para '+key+'.');
+    result[key]=selected;
   }
   return result;
 }
 export const cosmeticId=(base,slot,key)=>`${base}.${slot}.${key}`;
-export const COSMETICS=Object.entries(AVATAR_CATALOGS).flatMap(([base,slots])=>Object.entries(slots).flatMap(([slot,items])=>items.map(([key,name])=>({id:cosmeticId(base,slot,key),slot,key,name,starter:true,bases:[base],rig:`portrait-v2-${base}`}))));
+export const COSMETICS=Object.entries(AVATAR_CATALOGS).flatMap(([base,slots])=>Object.entries(slots).flatMap(([slot,items])=>items.map(([key,name])=>{const id=cosmeticId(base,slot,key),price=cosmeticPrices.get(id)||0;return {id,slot,key,name,price,rarity:name.includes('Legendario')||['f1','silk'].includes(key)?'legendary':price?'rare':'starter',starter:price===0,bases:[base],rig:`portrait-v2-${base}`};})));
 export function migrateAvatar(value){
   if(value.version===AVATAR_VERSION)return validateAvatar(value);
   if(value.version!==1)throw Error('Versión de avatar inválida.');
@@ -63,5 +73,5 @@ export function avatarLayers(value){
   return [layer('hair-'+a.hair+'-back',a.hairColor),layer('base-skin',a.skin),layer('base-lines'),
     layer('outfit-'+a.outfit+'-color',a.outfitColor),layer('outfit-'+a.outfit+'-lines'),
     layer('eyes-'+a.eyes),layer('mouth-'+a.mouth),layer('hair-'+a.hair+'-front',a.hairColor),layer('hair-'+a.hair+'-lines'),
-    ...(a.accessory==='none'?[]:[layer('accessory-'+a.accessory)])];
+    ...(a.accessory==='none'?[]:[layer('accessory-'+a.accessory)]),...(a.makeup==='none'?[]:[layer('makeup-'+a.makeup)])];
 }

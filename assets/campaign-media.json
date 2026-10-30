@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "stages": {
+    "kenji": {
+      "portrait": "/assets/campanias/1%20akina/Kenji/kenji%20profile.jpg",
+      "comics": [
+        "/assets/campanias/1%20akina/Kenji/comic.jpg"
+      ]
+    },
+    "iketani-akina": {
+      "portrait": "/assets/campanias/1%20akina/Iketani/iketani%20photo.jpg",
+      "comics": [
+        "/assets/campanias/1%20akina/Iketani/comic.jpg"
+      ]
+    },
+    "takumi-initial": {
+      "portrait": "/assets/campanias/1%20akina/Takumi/takumi-fujiwara-initial-d-first-stage-48.4_thumb.jpg",
+      "comics": [
+        "/assets/campanias/1%20akina/Takumi/comic.jpg"
+      ]
+    },
+    "kenta": {
+      "portrait": "/assets/campanias/2%20akagi/kenta/kenta%20photo.jpg",
+      "comics": [
+        "/assets/campanias/2%20akagi/kenta/comic.jpg"
+      ]
+    },
+    "keisuke-initial": {
+      "portrait": "/assets/campanias/2%20akagi/keisuke/keisuke%20photo.jpg",
+      "comics": [
+        "/assets/campanias/2%20akagi/keisuke/comic.jpg"
+      ]
+    },
+    "kyoichi": {
+      "portrait": "/assets/campanias/3%20Irohazaka/kyoichi/keyoichi%20photo.jpg",
+      "comics": [
+        "/assets/campanias/3%20Irohazaka/kyoichi/comic.jpg"
+      ]
+    },
+    "kai-campaign": {
+      "portrait": "/assets/campanias/3%20Irohazaka/Kai/kogashiwa%20photo.jpg",
+      "comics": [
+        "/assets/campanias/3%20Irohazaka/Kai/comic.jpg"
+      ]
+    },
+    "iketani-usui": {
+      "portrait": "/assets/campanias/4%20Usui/iketani/iketani%20photo.jpg",
+      "comics": [
+        "/assets/campanias/4%20Usui/iketani/comic.jpg"
+      ]
+    },
+    "mako-campaign": {
+      "portrait": "/assets/campanias/4%20Usui/mako_sayuki/mako-and-sayuki-artwork-from-arcade-stage-zero-v0-gmupaa4yotkb1.jpg",
+      "comics": [
+        "/assets/campanias/4%20Usui/mako_sayuki/comic.jpg"
+      ]
+    },
+    "godfoot": {
+      "portrait": "/assets/campanias/5%20Tsukuba/Kozo%20Hoshino/kozo%20photo.jpg",
+      "comics": [
+        "/assets/campanias/5%20Tsukuba/Kozo%20Hoshino/comic.jpg"
+      ]
+    },
+    "godhand-campaign": {
+      "portrait": "/assets/campanias/5%20Tsukuba/Toshiya%20Yoshima/toshiya.jpg",
+      "comics": [
+        "/assets/campanias/5%20Tsukuba/Toshiya%20Yoshima/comic.jpg"
+      ]
+    },
+    "shinji-campaign": {
+      "portrait": "/assets/campanias/6%20Tsubaki%20line/Shinji/shinji%20photo.jpg",
+      "comics": [
+        "/assets/campanias/6%20Tsubaki%20line/Shinji/comic.jpg"
+      ]
+    },
+    "takumi-project": {
+      "portrait": "/assets/campanias/6%20Tsubaki%20line/Takumi/takumi%20D%20photo.jpg",
+      "comics": [
+        "/assets/campanias/6%20Tsubaki%20line/Takumi/comic.jpg"
+      ]
+    },
+    "keisuke-project": {
+      "portrait": "/assets/campanias/6%20Tsubaki%20line/keisuke%20D/keisuke.jpg",
+      "comics": [
+        "/assets/campanias/6%20Tsubaki%20line/keisuke%20D/comic.jpg"
+      ]
+    },
+    "nozomi": {
+      "portrait": "/assets/campanias/7%20Odawara%20Pines%20Peak/nozomi/kitahara%20face.jpg",
+      "comics": [
+        "/assets/campanias/7%20Odawara%20Pines%20Peak/nozomi/Nozomi%20Kitahara_%20Duelo%20en%20la%20Monta%C3%B1a.jpg"
+      ]
+    },
+    "kakeru": {
+      "portrait": "/assets/campanias/7%20Odawara%20Pines%20Peak/kakeru/Screenshot%202026-10-30%20143353.png",
+      "comics": [
+        "/assets/campanias/7%20Odawara%20Pines%20Peak/kakeru/MFG%20Debut_%20High-Speed%20Mountain%20Duel.jpg"
+      ]
+    },
+    "jackson": {
+      "portrait": "/assets/campanias/7%20Odawara%20Pines%20Peak/jackson/jackson%20photo.jpg",
+      "comics": [
+        "/assets/campanias/7%20Odawara%20Pines%20Peak/jackson/Number%208_%20The%20Mountain%20Road%20Challenge.jpg"
+      ]
+    },
+    "sakamoto": {
+      "portrait": "/assets/campanias/8%20Lake%20ashinoko%20GT/sakamoto/sakamoto%20photo.jpg",
+      "comics": [
+        "/assets/campanias/8%20Lake%20ashinoko%20GT/sakamoto/comic.jpg"
+      ]
+    },
+    "maezono": {
+      "portrait": "/assets/campanias/8%20Lake%20ashinoko%20GT/maezono/Screenshot%202026-10-30%20143655.png",
+      "comics": [
+        "/assets/campanias/8%20Lake%20ashinoko%20GT/maezono/comic.jpg"
+      ]
+    },
+    "akaba": {
+      "portrait": "/assets/campanias/8%20Lake%20ashinoko%20GT/akaba/whats-preventing-akaba-from-reaching-the-levels-of-kanata-v0-0atg1x9r699e1.jpg",
+      "comics": [
+        "/assets/campanias/8%20Lake%20ashinoko%20GT/akaba/comic.jpg"
+      ]
+    },
+    "moroboshi": {
+      "portrait": "/assets/campanias/9%20Peninsula%20Manazuru/moroboshi/Screenshot%202026-10-30%20143808.png",
+      "comics": [
+        "/assets/campanias/9%20Peninsula%20Manazuru/moroboshi/Manga%20Mountain%20Race_%20Supra%20in%20Motion.jpg"
+      ]
+    },
+    "sawatari": {
+      "portrait": "/assets/campanias/9%20Peninsula%20Manazuru/sawatari/Screenshot%202026-10-30%20143840.png",
+      "comics": [
+        "/assets/campanias/9%20Peninsula%20Manazuru/sawatari/Alpine%20Rivalry_%20Mountain%20Circuit%20Showdown.jpg"
+      ]
+    },
+    "beckenbauer": {
+      "portrait": "/assets/campanias/9%20Peninsula%20Manazuru/beckenbauer/michael-beckenbauer-mf-ghost-75.6_thumb.jpg",
+      "comics": [
+        "/assets/campanias/9%20Peninsula%20Manazuru/beckenbauer/Racing%20Rivalry%20on%20the%20Mountain%20Road.jpg"
+      ]
+    },
+    "kanata-final": {
+      "portrait": "/assets/campanias/9%20Peninsula%20Manazuru/kanata/1f3b8efe1d2cc810b63663555de2229e42fa6e69-1168x655.jpg",
+      "comics": [
+        "/assets/campanias/9%20Peninsula%20Manazuru/kanata/Manga%20Racing%20Duel_%20Toyota%2086%20Revelation.jpg"
+      ]
+    }
+  }
+}

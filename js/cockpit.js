@@ -59,7 +59,7 @@ export class Cockpit {
     const dpr=Math.min(window.devicePixelRatio||1,1.5),w=canvas.clientWidth,h=canvas.clientHeight;
     if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
     const c=this.ctx,scale=Math.max(w/1280,h/900),W=w/scale,H=h/scale;c.setTransform(dpr*scale,0,0,dpr*scale,0,0);c.clearRect(0,0,W,H);
-    const cabin=CABINS[r.car.id],accent=cabin.accent,top=H*.66,cx=W*.61,gy=top+67,gr=Math.min(59,W*.055),wr=Math.min(W*.155,163),wy=H-52;
+    const cabin=CABINS[r.car.id]||{...(CABINS[r.car.mesh]||CABINS.rx7),name:r.car.name,badge:r.car.brand},accent=cabin.accent,top=H*.66,cx=W*.61,gy=top+67,gr=Math.min(59,W*.055),wr=Math.min(W*.155,163),wy=H-52;
     this.rotation=mix(this.rotation,-r.steer*2.1,1-Math.exp(-dt*17));if(r.gear!==this.lastGear){this.shift=1;this.lastGear=r.gear;}this.shift=Math.max(0,this.shift-dt*5);
     // Header, glass seal and perspective pillars. Windshield remains transparent.
     const roof=c.createLinearGradient(0,0,0,32);roof.addColorStop(0,'#111719');roof.addColorStop(1,'#29302b');box(c,0,0,W,20,roof);path(c,[[0,0],[24,0],[W*.09,top+35],[0,top+75]],cabin.trim,'#626a5e');path(c,[[W-24,0],[W,0],[W,top+75],[W*.94,top+25]],cabin.trim,'#626a5e');

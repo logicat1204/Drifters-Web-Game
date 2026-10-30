@@ -7,6 +7,7 @@ import {networkInterfaces} from 'node:os';
 import {attachOnline} from './server/online.mjs';
 import {Store} from './server/store.mjs';
 import {Accounts} from './server/accounts.mjs';
+import {publicOrigin} from './server/origin.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const songsRoot = path.join(root, 'songs');
@@ -14,7 +15,7 @@ export const store=new Store();
 export const accounts=new Accounts(store);
 let onlineService;
 const audio = new Set(['.mp3', '.ogg', '.wav', '.m4a', '.aac', '.flac', '.opus', '.webm']);
-const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg', '.webm': 'audio/webm', '.ico': 'image/x-icon' };
+const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg', '.webm': 'audio/webm', '.ico': 'image/x-icon' };
 async function listSongs(dir = songsRoot) {
   let entries;
   try { entries = await readdir(dir, { withFileTypes: true }); } catch { return []; }
@@ -39,7 +40,7 @@ export const server = http.createServer(async (req, res) => {
     if(pathname==='/api/online'){
       const port=server.address()?.port||4173,addresses=Object.values(networkInterfaces()).flat().filter(v=>v.family==='IPv4'&&!v.internal).map(v=>v.address);
       const lan=addresses.find(ip=>/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip));
-      let publicUrl=null;try{const u=new URL(process.env.PUBLIC_URL);if(['http:','https:'].includes(u.protocol)&&!u.username&&!u.password)publicUrl=u.origin;}catch{}
+      const publicUrl=publicOrigin();
       const json=JSON.stringify({online:true,maxPlayers:4,publicUrl,lanUrl:lan?`http://${lan}:${port}`:null});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(req.method==='HEAD'?undefined:json);return;
     }
     if (pathname === '/api/songs') {

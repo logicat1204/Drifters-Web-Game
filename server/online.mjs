@@ -1,7 +1,7 @@
 import {randomBytes,randomUUID} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {WebSocketServer,WebSocket} from 'ws';
-import {CARS,TRACKS,makeTrack,createRace,updateRace,repositionRace,clamp} from '../js/sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,makeTrack,createRace,updateRace,repositionRace,clamp} from '../js/sim.mjs';
 import {activateFocus} from '../js/focus.mjs';
 import {sameOrigin} from './accounts.mjs';
 
@@ -56,7 +56,7 @@ export class OnlineRooms {
         if(room.players.size<2)throw Error('Se necesitan al menos 2 jugadores.');if([...room.players.values()].some(v=>!v.ready))throw Error('Todos deben estar listos antes de iniciar.');
         room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.phase='racing';room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
         for(const other of room.players.values()){
-          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',night:room.config.night,wet:room.config.wet});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
+          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',night:room.config.night,wet:room.config.wet,...(this.store?this.store.loadout(other.userId):{})});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
         }
         this.publish(room);this.snapshot(room);return;
       }else if(data.type==='reposition'||data.type==='focus'){

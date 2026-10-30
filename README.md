@@ -55,7 +55,7 @@ $env:PUBLIC_URL='https://tu-dominio.example'
 npm start
 ```
 
-Al abrirlo por HTTPS, el cliente usa **wss://** automáticamente y el botón Copiar genera invitaciones con PUBLIC_URL. En HTTP local se usa **ws://**. Si no hay permiso para el portapapeles, Copiar selecciona el enlace e indica pulsar Ctrl+C. Los invitados necesitan llegar al mismo servidor: compartir solo un código entre servidores distintos no conecta sus salas. Las salas viven en memoria; reiniciar el servidor las cierra.
+En Render se detecta automáticamente la URL HTTPS del servicio; PUBLIC_URL solo es necesario para indicar un dominio propio o una dirección preferida. Al abrirlo por HTTPS, el cliente usa **wss://** automáticamente y el botón Copiar genera invitaciones con PUBLIC_URL. En HTTP local se usa **ws://**. Si no hay permiso para el portapapeles, Copiar selecciona el enlace e indica pulsar Ctrl+C. Los invitados necesitan llegar al mismo servidor: compartir solo un código entre servidores distintos no conecta sus salas. Las salas viven en memoria; reiniciar el servidor las cierra.
 
 Implementación WebSocket con [ws](https://github.com/websockets/ws), con límite de mensajes y tamaño, comprobación de origen, latidos y cierre de conexiones lentas. Los clientes no pueden enviar posiciones ni asignarse resultados; iniciar, configurar y abrir revancha se valida también en el servidor.
 
@@ -178,3 +178,10 @@ Las pruebas de recuperación comprueban ambos muros con los siete coches a disti
 Las pruebas de garaje verifican siete geometrías distintas y sus variantes online, giro real a igual velocidad, aceleración y punta entre los tres perfiles, y vueltas limpias de los siete coches en los siete cursos y en Irohazaka mojado. Se comprueba la admisión y la física de cada coche en el servidor; la prueba con cuatro WebSockets reales usa Supra, MR2, S2000 y Silvia.
 
 Estructura: `js/sim.mjs` contiene la simulación; `js/courses.mjs`, cursos y rivales; `js/scenery.mjs`, el corredor espacial; `js/renderer.js`, el motor WebGL; `js/cockpit.js`, las siete cabinas; `js/skill.mjs` y `js/effects.js`, valoración y efectos de curva; `js/focus.mjs`, carga y duración de Superconcentración; `js/game.js`, interfaz, audio y controles; `server.mjs`, el servidor HTTP y la exploración de canciones; `server/online.mjs`, las salas y simulación autoritativa; `js/online.js`, conexión, lobby e interpolación de jugadores.
+
+
+## Campaña, tienda y especialidades
+
+La campaña tiene 24 duelos en nueve capítulos, con los retratos y cómics de assets/campanias. Balance se desbloquea al vencer a Takumi en Akina, Time Master tras Keisuke en Akagi y Drift Master tras Kai en Irohazaka. La licencia permite elegir la especialidad. Las victorias verificadas dan monedas para comprar 18 autos nuevos y 30 cosméticos separados por base. Se conservan los siete autos anteriores.
+
+Consulta [la guía de campaña, tienda y superconcentración](docs/CAMPANIA-TIENDA-FOCUS.md) y [la solicitud registrada el 30 de octubre de 2026](logs_solicitudes/2026-10-30-campania-superconcentracion-tienda.md). La actualización migra la base a v3 conservando cuentas y datos.

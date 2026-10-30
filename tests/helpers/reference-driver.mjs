@@ -1,6 +1,6 @@
 import {CARS,makeTrack,createRace,updateRace,sample,steeringAngle,lateralGrip,clamp} from '../../js/sim.mjs';
 
-export function driverInput(r,{brake=true,attack=true,avoidRival=true,handbrake=false}={}){
+export function driverInput(r,{brake=true,attack=true,avoidRival=true,handbrake=false,line=undefined}={}){
   const v=r.speed,p=sample(r.track,r.s),base=lateralGrip(r.car,r.wet);
   let target=r.car.max;
   if(brake)for(let distance=0;distance<=210;distance+=10){
@@ -9,7 +9,7 @@ export function driverInput(r,{brake=true,attack=true,avoidRival=true,handbrake=
   }
   if(!attack)target=Math.min(target,48);
   const braking=brake&&v>target+.25,throttle=!braking&&v<target+.05;
-  const gap=r.rivalS-r.s,lane=avoidRival&&r.mode!=='time'&&gap>-15&&gap<80?(r.rivalLateral>=0?-2.65:2.65):0;
+  const gap=r.rivalS-r.s,lane=line??(avoidRival&&r.mode!=='time'&&gap>-15&&gap<80?(r.rivalLateral>=0?-2.65:2.65):0);
   const desiredTravel=clamp(-(r.lateral-lane)*.065,-.22,.22);
   const roadRate=p.curve*v*Math.cos(r.travelYaw)/clamp(1-p.curve*r.lateral,.65,1.35);
   const travelRate=roadRate+(desiredTravel-r.travelYaw)*3.3;

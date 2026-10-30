@@ -1,15 +1,21 @@
 import {cornerQuality} from './skill.mjs';
 
 export const FOCUS=Object.freeze({capacity:100,minimum:30,maxDuration:5,rechargeRate:6,cooldown:3,grip:1.22,topSpeed:1.06,acceleration:1.10});
-export function createFocus(){return {charge:0,remaining:0,duration:0,cooldown:0,activations:0};}
+export const FOCUS_TYPES={
+  balance:{id:'balance',name:'Balance',color:'#bd8cff',aura:'#9c6dff',grip:1.22,topSpeed:1.06,acceleration:1.10,braking:1.1,alignment:1.15,description:'Equilibrio: +22% de agarre, +10% de aceleración y +6% de punta.',unlock:'Vence a Takumi en Akina'},
+  drift:{id:'drift',name:'Drift Master',color:'#b0f3ff',aura:'#76daff',grip:1.52,topSpeed:1.02,acceleration:1.04,braking:1.1,alignment:1.30,description:'Alas celestes: +52% de agarre y mayor control de la trayectoria. +2% de punta.',unlock:'Vence a Kai Kogashiwa en Irohazaka'},
+  time:{id:'time',name:'Time Master',color:'#ffe57f',aura:'#569bff',grip:1.08,topSpeed:1.08,acceleration:1.65,braking:1.90,alignment:1.10,description:'Impulso amarillo y aura azul: +65% de aceleración, +90% de frenada y +8% de punta.',unlock:'Vence a Keisuke en Akagi'}
+};
+export const focusType=r=>FOCUS_TYPES[r.focus?.type]||FOCUS_TYPES.balance;
+export function createFocus(type='balance',enabled=true){return {type:FOCUS_TYPES[type]?type:'balance',enabled,charge:0,remaining:0,duration:0,cooldown:0,activations:0};}
 export function activateFocus(r){
   const f=r.focus;
-  if(!f||r.finished||r.countdown>0||r.resetHold>0||r.collision>0||r.wallTouch>0||f.remaining>0||f.cooldown>0||f.charge<FOCUS.minimum)return false;
+  if(!f||f.enabled===false||r.finished||r.countdown>0||r.resetHold>0||r.collision>0||r.wallTouch>0||f.remaining>0||f.cooldown>0||f.charge<FOCUS.minimum)return false;
   f.duration=FOCUS.maxDuration*Math.min(1,f.charge/FOCUS.capacity);f.remaining=f.duration;f.charge=0;f.activations++;return true;
 }
 export function cancelFocus(r){if(r.focus?.remaining>0){r.focus.remaining=0;r.focus.cooldown=FOCUS.cooldown;}}
 export function updateFocus(r,dt,curve,grip){
-  const f=r.focus;if(!f)return;
+  const f=r.focus;if(!f)return;if(f.enabled===false){f.charge=0;f.remaining=0;return;}
   if(r.collision>0||r.resetHold>0){cancelFocus(r);return;}
   if(f.remaining>0){f.remaining=Math.max(0,f.remaining-dt);if(f.remaining===0)f.cooldown=FOCUS.cooldown;return;}
   if(f.cooldown>0){f.cooldown=Math.max(0,f.cooldown-dt);return;}

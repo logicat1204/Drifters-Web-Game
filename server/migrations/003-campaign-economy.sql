@@ -1,0 +1,12 @@
+ALTER TABLE profiles ADD COLUMN focus_type TEXT NOT NULL DEFAULT 'balance';
+ALTER TABLE runs ADD COLUMN campaign_level TEXT;
+ALTER TABLE runs ADD COLUMN focus_type TEXT NOT NULL DEFAULT 'balance';
+ALTER TABLE runs ADD COLUMN focus_enabled INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE wallets(user_id TEXT PRIMARY KEY REFERENCES users(id),balance INTEGER NOT NULL DEFAULT 0 CHECK(balance>=0));
+CREATE TABLE owned_cars(user_id TEXT NOT NULL REFERENCES users(id),car_id TEXT NOT NULL,acquired_at INTEGER NOT NULL,PRIMARY KEY(user_id,car_id));
+CREATE TABLE campaign_progress(user_id TEXT NOT NULL REFERENCES users(id),level_id TEXT NOT NULL,best_time REAL NOT NULL,best_points INTEGER NOT NULL,reward_coins INTEGER NOT NULL,cleared_at INTEGER NOT NULL,PRIMARY KEY(user_id,level_id));
+CREATE TABLE economy_ledger(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),delta INTEGER NOT NULL,reason TEXT NOT NULL,run_id TEXT,created_at INTEGER NOT NULL);
+CREATE INDEX economy_user ON economy_ledger(user_id,created_at);
+INSERT INTO wallets(user_id) SELECT id FROM users;
+UPDATE profiles SET avatar=json_set(avatar,'$.makeup','none'),photo_version=photo_version+1 WHERE json_extract(avatar,'$.makeup') IS NULL;
+PRAGMA user_version=3;

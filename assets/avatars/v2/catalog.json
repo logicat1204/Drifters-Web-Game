@@ -54,6 +54,8 @@
       "slot": "hair",
       "key": "short",
       "name": "Corto",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -65,6 +67,8 @@
       "slot": "hair",
       "key": "spiked",
       "name": "Puntas",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -76,6 +80,8 @@
       "slot": "hair",
       "key": "swept",
       "name": "Flequillo recto",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -87,7 +93,48 @@
       "slot": "hair",
       "key": "long",
       "name": "Largo",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.undercut",
+      "slot": "hair",
+      "key": "undercut",
+      "name": "Degradado de piloto",
+      "price": 280,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.racer-cap",
+      "slot": "hair",
+      "key": "racer-cap",
+      "name": "Gorra de piloto",
+      "price": 400,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.hair.braids",
+      "slot": "hair",
+      "key": "braids",
+      "name": "Trenzas recogidas",
+      "price": 450,
+      "rarity": "rare",
+      "starter": false,
       "bases": [
         "male"
       ],
@@ -98,6 +145,8 @@
       "slot": "eyes",
       "key": "calm",
       "name": "Serenos",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -109,6 +158,8 @@
       "slot": "eyes",
       "key": "sharp",
       "name": "Intensos",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -120,7 +171,35 @@
       "slot": "eyes",
       "key": "round",
       "name": "Abiertos",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.eyes.focused",
+      "slot": "eyes",
+      "key": "focused",
+      "name": "Concentrados",
+      "price": 220,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.eyes.bright",
+      "slot": "eyes",
+      "key": "bright",
+      "name": "Mirada cristalina",
+      "price": 300,
+      "rarity": "rare",
+      "starter": false,
       "bases": [
         "male"
       ],
@@ -131,6 +210,8 @@
       "slot": "mouth",
       "key": "neutral",
       "name": "Natural",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -142,6 +223,8 @@
       "slot": "mouth",
       "key": "smile",
       "name": "Sonrisa",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -153,6 +236,8 @@
       "slot": "mouth",
       "key": "full",
       "name": "Labios definidos",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -164,6 +249,8 @@
       "slot": "outfit",
       "key": "shirt",
       "name": "Camiseta recta",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -175,6 +262,8 @@
       "slot": "outfit",
       "key": "jacket",
       "name": "Chaqueta de piloto",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -186,7 +275,61 @@
       "slot": "outfit",
       "key": "hoodie",
       "name": "Chompa amplia",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.racer",
+      "slot": "outfit",
+      "key": "racer",
+      "name": "Mono de piloto",
+      "price": 420,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.f1",
+      "slot": "outfit",
+      "key": "f1",
+      "name": "Mono de fórmula",
+      "price": 900,
+      "rarity": "legendary",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.rally",
+      "slot": "outfit",
+      "key": "rally",
+      "name": "Chaqueta de rally",
+      "price": 650,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.champion",
+      "slot": "outfit",
+      "key": "champion",
+      "name": "Piloto nocturno · Legendario",
+      "price": 1200,
+      "rarity": "legendary",
+      "starter": false,
       "bases": [
         "male"
       ],
@@ -197,6 +340,8 @@
       "slot": "accessory",
       "key": "none",
       "name": "Sin accesorio",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -208,6 +353,8 @@
       "slot": "accessory",
       "key": "glasses",
       "name": "Gafas rectangulares",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -219,6 +366,8 @@
       "slot": "accessory",
       "key": "stud",
       "name": "Pendiente metálico",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "male"
@@ -230,7 +379,74 @@
       "slot": "accessory",
       "key": "cap",
       "name": "Gorra",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.glasses-blue",
+      "slot": "accessory",
+      "key": "glasses-blue",
+      "name": "Gafas azules",
+      "price": 140,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.glasses-red",
+      "slot": "accessory",
+      "key": "glasses-red",
+      "name": "Gafas rojas",
+      "price": 140,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.accessory.glasses-gold",
+      "slot": "accessory",
+      "key": "glasses-gold",
+      "name": "Gafas doradas",
+      "price": 220,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.makeup.none",
+      "slot": "makeup",
+      "key": "none",
+      "name": "Sin maquillaje",
+      "price": 0,
+      "rarity": "starter",
+      "starter": true,
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.makeup.warpaint",
+      "slot": "makeup",
+      "key": "warpaint",
+      "name": "Marcas de equipo",
+      "price": 180,
+      "rarity": "rare",
+      "starter": false,
       "bases": [
         "male"
       ],
@@ -241,6 +457,8 @@
       "slot": "hair",
       "key": "bob",
       "name": "Media melena",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -252,6 +470,8 @@
       "slot": "hair",
       "key": "long",
       "name": "Largo en capas",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -263,6 +483,8 @@
       "slot": "hair",
       "key": "ponytail",
       "name": "Cola alta",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -274,7 +496,61 @@
       "slot": "hair",
       "key": "wavy",
       "name": "Ondulado",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.pixie",
+      "slot": "hair",
+      "key": "pixie",
+      "name": "Corto asimétrico",
+      "price": 280,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.racer-cap",
+      "slot": "hair",
+      "key": "racer-cap",
+      "name": "Gorra de piloto",
+      "price": 400,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.twinbun",
+      "slot": "hair",
+      "key": "twinbun",
+      "name": "Moños dobles",
+      "price": 450,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.hair.silk",
+      "slot": "hair",
+      "key": "silk",
+      "name": "Largo de seda · Legendario",
+      "price": 700,
+      "rarity": "legendary",
+      "starter": false,
       "bases": [
         "female"
       ],
@@ -285,6 +561,8 @@
       "slot": "eyes",
       "key": "almond",
       "name": "Almendrados",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -296,6 +574,8 @@
       "slot": "eyes",
       "key": "defined",
       "name": "Mirada intensa",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -307,7 +587,35 @@
       "slot": "eyes",
       "key": "soft",
       "name": "Mirada abierta",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.eyes.cat",
+      "slot": "eyes",
+      "key": "cat",
+      "name": "Mirada felina",
+      "price": 240,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.eyes.starlight",
+      "slot": "eyes",
+      "key": "starlight",
+      "name": "Destellos",
+      "price": 320,
+      "rarity": "rare",
+      "starter": false,
       "bases": [
         "female"
       ],
@@ -318,6 +626,8 @@
       "slot": "mouth",
       "key": "natural",
       "name": "Natural",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -329,6 +639,8 @@
       "slot": "mouth",
       "key": "smile",
       "name": "Sonrisa suave",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -340,6 +652,8 @@
       "slot": "mouth",
       "key": "defined",
       "name": "Labios definidos",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -351,6 +665,8 @@
       "slot": "outfit",
       "key": "shirt",
       "name": "Camiseta entallada",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -362,6 +678,8 @@
       "slot": "outfit",
       "key": "jacket",
       "name": "Cazadora corta",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -373,7 +691,74 @@
       "slot": "outfit",
       "key": "hoodie",
       "name": "Chompa con cordones",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.racer",
+      "slot": "outfit",
+      "key": "racer",
+      "name": "Mono de piloto",
+      "price": 420,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.dress",
+      "slot": "outfit",
+      "key": "dress",
+      "name": "Vestido de noche",
+      "price": 650,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.sundress",
+      "slot": "outfit",
+      "key": "sundress",
+      "name": "Vestido de verano",
+      "price": 450,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.bikini",
+      "slot": "outfit",
+      "key": "bikini",
+      "name": "Bikini deportivo",
+      "price": 400,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.sapphire",
+      "slot": "outfit",
+      "key": "sapphire",
+      "name": "Vestido zafiro · Legendario",
+      "price": 1200,
+      "rarity": "legendary",
+      "starter": false,
       "bases": [
         "female"
       ],
@@ -384,6 +769,8 @@
       "slot": "accessory",
       "key": "none",
       "name": "Sin accesorio",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -395,6 +782,8 @@
       "slot": "accessory",
       "key": "glasses",
       "name": "Gafas redondeadas",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -406,6 +795,8 @@
       "slot": "accessory",
       "key": "earrings",
       "name": "Aros dorados",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
       "bases": [
         "female"
@@ -417,7 +808,100 @@
       "slot": "accessory",
       "key": "headband",
       "name": "Diadema",
+      "price": 0,
+      "rarity": "starter",
       "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.glasses-blue",
+      "slot": "accessory",
+      "key": "glasses-blue",
+      "name": "Gafas celestes",
+      "price": 140,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.glasses-red",
+      "slot": "accessory",
+      "key": "glasses-red",
+      "name": "Gafas rosas",
+      "price": 140,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.accessory.glasses-gold",
+      "slot": "accessory",
+      "key": "glasses-gold",
+      "name": "Gafas doradas",
+      "price": 220,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.makeup.none",
+      "slot": "makeup",
+      "key": "none",
+      "name": "Sin maquillaje",
+      "price": 0,
+      "rarity": "starter",
+      "starter": true,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.makeup.blush",
+      "slot": "makeup",
+      "key": "blush",
+      "name": "Rubor suave",
+      "price": 160,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.makeup.eyeliner",
+      "slot": "makeup",
+      "key": "eyeliner",
+      "name": "Delineado",
+      "price": 220,
+      "rarity": "rare",
+      "starter": false,
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.makeup.gloss",
+      "slot": "makeup",
+      "key": "gloss",
+      "name": "Brillo de labios",
+      "price": 200,
+      "rarity": "rare",
+      "starter": false,
       "bases": [
         "female"
       ],
@@ -478,6 +962,18 @@
         [
           "long",
           "Largo"
+        ],
+        [
+          "undercut",
+          "Degradado de piloto"
+        ],
+        [
+          "racer-cap",
+          "Gorra de piloto"
+        ],
+        [
+          "braids",
+          "Trenzas recogidas"
         ]
       ],
       "hairColor": [
@@ -514,6 +1010,14 @@
         [
           "round",
           "Abiertos"
+        ],
+        [
+          "focused",
+          "Concentrados"
+        ],
+        [
+          "bright",
+          "Mirada cristalina"
         ]
       ],
       "mouth": [
@@ -542,6 +1046,22 @@
         [
           "hoodie",
           "Chompa amplia"
+        ],
+        [
+          "racer",
+          "Mono de piloto"
+        ],
+        [
+          "f1",
+          "Mono de fórmula"
+        ],
+        [
+          "rally",
+          "Chaqueta de rally"
+        ],
+        [
+          "champion",
+          "Piloto nocturno · Legendario"
         ]
       ],
       "outfitColor": [
@@ -582,6 +1102,28 @@
         [
           "cap",
           "Gorra"
+        ],
+        [
+          "glasses-blue",
+          "Gafas azules"
+        ],
+        [
+          "glasses-red",
+          "Gafas rojas"
+        ],
+        [
+          "glasses-gold",
+          "Gafas doradas"
+        ]
+      ],
+      "makeup": [
+        [
+          "none",
+          "Sin maquillaje"
+        ],
+        [
+          "warpaint",
+          "Marcas de equipo"
         ]
       ]
     },
@@ -638,6 +1180,22 @@
         [
           "wavy",
           "Ondulado"
+        ],
+        [
+          "pixie",
+          "Corto asimétrico"
+        ],
+        [
+          "racer-cap",
+          "Gorra de piloto"
+        ],
+        [
+          "twinbun",
+          "Moños dobles"
+        ],
+        [
+          "silk",
+          "Largo de seda · Legendario"
         ]
       ],
       "hairColor": [
@@ -674,6 +1232,14 @@
         [
           "soft",
           "Mirada abierta"
+        ],
+        [
+          "cat",
+          "Mirada felina"
+        ],
+        [
+          "starlight",
+          "Destellos"
         ]
       ],
       "mouth": [
@@ -702,6 +1268,26 @@
         [
           "hoodie",
           "Chompa con cordones"
+        ],
+        [
+          "racer",
+          "Mono de piloto"
+        ],
+        [
+          "dress",
+          "Vestido de noche"
+        ],
+        [
+          "sundress",
+          "Vestido de verano"
+        ],
+        [
+          "bikini",
+          "Bikini deportivo"
+        ],
+        [
+          "sapphire",
+          "Vestido zafiro · Legendario"
         ]
       ],
       "outfitColor": [
@@ -742,6 +1328,36 @@
         [
           "headband",
           "Diadema"
+        ],
+        [
+          "glasses-blue",
+          "Gafas celestes"
+        ],
+        [
+          "glasses-red",
+          "Gafas rosas"
+        ],
+        [
+          "glasses-gold",
+          "Gafas doradas"
+        ]
+      ],
+      "makeup": [
+        [
+          "none",
+          "Sin maquillaje"
+        ],
+        [
+          "blush",
+          "Rubor suave"
+        ],
+        [
+          "eyeliner",
+          "Delineado"
+        ],
+        [
+          "gloss",
+          "Brillo de labios"
         ]
       ]
     }

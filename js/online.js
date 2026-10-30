@@ -1,4 +1,4 @@
-import {CARS,TRACKS,createRace,updateRace,clamp,mix} from './sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix} from './sim.mjs';
 const $=id=>document.getElementById(id);
 export function roomCode(value){try{const url=new URL(value,location.origin);const code=url.searchParams.get('room')||value.trim();return /^[A-F\d]{8}$/i.test(code)?code.toUpperCase():null;}catch{return null;}}
 export class OnlineClient {

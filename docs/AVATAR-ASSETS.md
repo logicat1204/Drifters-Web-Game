@@ -9,7 +9,7 @@ La versión actual es **2**. Hay dos rigs: **portrait-v2-male** y **portrait-v2-
 - Hombre: mandíbula más ancha, cuello grueso, hombros amplios y ropa de corte recto. Cabellos corto, en puntas, flequillo recto y largo; ojos serenos/intensos/abiertos; gafas rectangulares, pendiente y gorra.
 - Mujer: rostro ovalado y barbilla afinada, cuello estrecho, hombros inclinados y ropa con una silueta propia. Media melena, largo en capas, cola alta y ondulado; ojos almendrados/intensos/abiertos; gafas redondeadas, aros y diadema. Camiseta, cazadora y chompa están redibujadas para esta base.
 
-Se generan **58 capas PNG y sus 58 fuentes SVG**, en `assets/avatars/v2/layers/{male,female}/` y `sources/{male,female}/`. `base-male.png` y `base-female.png` son retratos completos de muestra. Cada base editable tiene `base-skin.png` y `base-lines.png`. Los archivos v1 se conservan como material histórico; el editor y los retratos usan exclusivamente v2.
+Se generan **111 capas PNG y sus 111 fuentes SVG**, en `assets/avatars/v2/layers/{male,female}/` y `sources/{male,female}/`. `base-male.png` y `base-female.png` son retratos completos de muestra. Cada base editable tiene `base-skin.png` y `base-lines.png`. Los archivos v1 se conservan como material histórico; el editor y los retratos usan exclusivamente v2.
 
 Los anclajes se documentan en `catalog.json`:
 
@@ -102,3 +102,8 @@ Si se generan futuras ilustraciones con IA, usar como guía la plantilla especí
 SQLite mantiene `cosmetics(id,slot,rig)` e `inventory(user_id,item_id,acquired_at)`. Los IDs incluyen la base: `female.hair.ponytail`, `male.accessory.cap`. Una futura compra debe descontar saldo y conceder el artículo en una misma transacción. Una compra de una base no debe desbloquear automáticamente la versión de la otra.
 
 Los puntos de conducción actuales son estadísticas verificadas, **no saldo gastable**. No hay compras ni artículos de pago en esta versión. Las fotos no forman parte del catálogo y no se guardan en Git.
+
+
+## Actualización: campaña, colección y especialidades
+
+El sistema actual incluye 24 duelos, tres especialidades desbloqueables, monedas verificadas y tienda. El esquema SQLite actual es v3 y el avatar v2 admite maquillaje opcional. Hay 111 capas por piezas en dos rigs, y los artículos de tienda solo se equipan al poseerlos. Consulta [Campaña, tienda y superconcentración](CAMPANIA-TIENDA-FOCUS.md) para las reglas actuales y la migración.

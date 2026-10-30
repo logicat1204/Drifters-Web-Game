@@ -61,9 +61,9 @@ test('database v1 migration preserves profiles, photos, sessions and records and
     store.db.prepare('UPDATE profiles SET avatar=? WHERE user_id=?').run(JSON.stringify(legacy),user.id);
     store.db.prepare('DELETE FROM inventory WHERE user_id=?').run(user.id);
     store.db.exec("INSERT INTO cosmetics VALUES('hair.spiked','hair','portrait-v1'); PRAGMA user_version=1;");store.db.prepare('INSERT INTO inventory VALUES(?,?,?)').run(user.id,'hair.spiked',1);
-    const oldVersion=store.user(user.id).photoVersion;store.close();store=new Store(filename);
+    store.db.exec('DROP TABLE economy_ledger; DROP TABLE campaign_progress; DROP TABLE owned_cars; DROP TABLE wallets; ALTER TABLE profiles DROP COLUMN focus_type; ALTER TABLE runs DROP COLUMN campaign_level; ALTER TABLE runs DROP COLUMN focus_type; ALTER TABLE runs DROP COLUMN focus_enabled;');const oldVersion=store.db.prepare('SELECT photo_version FROM profiles WHERE user_id=?').get(user.id).photo_version;store.close();store=new Store(filename);
     const restored=store.user(user.id);assert.deepEqual(restored.avatar,migrateAvatar(legacy));assert.equal(restored.displayName,'Piloto anterior');assert.equal(restored.defaultCar,'supra');assert.equal(restored.onboarded,true);assert.equal(restored.photoVersion,oldVersion+1);assert.equal(store.session(session.token).user.id,user.id);assert.deepEqual(store.portrait(user.id).bytes,Buffer.from([3,2,1]));assert.equal(store.records()[0].time,145);
-    const count=store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n;assert.equal(count,COSMETICS.length+1);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,2);
+    const count=store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n;assert.equal(count,COSMETICS.filter(item=>item.starter).length+1);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,3);
     store.close();store=new Store(filename);assert.equal(store.user(user.id).photoVersion,oldVersion+1);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n,count);
     store.updateProfile(user.id,{portraitMode:'avatar'});assert.equal(store.portrait(user.id).mime,'image/svg+xml');
   }finally{store.close();await rm(folder,{recursive:true,force:true});}
@@ -78,6 +78,7 @@ function recordedLap(options={}){const r=createRace(CARS[0],makeTrack(TRACKS[3])
 }
 test('solo results are derived from a real replay with gears, lamps, focus and recovery, never from submitted times',async()=>{
   let now=0;const store=new Store(':memory:');try{const user=complete(store,await store.register('Replay24','night-pass-24')),runs=new Runs(store,{now:()=>now});
+    store.db.prepare('INSERT INTO campaign_progress VALUES(?,?,?,?,?,?)').run(user.id,'takumi-initial',160,1000,0,0);
     for(const manual of [false,true]){const attempt=runs.start(user.id,{car:'ae86',track:'usui',mode:'time',difficulty:'normal',manual}),{r,recorder}=recordedLap({manual});assert.ok(r.won);now+=300000;const saved=await runs.submit(user.id,attempt.id,recorder.frames);assert.equal(saved.time,r.elapsed);assert.equal(saved.points,Math.floor(r.skill.points));assert.equal(saved.completed,true);assert.equal((await runs.submit(user.id,attempt.id,[])).id,saved.id);}
     assert.equal(store.stats(user.id).races,2);assert.equal(store.personal(user.id).records.length,2);
     const invalid=runs.start(user.id,{car:'ae86',track:'usui',mode:'time',difficulty:'normal'});await assert.rejects(runs.submit(user.id,invalid.id,[[999999,0,1,1,0]]),/inválido|larga/);await assert.rejects(runs.submit(user.id,invalid.id,[[1,0,1,1,0]]),/no terminó/);await assert.rejects(runs.submit('another-user',invalid.id,[]),/pertenece/);

@@ -1,10 +1,13 @@
 import { COURSE_LAYOUTS, TRACKS, RIVALS } from './courses.mjs';
 import {createSkillState,updateCornerSkill} from './skill.mjs';
-import {FOCUS,createFocus,cancelFocus,updateFocus} from './focus.mjs';
+import {FOCUS,focusType,createFocus,cancelFocus,updateFocus} from './focus.mjs';
+import {EXTRA_CARS} from './vehicles.mjs';
+import {CAMPAIGN_TRACKS,DRIVER_STYLES} from './campaign.mjs';
 export { TRACKS, RIVALS };
+export const ALL_TRACKS=[...TRACKS,...CAMPAIGN_TRACKS];
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export const mix = (a, b, t) => a + (b - a) * t;
-export const HANDLING_VERSION='v5';
+export const HANDLING_VERSION='v6';
 export function steeringAngle(speed){return .5/(1+Math.max(0,speed)*.045);}
 export function lateralGrip(car,wet=false){return 18*car.grip*(wet?.75:1);}
 export function cornerSpeed(car,curve,wet=false){return Math.sqrt(lateralGrip(car,wet)/Math.max(.00001,Math.abs(curve)));}
@@ -30,9 +33,10 @@ export const CARS = [
   { id:'silvia',name:"SILVIA K’S",code:'S13',brand:'NISSAN',year:'1989',drive:'FR',power:'175',weight:'1120',color:'#6e9796',accel:15.0,max:67,grip:1.11,profile:'balanced',label:'Control y respuesta turbo' },
   { id:'supra',name:'SUPRA RZ',code:'JZA80',brand:'TOYOTA',year:'1993',drive:'FR',power:'280',weight:'1490',color:'#bdc4c8',accel:16.4,max:73,grip:1.02,profile:'power',label:'El empuje del biturbo' }
 ].map(car=>({...car,stats:[Math.round(car.accel/17*100),Math.round(car.grip/1.20*100),Math.round(car.max/75*100)]}));
+export const ALL_CARS=[...CARS,...EXTRA_CARS];
 export function makeTrack(config) {
   const step = 8, points = [];
-  const recipe=COURSE_LAYOUTS[config.id],total=recipe.reduce((sum,p)=>sum+p[0],0);
+  const recipe=config.layout||COURSE_LAYOUTS[config.id],total=recipe.reduce((sum,p)=>sum+p[0],0);
   let cursor=0;const sectors=recipe.map(([weight,degrees])=>{const start=cursor,length=weight/total*config.length;cursor+=length;return {start,end:cursor,length,radians:degrees*Math.PI/180};});
   let x = 0, z = 0, heading = 0;
   for (let i = 0; i <= Math.ceil(config.length / step) + 80; i++) {
@@ -60,18 +64,20 @@ export function worldAt(track, s, lateral = 0) {
   return p;
 }
 export function createRace(car, track, opts = {}) {
-  const mode=opts.mode||'battle',rival=RIVALS[track.rival];
-  return { car, track, rival, s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, difficulty: opts.difficulty || 'normal' };
+  const mode=opts.mode||'battle',rival=opts.rival||RIVALS[track.rival];
+  return { car, track, rival, campaignStage:opts.campaignStage||null,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, difficulty: opts.difficulty || 'normal' };
 }
 export function rivalCar(rival){
-  const base=CARS.find(c=>c.id===rival.car)||CARS[0];
+  const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0];
+  if(rival.level){const style=DRIVER_STYLES[rival.style];return {...base,...style,id:rival.car,color:rival.color};}
   // Rivals keep their calibrated setups independently of the playable garage.
   const tune={ae86:{max:62,accel:13.8,grip:1.08},rx7:{max:68,accel:15.3,grip:1.12},mr2:{max:62,accel:14,grip:1.09},sileighty:{max:62,accel:13.8,grip:1.08},s2000:{max:64,accel:14.1,grip:1.12},ae86coupe:{max:62,accel:13.8,grip:1.09},gt86:{max:64,accel:14.3,grip:1.12}}[rival.car]||{};
   return {...base,...tune,id:rival.car,color:rival.color};
 }
 export function rivalDriverInput(r,o,dt){
   const level=r.difficulty,tune={keisuke:.85,godhand:.87,kanata:.91}[r.rival.id]??.92,baseGrip=r.rival.id==='keisuke'?.61:.67;
-  const gripUse=baseGrip+(level==='easy'?-.09:level==='hard'?.12:0),maxUse=clamp(tune+(level==='easy'?-.07:level==='hard'?.075:0),.7,1);
+  const campaignLevel=r.rival.level;
+  const gripUse=campaignLevel?[0,.43,.48,.56,.65,.71][campaignLevel]:baseGrip+(level==='easy'?-.09:level==='hard'?.12:0),maxUse=campaignLevel?[0,.68,.74,.84,.92,.96][campaignLevel]:clamp(tune+(level==='easy'?-.07:level==='hard'?.075:0),.7,1);
   const grip=lateralGrip(o.car,o.wet),p=sample(o.track,o.s),v=o.speed;
   let target=o.car.max*maxUse;
   for(let ahead=0;ahead<=210;ahead+=10){const c=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*gripUse/Math.max(.0001,c));target=Math.min(target,Math.sqrt(safe*safe+2*13* ahead));}
@@ -93,14 +99,14 @@ export function updateRace(r, input, dt) {
   const resetHeld=r.resetHold>0;r.resetHold=Math.max(0,r.resetHold-dt);r.resetCooldown=Math.max(0,r.resetCooldown-dt);
   if(resetHeld)input={steer:0,throttle:false,brake:true,handbrake:false};
   r.wallSlow=Math.max(0,r.wallSlow-dt);r.wallTouch=Math.max(0,r.wallTouch-dt);if(r.wallTouch===0)r.wallContact=0;
-  const concentrating=r.focus.remaining>0&&r.collision===0,maxSpeed=r.car.max*(concentrating?FOCUS.topSpeed:1);
+  const concentrating=r.focus.remaining>0&&r.focus.enabled!==false&&r.collision===0,power=focusType(r),maxSpeed=r.car.max*(concentrating?power.topSpeed:1);
   const p = sample(r.track, r.s), speed = r.speed;
   // The +Z camera sees world +X on its left; positive player input is screen-right.
   const targetSteer = -clamp(input.steer || 0, -1, 1);
   r.steer = mix(r.steer, targetSteer, 1 - Math.exp(-dt * 16));
   const handbrake=!!input.handbrake&&speed>8,braking=!!input.brake;
   r.braking=braking;
-  const baseGrip=lateralGrip(r.car,r.wet),grip=baseGrip*(concentrating?FOCUS.grip:1),wheelbase=r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4;
+  const baseGrip=lateralGrip(r.car,r.wet),grip=baseGrip*(concentrating?power.grip:1),wheelbase=r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4;
   const brakeInitiation=braking&&Math.abs(r.steer)>.32&&speed>16;
   if(handbrake&&!r.handbrakeDown&&Math.abs(targetSteer)>.15){r.driftAssist=1;r.yawRate+=Math.sign(targetSteer)*1.1;}
   if(handbrake&&Math.abs(r.steer)>.15)r.driftAssist=1;
@@ -114,7 +120,7 @@ export function updateRace(r, input, dt) {
   const yawBudget=budget/Math.max(6,speed)*(1+r.driftAssist*.75);
   const bodyRate=clamp(requestedRate,-yawBudget,yawBudget);
   r.yawRate=mix(r.yawRate,bodyRate,1-Math.exp(-dt*(r.driftAssist>0?12:10)));
-  const alignment=(handbrake?2.7:brakeInitiation?6.2:9.5)*(1-r.driftAssist*.28)*(concentrating?1.15:1);
+  const alignment=(handbrake?2.7:brakeInitiation?6.2:9.5)*(1-r.driftAssist*.28)*(concentrating?power.alignment:1);
   const travelRate=clamp((r.yaw-r.travelYaw)*alignment,-budget/Math.max(6,speed),budget/Math.max(6,speed));
   const progressRate=speed*Math.cos(r.travelYaw)/clamp(1-p.curve*r.lateral,.65,1.35);
   const roadRate=p.curve*Math.max(0,progressRate);
@@ -132,9 +138,9 @@ export function updateRace(r, input, dt) {
   r.lateral+=r.lateralV*dt;
   const gearMax = [0, 20, 33, 44, 55, maxSpeed];
   if (!r.manual) { while (r.gear < 5 && speed > gearMax[r.gear] * .91) r.gear++; while (r.gear > 1 && speed < gearMax[r.gear - 1] * .72) r.gear--; }
-  const accel = r.car.accel * Math.max(.15, 1 - speed / (maxSpeed * 1.13))*(concentrating?FOCUS.acceleration:1);
+  const accel = r.car.accel * Math.max(.15, 1 - speed / (maxSpeed * 1.13))*(concentrating?power.acceleration:1);
   const overrev = r.manual && speed > gearMax[r.gear] ? 0 : 1;
-  r.speed += ((input.throttle&&!braking ? accel * overrev : -1.05) - (braking ? 19 : 0) - (handbrake ? 13 : 0) - .00048 * speed * speed - r.understeer*3.2 - Math.abs(r.slipAngle)*speed*.10 - r.drift*1.2) * dt;
+  r.speed += ((input.throttle&&!braking ? accel * overrev : -1.05) - (braking ? 19*(concentrating?power.braking:1) : 0) - (handbrake ? 13 : 0) - .00048 * speed * speed - r.understeer*3.2 - Math.abs(r.slipAngle)*speed*.10 - r.drift*1.2) * dt;
   if (Math.abs(r.lateral) > 4.1) r.speed -= dt * 5;
   const wallSide=Math.sign(r.lateral),scraping=r.wallTouch>0&&r.wallContact===wallSide&&Math.abs(r.lateral)>4.45&&wallSide*(r.travelYaw+r.yaw)>0;
   if (Math.abs(r.lateral)>=4.65 || scraping) {
@@ -161,7 +167,7 @@ export function updateRace(r, input, dt) {
   updateFocus(r,dt,p.curve,baseGrip);
   r.blindAward=Math.max(0,r.blindAward-dt);
   if(r.mode!=='time'){
-    if(!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
+    if(!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
     const previousGap=r.rivalS-r.s;
     updateRace(r.opponent,rivalDriverInput(r,r.opponent,dt),dt);
     const o=r.opponent;r.rivalS=o.s;r.rivalSpeed=o.speed;r.rivalLateral=o.lateral;r.rivalYaw=o.yaw;r.rivalBraking=o.braking;r.rivalSteer=o.steer;r.rivalFinished=o.finished;

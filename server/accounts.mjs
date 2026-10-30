@@ -2,6 +2,13 @@ import {timingSafeEqual} from 'node:crypto';
 import {AVATAR_VERSION,avatarOptions,defaultAvatar,COSMETICS} from '../js/avatar.mjs';
 import {avatarSvg} from './store.mjs';
 import {Runs} from './runs.mjs';
+import {readFileSync} from 'node:fs';
+import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES} from '../js/campaign.mjs';
+import {ALL_CARS} from '../js/sim.mjs';
+import {FOCUS_TYPES} from '../js/focus.mjs';
+const campaignMedia=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',import.meta.url),'utf8'));
+import {sameOrigin,secureSession} from './origin.mjs';
+export {sameOrigin} from './origin.mjs';
 export const fail=(message,status=400)=>Object.assign(Error(message),{status});
 export async function jsonBody(req,max=12000){
   if(!String(req.headers['content-type']||'').startsWith('application/json'))throw fail('Se requiere JSON.',415);
@@ -10,7 +17,6 @@ export async function jsonBody(req,max=12000){
 }
 export const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 function sessionToken(req){const cookies=String(req.headers.cookie||'').split(';').map(v=>v.trim());return cookies.find(v=>v.startsWith('touge_session='))?.slice(14);}
-export function sameOrigin(req){if(!req.headers.origin)return true;try{const origin=new URL(req.headers.origin);if(process.env.PUBLIC_URL)return origin.origin===new URL(process.env.PUBLIC_URL).origin;return origin.host===req.headers.host&&origin.protocol===(req.socket.encrypted?'https:':'http:');}catch{return false;}}
 function safeEqual(a,b){return typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));}
 function validPhoto(bytes,type){
   let width=0,height=0;
@@ -24,7 +30,7 @@ export class Accounts {
   session(req){return this.store.session(sessionToken(req));}
   require(req,complete=false){const session=this.session(req);if(!session)throw fail('Inicia sesión para continuar.',401);if(complete&&!session.user.onboarded)throw fail('Completa tu nombre y tu retrato de piloto.',403);return session;}
   throttle(req,key,max,window){const ip=req.socket.remoteAddress||'local',id=key+':'+ip;let r=this.limits.get(id);const now=Date.now();if(!r||now>r.until){r={n:0,until:now+window};this.limits.set(id,r);}if(++r.n>max)throw fail('Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',429);if(this.limits.size>5000)for(const [k,v] of this.limits)if(now>v.until)this.limits.delete(k);}
-  cookie(req,res,token){const secure=req.socket.encrypted||process.env.PUBLIC_URL?.startsWith('https://');res.setHeader('Set-Cookie',`touge_session=${token||''}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${token?2592000:0}${secure?'; Secure':''}`);}
+  cookie(req,res,token){res.setHeader('Set-Cookie',`touge_session=${token||''}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${token?2592000:0}${secureSession(req)?'; Secure':''}`);}
   async handle(req,res,url,online){
     const p=url.pathname;if(!p.startsWith('/api/'))return false;
     try{
@@ -41,7 +47,7 @@ export class Accounts {
         if(!sameOrigin(req))throw fail('Origen no permitido.',403);this.throttle(req,p,p==='/api/register'?12:35,p==='/api/register'?3600000:60000);
         const data=await jsonBody(req),user=p==='/api/register'?await this.store.register(data.username,data.password):await this.store.login(data.username,data.password),session=this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
-      const routes=['/api/logout','/api/profile','/api/profile/photo','/api/records','/api/records/me','/api/rooms','/api/runs/start','/api/runs/finish'];if(!routes.includes(p))return false;
+      const routes=['/api/logout','/api/profile','/api/profile/photo','/api/records','/api/records/me','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/shop','/api/shop/buy'];if(!routes.includes(p))return false;
       const s=this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
       if(p==='/api/logout'&&req.method==='POST'){this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
@@ -52,6 +58,9 @@ export class Accounts {
         validPhoto(bytes,match[1]);
         json(res,200,{user:this.store.setPhoto(s.user.id,bytes,'image/'+match[1])});return true;
       }
+      if(p==='/api/campaign'&&req.method==='GET'){json(res,200,{chapters:CAMPAIGN_CHAPTERS,stages:CAMPAIGN_STAGES.map(stage=>({...stage,carInfo:ALL_CARS.find(c=>c.id===stage.car),media:campaignMedia.stages[stage.id]})),focusTypes:FOCUS_TYPES,user:s.user});return true;}
+      if(p==='/api/shop'&&req.method==='GET'){json(res,200,{cars:ALL_CARS.filter(c=>c.price),cosmetics:COSMETICS.filter(c=>!c.starter),user:s.user});return true;}
+      if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);const data=await jsonBody(req);json(res,200,this.store.buy(s.user.id,data.kind,data.id));return true;}
       if(p==='/api/records/me'&&req.method==='GET'){json(res,200,this.store.personal(s.user.id));return true;}
       if(p==='/api/records'&&req.method==='GET'){const q=url.searchParams;json(res,200,{records:this.store.records({track:q.get('track')||'akina',source:q.get('source')||'solo',car:q.get('car')||null,wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',userId:q.get('mine')==='1'?s.user.id:null})});return true;}
       if(p==='/api/rooms'&&req.method==='GET'){json(res,200,{rooms:online.rooms.publicRooms()});return true;}
