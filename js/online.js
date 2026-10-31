@@ -1,4 +1,5 @@
-import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix} from './sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix,sample} from './sim.mjs';
+import {vehiclePose,resolveVehicleContact} from './traffic.mjs';
 const $=id=>document.getElementById(id);
 export function roomCode(value){try{const url=new URL(value,location.origin);const code=url.searchParams.get('room')||value.trim();return /^[A-F\d]{8}$/i.test(code)?code.toUpperCase():null;}catch{return null;}}
 export class OnlineClient {
@@ -90,13 +91,25 @@ export class OnlineClient {
     this.input=active?input:{steer:0,throttle:false,brake:true,handbrake:false};const now=performance.now();
     if(this.room?.phase==='racing'&&now-this.lastSend>=1000/30){this.lastSend=now;this.send({type:'input',seq:++this.seq,...this.input,headlights:this.lights});}
   }
+  predict(r,input,dt,players=this.snapshots?.at(-1)?.players||[]){
+    // Predict from current authoritative traffic, independently of the 100 ms
+    // interpolation used to draw remote cars. Contact copies never mutate snapshots.
+    const traffic=players.filter(p=>p.id!==this.id&&p.connected&&!p.dnf&&!p.state.finished).map(p=>{
+      const state=p.state,o={...vehiclePose(state),track:r.track,timeLeft:state.timeLeft,contactCooldown:state.contactCooldown};
+      const advance=clamp(r.elapsed-state.elapsed,0,.15),curve=sample(r.track,o.s).curve;
+      o.progress=o.speed*Math.max(.12,Math.cos(o.travelYaw))/clamp(1-curve*o.lateral,.65,1.35);
+      o.s+=o.progress*advance;o.lateral=clamp(o.lateral+(state.lateralV||0)*advance,-4.65,4.65);return o;
+    });
+    const before=vehiclePose(r);updateRace(r,input,dt,traffic);
+    for(const o of traffic){const old=vehiclePose(o);o.s+=o.progress*dt;resolveVehicleContact(r,o,before,old);}
+  }
   reconcile(r,track,message){
     const self=message.players.find(p=>p.id===this.id);if(!self)return;
     const state=structuredClone(self.state),predicted=createRace(r.car,track,{mode:'time',night:r.night,wet:r.wet});Object.assign(predicted,state);
     const resetChanged=state.resetId!==r.resetId;
-    let ahead=clamp(r.elapsed-state.elapsed,0,.15);if(state.countdown>0||resetChanged||state.resetHold>0)ahead=0;while(ahead>0&&!predicted.finished){const dt=Math.min(1/120,ahead);updateRace(predicted,this.input,dt);ahead-=dt;}
+    let ahead=clamp(r.elapsed-state.elapsed,0,.15);if(state.countdown>0||resetChanged||state.resetHold>0)ahead=0;while(ahead>0&&!predicted.finished){const dt=Math.min(1/120,ahead);this.predict(predicted,this.input,dt,message.players);ahead-=dt;}
     const old={s:r.s,lateral:r.lateral,yaw:r.yaw};Object.assign(r,predicted,{online:true,headlights:this.lights});
-    if(!resetChanged&&state.resetHold===0&&Math.abs(old.s-r.s)<10&&Math.abs(old.lateral-r.lateral)<2&&!state.finished&&state.countdown===0){r.s=mix(old.s,r.s,.45);r.lateral=mix(old.lateral,r.lateral,.45);r.yaw=mix(old.yaw,r.yaw,.45);}
+    if(!resetChanged&&state.resetHold===0&&state.collision===0&&Math.abs(old.s-r.s)<10&&Math.abs(old.lateral-r.lateral)<2&&!state.finished&&state.countdown===0){r.s=mix(old.s,r.s,.45);r.lateral=mix(old.lateral,r.lateral,.45);r.yaw=mix(old.yaw,r.yaw,.45);}
     r.netPlace=self.place;r.netDnf=self.dnf;r.netFinished=state.finished;r.netPlayers=message.players;
   }
   opponents(){

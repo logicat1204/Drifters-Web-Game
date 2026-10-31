@@ -2,6 +2,7 @@ import {randomBytes,randomUUID} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {WebSocketServer,WebSocket} from 'ws';
 import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,makeTrack,createRace,updateRace,repositionRace,clamp} from '../js/sim.mjs';
+import {vehiclePose,resolveVehicleContact} from '../js/traffic.mjs';
 import {activateFocus} from '../js/focus.mjs';
 import {sameOrigin} from './accounts.mjs';
 
@@ -9,7 +10,7 @@ const IDLE_INPUT={steer:0,throttle:false,brake:true,handbrake:false};
 const cleanName=value=>typeof value==='string'?value.normalize('NFKC').replace(/[\p{Cc}\p{Cf}<>]/gu,'').trim().slice(0,20):'';
 const profile=data=>{const name=cleanName(data.name),car=CARS.find(c=>c.id===data.car);if(!name||!car)throw Error('Escribe tu nombre y elige un coche válido.');return {name,car:car.id};};
 const config=data=>({track:TRACKS.some(t=>t.id===data.track)?data.track:TRACKS[0].id,night:data.night!==false,wet:data.wet===true});
-const compact=r=>Object.fromEntries(['s','lateral','speed','yaw','yawRate','travelYaw','lateralV','steer','gripUsage','understeer','cornerSpeed','driftAssist','slipAngle','gear','rpm','elapsed','countdown','headlights','braking','drift','driftPoints','combo','bestCombo','collision','checkpoints','timeLeft','finished','won','blindPasses','blindAward','skill','focus','resetId','resetHold','resetCooldown','wallTouch','wallContact','wallCooldown','wallSlow'].map(k=>[k,r[k]]));
+const compact=r=>Object.fromEntries(['s','lateral','speed','yaw','yawRate','travelYaw','lateralV','steer','gripUsage','understeer','cornerSpeed','driftAssist','slipAngle','gear','rpm','elapsed','countdown','headlights','braking','drift','driftPoints','combo','bestCombo','collision','checkpoints','timeLeft','finished','won','blindPasses','blindAward','skill','focus','draft','contactCooldown','resetId','resetHold','resetCooldown','wallTouch','wallContact','wallCooldown','wallSlow'].map(k=>[k,r[k]]));
 export class OnlineRooms {
   constructor({now=()=>performance.now(),store=null}={}){this.now=now;this.store=store;this.rooms=new Map();this.clients=new Set();this.tickId=0;}
   connect(send,close=()=>{},identity=null){
@@ -17,9 +18,9 @@ export class OnlineRooms {
   }
   send(c,message){c.send(message);}
   broadcast(room,message){for(const p of room.players.values())if(p.connected)this.send(p.client,message);}
-  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,ready:p.ready,connected:p.connected}))};}
+  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,ready:p.ready,connected:p.connected}))};}
   publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,players:r.players.size,maxPlayers:4}));}
-  details(c,data){if(!this.store)return profile(data);const user=this.store.user(c.identity?.id);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl};}
+  details(c,data){if(!this.store)return profile(data);const user=this.store.user(c.identity?.id);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:this.store.vehicleBuild(user.id,user.defaultCar)};}
   revoke(userId){for(const c of this.clients)if(c.identity?.id===userId){this.disconnect(c);c.close(4001,'Sesión cerrada');}}
   publish(room){this.broadcast(room,this.lobby(room));}
   receive(c,data){
@@ -56,7 +57,8 @@ export class OnlineRooms {
         if(room.players.size<2)throw Error('Se necesitan al menos 2 jugadores.');if([...room.players.values()].some(v=>!v.ready))throw Error('Todos deben estar listos antes de iniciar.');
         room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.phase='racing';room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
         for(const other of room.players.values()){
-          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',night:room.config.night,wet:room.config.wet,...(this.store?this.store.loadout(other.userId):{})});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
+          if(this.store)other.build=this.store.vehicleBuild(other.userId,other.car);
+          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',build:this.store?this.store.vehicleBuild(other.userId,other.car):undefined,night:room.config.night,wet:room.config.wet,...(this.store?this.store.loadout(other.userId):{})});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
         }
         this.publish(room);this.snapshot(room);return;
       }else if(data.type==='reposition'||data.type==='focus'){
@@ -85,25 +87,21 @@ export class OnlineRooms {
     if(room.hostId===c.id)room.hostId=connected[0].client.id;this.publish(room);
   }
   disconnect(c){this.leave(c);this.clients.delete(c);}
-  snapshot(room){this.broadcast(room,{type:'snapshot',tick:this.tickId,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,connected:p.connected,dnf:p.dnf,place:p.place,state:compact(p.race)}))});}
+  snapshot(room){this.broadcast(room,{type:'snapshot',tick:this.tickId,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,build:p.build,connected:p.connected,dnf:p.dnf,place:p.place,state:compact(p.race)}))});}
   step(dt=1/120){
     this.tickId++;const now=this.now();
     for(const room of this.rooms.values()){
       if(room.phase!=='racing')continue;room.elapsed+=dt;
-      const newlyFinished=[];
-      for(const p of room.players.values()){
-        if(p.dnf||p.race.finished)continue;const before=p.race.s;
-        updateRace(p.race,now-p.inputAt>300?IDLE_INPUT:p.input,dt);
-        if(p.race.finished){if(p.race.s>=room.track.length)newlyFinished.push({p,fraction:clamp((room.track.length-before)/Math.max(.00001,p.race.s-before),0,1)});else p.dnf=true;}
-      }
-      // Resolve contacts once, on the server, for the same outcome on every client.
       const active=[...room.players.values()].filter(p=>!p.dnf&&!p.race.finished);
-      for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
-        const a=active[i].race,b=active[j].race;
-        if(a.countdown===0&&a.resetHold===0&&b.resetHold===0&&a.wallCooldown<=0&&b.wallCooldown<=0&&Math.abs(a.s-b.s)<4.1&&Math.abs(a.lateral-b.lateral)<1.7){
-          const direction=a.lateral>=b.lateral?1:-1;a.speed*=a.s<b.s?.87:.94;b.speed*=b.s<a.s?.87:.94;a.lateral=clamp(a.lateral+direction*.18,-4.75,4.75);b.lateral=clamp(b.lateral-direction*.18,-4.75,4.75);a.collision=b.collision=.55;a.wallCooldown=b.wallCooldown=1;
-        }
+      const poses=new Map(active.map(p=>[p,vehiclePose(p.race)]));
+      for(const p of active){
+        const traffic=active.filter(other=>other!==p).map(other=>poses.get(other));
+        updateRace(p.race,now-p.inputAt>300?IDLE_INPUT:p.input,dt,traffic);
       }
+      // One shared contact model for campaign and multiplayer, including recovery.
+      for(let pass=0;pass<3;pass++)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++)resolveVehicleContact(active[i].race,active[j].race,poses.get(active[i]),poses.get(active[j]));
+      const newlyFinished=[];
+      for(const p of active)if(p.race.finished){if(p.race.s>=room.track.length)newlyFinished.push({p,fraction:clamp((room.track.length-poses.get(p).s)/Math.max(.00001,p.race.s-poses.get(p).s),0,1)});else p.dnf=true;}
       newlyFinished.sort((a,b)=>a.fraction-b.fraction);
       for(const {p,fraction} of newlyFinished){p.place=room.finishOrder.length+1;p.finishTime=room.elapsed-3-dt*(1-fraction);room.finishOrder.push(p.client.id);if(room.firstFinish===null)room.firstFinish=room.elapsed;
         if(this.store&&p.userId){p.race.netPlace=p.place;this.store.addRun(room.runId+':'+p.userId,p.userId,p.race,'online',p.finishTime);p.saved=true;}

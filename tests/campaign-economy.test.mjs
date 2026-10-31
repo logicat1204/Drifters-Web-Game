@@ -55,7 +55,7 @@ test('purchases are permanent, gender-scoped, atomic and idempotent',async()=>{
 test('a real campaign replay grants the first clear, while fabricated focus actions fail for a locked account',async()=>{
   let now=0;const {store,user}=await fixture(),runs=new Runs(store,{now:()=>now});try{
     const attempt=runs.start(user.id,{car:'r32',mode:'campaign',campaignStage:'kenji',difficulty:'normal'}),r=createRace(CARS[2],makeTrack(ALL_TRACKS.find(t=>t.id===attempt.track)),attempt.options),recorder=new RunRecorder();
-    for(let i=0;i<120*900&&!r.finished;i++)updateRace(r,recorder.capture(r,driverInput(r)),1/120);assert.equal(r.won,true);now=900000;
+    for(let i=0;i<120*900&&!r.finished;i++)updateRace(r,recorder.capture(r,driverInput(r,{line:-2.5,gripUse:.90})),1/120);assert.equal(r.won,true);now=900000;
     const saved=await runs.submit(user.id,attempt.id,recorder.frames);assert.equal(saved.user.campaign[0].id,'kenji');assert.ok(saved.reward.coins>=300);assert.equal((await runs.submit(user.id,attempt.id,[])).user.coins,saved.user.coins);
     const bad=runs.start(user.id,{car:'ae86',track:'usui',mode:'time',difficulty:'normal'});await assert.rejects(runs.submit(user.id,bad.id,[[1,0,1,1,1]]),/concentración inválida/);
   }finally{store.close();}
@@ -77,14 +77,28 @@ test('all 24 campaign AIs maneuver physically and finish, with no guardrail impa
 });
 test('each campaign stage can be won with a starter machine and a physically driven passing line',()=>{
   for(const stage of CAMPAIGN_STAGES){let won=false;
-    for(const line of [-2.5,2.5,0]){for(const car of CARS.slice(0,3)){
-      const r=stageRace(stage,car);r.countdown=0;r.timeLeft=10000;r.focus.enabled=stage.index>=3;r.focus.type=stage.index>=7?'drift':'balance';
-      for(let i=0;i<108000&&!r.finished;i++){if(r.focus.charge>=90)activateFocus(r);updateRace(r,driverInput(r,{line}),1/120);}
+    for(const type of ['time','drift']){for(const line of [-2.5,2.5,0]){for(const car of CARS.slice(0,3)){
+      const r=stageRace(stage,car);r.countdown=0;r.timeLeft=10000;r.focus.enabled=stage.index>=3;r.focus.type=stage.index>=7?type:stage.index>=5?'time':'balance';
+      for(let i=0;i<108000&&!r.finished;i++){if(r.focus.charge>=60)activateFocus(r);updateRace(r,driverInput(r,{line,gripUse:.90}),1/120);}
       if(r.won){won=true;break;}
-    }if(won)break;}
+    }if(won)break;}if(won)break;}
     assert.ok(won,stage.id+' must be beatable without purchases');
   }
 });
 test('the five difficulty levels have strictly increasing physical pace on the same course and car',()=>{
   const times=[];for(let level=1;level<=5;level++){const r=stageRace({...CAMPAIGN_STAGES[2],level});r.countdown=0;r.timeLeft=10000;for(let i=0;i<108000&&!r.rivalFinished;i++)updateRace(r,{},1/120);assert.ok(r.rivalFinished);times.push(r.elapsed);}for(let i=1;i<times.length;i++)assert.ok(times[i]<times[i-1],JSON.stringify(times));
+});
+test('a complete Kanata counterattack duel replays identically on the authoritative server',async()=>{
+ let now=0;const {store,user}=await fixture();try{
+  for(const stage of CAMPAIGN_STAGES.slice(0,-1))win(store,user,stage);
+  store.updateProfile(user.id,{focusType:'time'});const runs=new Runs(store,{now:()=>now}),attempt=runs.start(user.id,{car:'r32',mode:'campaign',campaignStage:'kanata-final'});
+  const r=createRace(CARS[2],makeTrack(ALL_TRACKS.find(t=>t.id===attempt.track)),attempt.options),recorder=new RunRecorder();let counterSeen=false;
+  for(let i=0;i<108400&&!r.finished;i++){
+   if(r.focus.charge>=60&&activateFocus(r))recorder.action(1);
+   updateRace(r,recorder.capture(r,driverInput(r,{line:-2.5,gripUse:.90})),1/120);
+   counterSeen||=(r.boss.boost>0);
+  }
+  assert.ok(r.finished);assert.ok(r.won);assert.ok(r.boss.enraged);assert.ok(counterSeen);now=900000;
+  const result=await runs.submit(user.id,attempt.id,recorder.frames);assert.ok(result.user.campaign.some(s=>s.id==='kanata-final'));assert.ok(result.reward.coins>0);
+ }finally{store.close();}
 });

@@ -8,17 +8,19 @@ La plantilla de pilotos se transcribió de `assets/lista_de_pilotos_y_autos.md` 
 
 Cada duelo exige haber vencido al anterior. Los capítulos futuros se pueden consultar y sus pilotos se muestran, pero no se pueden iniciar. Se pueden repetir los niveles superados. Ni modificar `arcadeStage` en el perfil ni jugar un duelo especial del modo individual desbloquea la campaña.
 
-La IA usa el mismo sistema físico que el jugador: acelera, frena, gira, pierde velocidad y cruza realmente la meta. No se teletransporta para cumplir un reloj ni adapta su velocidad al progreso del jugador. Los cinco niveles cambian el uso de agarre y de punta. El estilo asigna una preparación independiente al rival:
+La IA usa el mismo sistema físico que el jugador: acelera, frena, gira, pierde velocidad y cruza realmente la meta. No se teletransporta para cumplir un reloj. Kanata puede activar un contraataque temporal cuando el jugador lo adelanta. Los cinco niveles cambian el uso de agarre y de punta. El estilo asigna una preparación independiente al rival:
 
 | Estilo | Preparación arcade | Comportamiento |
 | --- | --- | --- |
-| Grip | 70 m/s de punta, aceleración 15,8, agarre 1,02 | Potente en rectas; necesita frenar más en curvas |
-| Skiller | 62 m/s, aceleración 14,0, agarre 1,19 | Menor punta; mayor velocidad de paso por curva |
-| Complete | 67 m/s, aceleración 15,1, agarre 1,11 | Compromiso entre ambas |
+| Grip | 76 m/s de punta, aceleración 19,0, agarre 1,00 | Potente en rectas; necesita frenar más en curvas |
+| Skiller | 64 m/s, aceleración 15,4, agarre 1,32 | Menor punta; mayor velocidad de paso por curva |
+| Complete | 70 m/s, aceleración 17,1, agarre 1,16 | Compromiso entre ambas |
 
-Estos valores son ajustes de juego, no fichas técnicas reales. La dificultad sigue importando dentro de cada estilo. Las pruebas comprueban frenada/giro y llegada sin impactos para los 24 rivales, progresión de dificultad y una victoria posible en cada nivel con uno de los tres autos iniciales de referencia y una trayectoria de adelantamiento física, sin compras.
+El selector global de dificultad se elimina. Los parámetros actuales, firmas y contraataque de Kanata se detallan en [IA-JEFES.md](IA-JEFES.md). Estos valores son ajustes de juego, no fichas técnicas reales. La dificultad sigue importando dentro de cada estilo. Las pruebas comprueban frenada/giro y llegada sin impactos para los 24 rivales, progresión de dificultad y una victoria posible en cada nivel con uno de los tres autos iniciales de referencia y una trayectoria de adelantamiento física, sin compras.
 
 Odawara, Ashinoko y Manazuru tienen trazados originales de interpretación arcade. No son levantamientos exactos de los circuitos reales. Se mantienen los siete cursos anteriores para juego individual/online. **Lake Ashinoko fuerza lluvia, niebla y día**; los otros capítulos de MFG son diurnos y los de Initial D nocturnos. El servidor fija las condiciones y el rival aunque el cliente envíe otras.
+
+Ashinoko tiene un perfil de niebla más cerrado: comienza a 8 m y oculta por completo la geometría a 60 m, frente a los 35–185 m del perfil genérico. La distancia se mide desde el auto para mantener la misma visibilidad del entorno en las cuatro cámaras y el retrovisor. Se conservan las referencias cercanas de pista y guardarraíles. Es un ajuste visual, sin cambios a la física mojada ni al ritmo de los rivales. La comprobación visual reproducible es `npm run test:ashinoko-fog`.
 
 ## Retratos y cómics
 
@@ -42,7 +44,7 @@ Drift Master mejora también la alineación de la trayectoria. Todos conservan l
 
 El servidor captura la especialidad y el permiso al iniciar un intento o una carrera online. La reproducción del intento valida las activaciones. Los mensajes de controles no pueden conceder poderes y las instantáneas online incluyen el estado autoritativo. Las auras 3D también se ven alrededor de los otros jugadores; la vista del propio jugador añade estelas y alas de pantalla. Las animaciones de pantalla respetan movimiento reducido.
 
-Se usa `HANDLING_VERSION=v6`: las marcas anteriores se conservan, pero no se mezclan con los récords de esta física. Cada nueva partida registra el tipo de concentración y si estaba habilitado.
+Se usa `HANDLING_VERSION=v8`: las marcas anteriores se conservan, pero no se mezclan con los récords de esta física. Cada nueva partida registra el tipo de concentración y si estaba habilitado.
 
 ## Economía
 

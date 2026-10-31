@@ -10,13 +10,13 @@ export const COURSE_LAYOUTS = {
   atami: [[4,0],[3,40],[2,-90],[3,85],[3,-35],[4,15],[2,100],[3,-80],[2,125],[2,-135],[3,90],[3,-70],[4,20],[3,65],[3,-45],[4,0],[2,-100],[3,85],[2,-60],[3,45],[4,0]]
 };
 export const RIVALS = {
-  takumi:{id:'takumi',name:'TAKUMI FUJIWARA',short:'TAKUMI',jp:'藤原 拓海',car:'ae86',code:'TRUENO / AE86',color:'#e5e5dc',team:'AKINA SPEED STARS',pace:163,style:'gutter',quote:'Conozco cada curva de esta montaña.'},
-  keisuke:{id:'keisuke',name:'KEISUKE TAKAHASHI',short:'KEISUKE',jp:'高橋 啓介',car:'rx7',code:'RX-7 / FD3S',color:'#e7b948',team:'AKAGI REDSUNS',pace:126.5,style:'power',quote:'Intenta seguir el ritmo del rotativo.'},
-  kai:{id:'kai',name:'KAI KOGASHIWA',short:'KOGASHIWA',jp:'小柏 カイ',car:'mr2',code:'MR2 G-LIMITED / SW20',color:'#e8e8df',team:'IROHAZAKA',pace:137,style:'midship',quote:'El vértice está más cerca de lo que crees.'},
-  mako:{id:'mako',name:'MAKO & SAYUKI',short:'MAKO',jp:'佐藤 真子 / 沙雪',car:'sileighty',code:'SILEIGHTY / RPS13',color:'#3776bc',team:'IMPACT BLUE',pace:89,style:'flow',quote:'Sayuki, vamos a por la C-121.'},
-  godhand:{id:'godhand',name:'TOSHIYA JOSHIMA',short:'GOD HAND',jp:'城島 俊也',car:'s2000',code:'S2000 / AP1',color:'#3975a2',team:'PURPLE SHADOW',pace:137.5,style:'precision',quote:'La velocidad empieza con un movimiento suave.'},
-  shinji:{id:'shinji',name:'SHINJI INUI',short:'SHINJI',jp:'乾 信司',car:'ae86coupe',code:'TRUENO 2DOOR / AE86',color:'#e2e2d6',team:'SIDEWINDER',pace:152,style:'instinct',quote:'Esta carretera es el camino de vuelta a casa.'},
-  kanata:{id:'kanata',name:'KANATA KATAGIRI',short:'KANATA',jp:'片桐 夏向',car:'gt86',code:'TOYOTA 86 GT / ZN6',color:'#ca493f',team:'MFG / ESPECIAL',pace:243,style:'grip',quote:'La trazada todavía tiene algo que enseñarnos.'}
+  takumi:{id:'takumi',name:'TAKUMI FUJIWARA',short:'TAKUMI',jp:'藤原 拓海',car:'ae86',code:'TRUENO / AE86',color:'#e5e5dc',team:'AKINA SPEED STARS',pace:163,level:3,style:'Skiller',quote:'Conozco cada curva de esta montaña.'},
+  keisuke:{id:'keisuke',name:'KEISUKE TAKAHASHI',short:'KEISUKE',jp:'高橋 啓介',car:'rx7',code:'RX-7 / FD3S',color:'#e7b948',team:'AKAGI REDSUNS',pace:126.5,level:3,style:'Complete',quote:'Intenta seguir el ritmo del rotativo.'},
+  kai:{id:'kai',name:'KAI KOGASHIWA',short:'KOGASHIWA',jp:'小柏 カイ',car:'mr2',code:'MR2 G-LIMITED / SW20',color:'#e8e8df',team:'IROHAZAKA',pace:137,level:3,style:'Complete',quote:'El vértice está más cerca de lo que crees.'},
+  mako:{id:'mako',name:'MAKO & SAYUKI',short:'MAKO',jp:'佐藤 真子 / 沙雪',car:'sileighty',code:'SILEIGHTY / RPS13',color:'#3776bc',team:'IMPACT BLUE',pace:89,level:3,style:'Skiller',quote:'Sayuki, vamos a por la C-121.'},
+  godhand:{id:'godhand',name:'TOSHIYA JOSHIMA',short:'GOD HAND',jp:'城島 俊也',car:'s2000',code:'S2000 / AP1',color:'#3975a2',team:'PURPLE SHADOW',pace:137.5,level:4,style:'Complete',quote:'La velocidad empieza con un movimiento suave.'},
+  shinji:{id:'shinji',name:'SHINJI INUI',short:'SHINJI',jp:'乾 信司',car:'ae86coupe',code:'TRUENO 2DOOR / AE86',color:'#e2e2d6',team:'SIDEWINDER',pace:152,level:4,style:'Skiller',boss:'shinji-campaign',quote:'Esta carretera es el camino de vuelta a casa.'},
+  kanata:{id:'kanata',name:'KANATA KATAGIRI',short:'KANATA',jp:'片桐 夏向',car:'gt86',code:'TOYOTA 86 GT / ZN6',color:'#ca493f',team:'MFG / ESPECIAL',pace:243,level:5,style:'Skiller',boss:'kanata-final',quote:'La trazada todavía tiene algo que enseñarnos.'}
 };
 export const TRACKS = [
   {id:'akina',name:'AKINA',jp:'秋名',subtitle:'Las cinco horquillas de Takumi',length:7552,difficulty:'TÉCNICO',seed:1,turns:24,elevation:510,rival:'takumi',theme:'forest',region:'GUNMA',landmarks:[{at:.64,name:'FIVE HAIRPINS'},{at:.87,name:'LAST DOWNHILL'}]},

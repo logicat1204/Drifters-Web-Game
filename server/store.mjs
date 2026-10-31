@@ -1,3 +1,4 @@
+import {UPGRADES,VEHICLE_PARTS,stockBuild,validateBuild,buildKey} from '../js/tuning.mjs';
 import {DatabaseSync,backup} from 'node:sqlite';
 import {mkdirSync,readFileSync} from 'node:fs';
 import {randomBytes,randomUUID,scrypt as scryptCallback,timingSafeEqual,createHash} from 'node:crypto';
@@ -16,7 +17,7 @@ export class Store {
   constructor(filename=process.env.DB_PATH||(process.env.NODE_TEST_CONTEXT?':memory:':path.join(process.env.DATA_DIR||path.join(root,'data'),'touge.sqlite')),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>3){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>4){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -38,6 +39,7 @@ export class Store {
           for(const item of COSMETICS)if(item.starter)grantItem.run(user.id,item.id,this.now());
         }
       }
+      if(version<4)this.db.exec(readFileSync(new URL('./migrations/004-vehicle-garage.sql',import.meta.url),'utf8'));
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
@@ -85,7 +87,50 @@ export class Store {
   portrait(id){const p=this.db.prepare('SELECT portrait_mode,photo,photo_mime,avatar FROM profiles WHERE user_id=?').get(id);if(!p)return null;if(p.portrait_mode==='photo'&&p.photo)return {bytes:Buffer.from(p.photo),mime:p.photo_mime};return {bytes:Buffer.from(avatarSvg(JSON.parse(p.avatar))),mime:'image/svg+xml'};}
   progression(id){
     const cleared=this.db.prepare('SELECT level_id AS id,best_time AS bestTime,best_points AS bestPoints,reward_coins AS rewardCoins FROM campaign_progress WHERE user_id=?').all(id);
-    return {coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
+    return {garage:this.garage(id),coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
+  }
+  garage(id){
+    const parts=this.db.prepare('SELECT car_id,part_id FROM owned_vehicle_parts WHERE user_id=? ORDER BY part_id').all(id),result={};
+    for(const row of this.db.prepare('SELECT * FROM vehicle_builds WHERE user_id=?').all(id))result[row.car_id]={build:validateBuild(row),parts:parts.filter(p=>p.car_id===row.car_id).map(p=>p.part_id)};
+    return result;
+  }
+  vehicleBuild(id,car){return validateBuild(this.db.prepare('SELECT * FROM vehicle_builds WHERE user_id=? AND car_id=?').get(id,car)||stockBuild());}
+  requireCar(id,car){if(!ALL_CARS.some(c=>c.id===car)||!this.db.prepare('SELECT 1 FROM owned_cars WHERE user_id=? AND car_id=?').get(id,car))throw Error('Ese coche no pertenece a tu garaje.');}
+  ensureBuild(id,car){this.db.prepare('INSERT OR IGNORE INTO vehicle_builds(user_id,car_id) VALUES(?,?)').run(id,car);}
+  spend(id,price){if(!this.db.prepare('UPDATE wallets SET balance=balance-? WHERE user_id=? AND balance>=?').run(price,id,price).changes)throw Object.assign(Error('No tienes suficientes monedas.'),{status:409});}
+  upgradeVehicle(id,car,system,tier){
+    this.requireCar(id,car);const upgrade=Object.hasOwn(UPGRADES,system)?UPGRADES[system]:null;
+    if(!upgrade||!Number.isInteger(tier)||tier<1||tier>3)throw Error('Nivel de mejora inválido.');
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const current=this.vehicleBuild(id,car),alreadyOwned=current[system]>=tier;
+      if(!alreadyOwned){
+        if(tier!==current[system]+1)throw Error('Compra los niveles anteriores primero.');
+        const price=upgrade.prices[tier-1];this.spend(id,price);this.ensureBuild(id,car);
+        this.db.prepare(`UPDATE vehicle_builds SET ${system}=? WHERE user_id=? AND car_id=?`).run(tier,id,car);
+        this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run(`upgrade:${id}:${car}:${system}:${tier}`,id,-price,`upgrade:${car}:${system}:${tier}`,null,this.now());
+      }
+      this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  buyVehiclePart(id,car,key){
+    this.requireCar(id,car);const part=VEHICLE_PARTS.find(p=>p.id===key);if(!part)throw Error('Pieza visual inválida.');
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const owns=this.db.prepare('SELECT 1 FROM owned_vehicle_parts WHERE user_id=? AND car_id=? AND part_id=?').get(id,car,key);
+      if(!owns){
+        this.spend(id,part.price);this.ensureBuild(id,car);this.db.prepare('INSERT INTO owned_vehicle_parts VALUES(?,?,?,?)').run(id,car,key,this.now());
+        if(part.slot!=='paint')this.db.prepare(`UPDATE vehicle_builds SET ${part.slot}=? WHERE user_id=? AND car_id=?`).run(part.value,id,car);
+        this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run(`vehicle-part:${id}:${car}:${key}`,id,-part.price,`vehicle-part:${car}:${key}`,null,this.now());
+      }
+      this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned:!!owns};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  customizeVehicle(id,car,patch){
+    this.requireCar(id,car);if(!patch||typeof patch!=='object'||Array.isArray(patch)||Object.keys(patch).some(k=>!['color','vinyl','hood','spoiler','wheels'].includes(k)))throw Error('Personalización inválida.');
+    const current=this.vehicleBuild(id,car),next=validateBuild({...current,...patch}),owns=new Set(this.db.prepare('SELECT part_id FROM owned_vehicle_parts WHERE user_id=? AND car_id=?').all(id,car).map(p=>p.part_id));
+    if(next.color!==null&&!owns.has('paint'))throw Error('Desbloquea la pintura libre primero.');
+    for(const slot of ['vinyl','hood','spoiler','wheels'])if(next[slot]!==stockBuild()[slot]&&!owns.has(VEHICLE_PARTS.find(p=>p.slot===slot&&p.value===next[slot])?.id))throw Error('Compra esa pieza antes de equiparla.');
+    this.ensureBuild(id,car);this.db.prepare('UPDATE vehicle_builds SET color=?,vinyl=?,hood=?,spoiler=?,wheels=? WHERE user_id=? AND car_id=?').run(next.color,next.vinyl,next.hood,next.spoiler,next.wheels,id,car);
+    return {user:this.user(id)};
   }
   loadout(id){const user=this.user(id);return {focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)};}
   buy(id,kind,key){
@@ -104,7 +149,7 @@ export class Store {
   addRun(id,userId,r,source='solo',finishTime=r.elapsed){
     const valid=r.s>=r.track.length,stage=r.campaignStage?campaignStage(r.campaignStage):null;
     this.db.exec('BEGIN IMMEDIATE');try{
-      const inserted=this.db.prepare('INSERT OR IGNORE INTO runs VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,userId,r.track.id,r.car.id,source,r.mode,Number(r.manual),Number(r.wet),Number(r.night),HANDLING_VERSION,finishTime,Math.floor(r.skill.points),Math.floor(r.driftPoints),Number(valid),Number(source==='online'?r.netPlace===1:r.won),this.now(),stage?.id||null,r.focus.type,Number(r.focus.enabled!==false));
+      const inserted=this.db.prepare('INSERT OR IGNORE INTO runs(id,user_id,track,car,source,mode,manual,wet,night,handling,elapsed,points,drift,completed,won,created_at,campaign_level,focus_type,focus_enabled,vehicle_build,build_key) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,userId,r.track.id,r.car.id,source,r.mode,Number(r.manual),Number(r.wet),Number(r.night),HANDLING_VERSION,finishTime,Math.floor(r.skill.points),Math.floor(r.driftPoints),Number(valid),Number(source==='online'?r.netPlace===1:r.won),this.now(),stage?.id||null,r.focus.type,Number(r.focus.enabled!==false),JSON.stringify(validateBuild(r.car.build)),buildKey(r.car.build));
       if(inserted.changes&&stage&&source==='solo'&&r.mode==='campaign'&&valid&&r.won){
         const progress=this.progression(userId),cleared=progress.campaign.map(s=>s.id);
         if(stage.track!==r.track.id||!stageAvailable(stage,cleared))throw Error('Nivel de campaña bloqueado.');
@@ -115,14 +160,14 @@ export class Store {
       this.db.exec('COMMIT');return this.runResult(id,userId);
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
-  runResult(id,userId){const run=this.db.prepare('SELECT * FROM runs WHERE id=? AND user_id=?').get(id,userId);if(!run)return null;const best=this.db.prepare('SELECT MIN(elapsed) AS time FROM runs WHERE user_id=? AND track=? AND car=? AND source=? AND manual=? AND wet=? AND night=? AND handling=? AND completed=1').get(userId,run.track,run.car,run.source,run.manual,run.wet,run.night,run.handling);return {id,time:run.elapsed,points:run.points,drift:run.drift,completed:!!run.completed,won:!!run.won,personalBest:best.time,stats:this.stats(userId),reward:{coins:this.db.prepare('SELECT COALESCE(SUM(delta),0) AS n FROM economy_ledger WHERE user_id=? AND run_id=?').get(userId,id).n,stage:run.campaign_level},user:this.user(userId)};}
+  runResult(id,userId){const run=this.db.prepare('SELECT * FROM runs WHERE id=? AND user_id=?').get(id,userId);if(!run)return null;const best=this.db.prepare('SELECT MIN(elapsed) AS time FROM runs WHERE user_id=? AND track=? AND car=? AND source=? AND manual=? AND wet=? AND night=? AND handling=? AND build_key=? AND completed=1').get(userId,run.track,run.car,run.source,run.manual,run.wet,run.night,run.handling,run.build_key);return {id,build:JSON.parse(run.vehicle_build),buildKey:run.build_key,time:run.elapsed,points:run.points,drift:run.drift,completed:!!run.completed,won:!!run.won,personalBest:best.time,stats:this.stats(userId),reward:{coins:this.db.prepare('SELECT COALESCE(SUM(delta),0) AS n FROM economy_ledger WHERE user_id=? AND run_id=?').get(userId,id).n,stage:run.campaign_level},user:this.user(userId)};}
   stats(id){return this.db.prepare('SELECT COUNT(*) AS races,COALESCE(SUM(won),0) AS wins,COALESCE(SUM(points),0) AS points,COALESCE(MAX(points),0) AS bestPoints,COALESCE(MAX(drift),0) AS bestDrift FROM runs WHERE user_id=?').get(id);}
   records({userId=null,track='akina',source='solo',wet=false,night=true,manual=false,car=null}={}){
     if(!TRACKS.some(t=>t.id===track)||!['solo','online'].includes(source)||car&&!ALL_CARS.some(c=>c.id===car))throw Error('Filtro de récords inválido.');
     const filters=[HANDLING_VERSION,track,source,Number(wet),Number(night),Number(manual)],extra=(userId?' AND r.user_id=?':'')+(car?' AND r.car=?':'');if(userId)filters.push(userId);if(car)filters.push(car);
-    return this.db.prepare(`WITH ranked AS (SELECT r.*,u.username,p.display_name,p.photo_version,ROW_NUMBER() OVER(PARTITION BY r.user_id ORDER BY r.elapsed,r.created_at) AS n FROM runs r JOIN users u ON u.id=r.user_id JOIN profiles p ON p.user_id=u.id WHERE r.handling=? AND r.track=? AND r.source=? AND r.wet=? AND r.night=? AND r.manual=? AND r.completed=1${extra}) SELECT user_id AS userId,username,display_name AS displayName,car,elapsed AS time,points,created_at AS createdAt,photo_version AS portraitVersion FROM ranked WHERE n=1 ORDER BY elapsed,created_at LIMIT 50`).all(...filters).map(row=>({...row,portraitUrl:`/api/users/${row.userId}/portrait?v=${row.portraitVersion}`}));
+    return this.db.prepare(`WITH ranked AS (SELECT r.*,u.username,p.display_name,p.photo_version,ROW_NUMBER() OVER(PARTITION BY r.user_id ORDER BY r.elapsed,r.created_at) AS n FROM runs r JOIN users u ON u.id=r.user_id JOIN profiles p ON p.user_id=u.id WHERE r.handling=? AND r.track=? AND r.source=? AND r.wet=? AND r.night=? AND r.manual=? AND r.completed=1${extra}) SELECT user_id AS userId,username,display_name AS displayName,car,elapsed AS time,points,created_at AS createdAt,photo_version AS portraitVersion,build_key AS buildKey,vehicle_build AS vehicleBuild FROM ranked WHERE n=1 ORDER BY elapsed,created_at LIMIT 50`).all(...filters).map(row=>({...row,build:JSON.parse(row.vehicleBuild),portraitUrl:`/api/users/${row.userId}/portrait?v=${row.portraitVersion}`}));
   }
-  personal(id){return {stats:this.stats(id),records:this.db.prepare('SELECT track,car,source,manual,wet,night,MIN(elapsed) AS time,MAX(points) AS points FROM runs WHERE user_id=? AND handling=? AND completed=1 GROUP BY track,car,source,manual,wet,night ORDER BY track,time').all(id,HANDLING_VERSION)};}
+  personal(id){return {stats:this.stats(id),records:this.db.prepare('SELECT track,car,source,manual,wet,night,build_key AS buildKey,MIN(elapsed) AS time,MAX(points) AS points FROM runs WHERE user_id=? AND handling=? AND completed=1 GROUP BY track,car,source,manual,wet,night,build_key ORDER BY track,time').all(id,HANDLING_VERSION)};}
   close(){this.db.close();}
   backup(filename){return backup(this.db,filename);}
 }

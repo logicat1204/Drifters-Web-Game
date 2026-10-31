@@ -1,10 +1,12 @@
 import {CARS,makeTrack,createRace,updateRace,sample,steeringAngle,lateralGrip,clamp} from '../../js/sim.mjs';
+import {focusType} from '../../js/focus.mjs';
 
-export function driverInput(r,{brake=true,attack=true,avoidRival=true,handbrake=false,line=undefined}={}){
-  const v=r.speed,p=sample(r.track,r.s),base=lateralGrip(r.car,r.wet);
-  let target=r.car.max;
+export function driverInput(r,{brake=true,attack=true,gripUse=attack?.80:.62,avoidRival=true,handbrake=false,line=undefined}={}){
+  const power=r.focus.remaining>0?focusType(r):null;
+  const v=r.speed,p=sample(r.track,r.s),base=lateralGrip(r.car,r.wet)*(power?.grip||1);
+  let target=r.car.max*(power?.topSpeed||1);
   if(brake)for(let distance=0;distance<=210;distance+=10){
-    const bend=Math.abs(sample(r.track,r.s+distance).curve),safe=Math.sqrt(base*(attack?.80:.62)/Math.max(.0001,bend));
+    const bend=Math.abs(sample(r.track,r.s+distance).curve),safe=Math.sqrt(base*gripUse/Math.max(.0001,bend));
     target=Math.min(target,Math.sqrt(safe*safe+2*14*distance));
   }
   if(!attack)target=Math.min(target,48);

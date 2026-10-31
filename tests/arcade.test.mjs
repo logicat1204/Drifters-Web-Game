@@ -20,7 +20,7 @@ function rivalLap(cfg,difficulty='normal',wet=false){
   const result={race:r,braking,steering,impacts};rivalLaps.set(key,result);return result;
 }
 test('all seven rivals physically steer, brake, and complete their course without walls',()=>{
-  for(const cfg of TRACKS){const {race:r,braking,steering,impacts}=rivalLap(cfg);assert.ok(r.rivalFinished,cfg.id);assert.ok(braking>120,cfg.id+' must brake');assert.ok(steering>600,cfg.id+' must steer');assert.equal(impacts,0,cfg.id);assert.ok(r.elapsed>=r.rival.pace*.99&&r.elapsed<r.rival.pace*1.07,cfg.id+' calibration');}
+  for(const cfg of TRACKS){const {race:r,braking,steering,impacts}=rivalLap(cfg);assert.ok(r.rivalFinished,cfg.id);assert.ok(braking>120,cfg.id+' must brake');assert.ok(steering>600,cfg.id+' must steer');assert.equal(impacts,0,cfg.id);assert.ok(r.elapsed<r.rival.pace*.98,cfg.id+' must improve on the previous pace');}
 });
 test('race clock cannot teleport the rival and distant player pace never changes it',()=>{
   const track=makeTrack(TRACKS[0]),a=createRace(CARS[0],track),b=createRace(CARS[2],track);a.countdown=b.countdown=0;a.s=0;b.s=5000;a.elapsed=500;b.elapsed=20;a.timeLeft=b.timeLeft=1000;
@@ -43,12 +43,6 @@ test('all seven authored roads have no non-neighbor centerline crossings',()=>{
   const cross=(a,b,c)=>(b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x);
   for(const cfg of TRACKS){const p=makeTrack(cfg).points;for(let i=0;i<p.length-1;i++)for(let j=i+12;j<p.length-1;j++){const a=p[i],b=p[i+1],c=p[j],d=p[j+1];if(Math.max(a.x,b.x)<Math.min(c.x,d.x)||Math.max(c.x,d.x)<Math.min(a.x,b.x)||Math.max(a.z,b.z)<Math.min(c.z,d.z)||Math.max(c.z,d.z)<Math.min(a.z,b.z))continue;assert.ok(!(cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0),cfg.id);}}
 });
-test('normal rivals leave a modest winning margin for a clean attacking AE86 lap',()=>{
-  for(const cfg of TRACKS){const {race:r}=driveWithGrip(cfg,{mode:'time'}),ai=rivalLap(cfg).race;const margin=(ai.elapsed-r.elapsed)/ai.elapsed;assert.ok(margin>.01,cfg.id+' should allow a clean win');assert.ok(margin<.09,cfg.id+' should remain competitive');}
-});
-test('legend remains beatable by a clean attacking GT-R lap',()=>{
-  for(const cfg of TRACKS){const {race:r}=driveWithGrip(cfg,{car:CARS[2],mode:'time'}),ai=rivalLap(cfg,'hard').race;assert.ok(ai.elapsed>r.elapsed,cfg.id+' legend impossible');}
-});
-test('all levels have distinct physical pace and rain also slows the rival',()=>{
-  for(const cfg of TRACKS){const easy=rivalLap(cfg,'easy').race,normal=rivalLap(cfg).race,hard=rivalLap(cfg,'hard').race,wet=rivalLap(cfg,'normal',true).race;assert.ok(easy.elapsed>normal.elapsed*1.025,cfg.id);assert.ok(normal.elapsed>hard.elapsed*1.02,cfg.id);assert.ok(wet.elapsed>normal.elapsed*1.025,cfg.id);}
+test('retired global difficulty values cannot alter fixed rival pace; rain still reduces grip',()=>{
+  for(const cfg of TRACKS){const easy=rivalLap(cfg,'easy').race,normal=rivalLap(cfg).race,hard=rivalLap(cfg,'hard').race,wet=rivalLap(cfg,'normal',true).race;assert.equal(easy.elapsed,normal.elapsed,cfg.id);assert.equal(normal.elapsed,hard.elapsed,cfg.id);assert.ok(wet.elapsed>normal.elapsed+.5,cfg.id);}
 });

@@ -55,7 +55,7 @@ Lista detallada de personajes, vehículos (modelo, color, estilo de carrocería)
 | Personaje | Vehículo | Color | Estilo de Carrocería | Nivel | Estilo de Conducción |
 | :--- | :--- | :--- | :--- | :---: | :---: |
 | **Shinji Inui** | Toyota Sprinter Trueno 2-Door GT-APEX (AE86) | Blanco | Sedán (2 Puertas) | 4 | Skiller |
-| **Takumi Fujiwara *(Project D)*** | Toyota Sprinter Trueno GT-APEX Carbon Hood (AE86) | Blanco y Negro *(Capó Carbono)* | Liftback / Hatchback | 5 | Complete |
+| **Takumi Fujiwara *(Project D)*** | Toyota Sprinter Trueno GT-APEX Carbon Hood (AE86) | Blanco y Negro *(Capó Carbono)* | Liftback / Hatchback | 5 | Skiller |
 | **Keisuke Takahashi *(Project D)*** | Mazda RX-7 FD3S *(RE Amemiya Spec)* | Amarillo | Coupe | 5 | Complete |
 
 ---
@@ -86,6 +86,6 @@ Lista detallada de personajes, vehículos (modelo, color, estilo de carrocería)
 | Personaje | Vehículo | Color | Estilo de Carrocería | Nivel | Estilo de Conducción |
 | :--- | :--- | :--- | :--- | :---: | :---: |
 | **Sena Moroboshi** | Toyota GR Supra (DB42) | Amarillo | Coupe | 4 | Complete |
-| **Daigo Sawatari** | Alpine A110S | Azul *(Alpine Blue)* | Coupe | 4 | Skiller |
+| **Daigo Sawatari** | Alpine A110S | Azul *(Alpine Blue)* | Coupe | 4 | Complete |
 | **Michael Beckenbauer** | Porsche 718 Cayman GTS / GT4 | Blanco | Coupe | 5 | Complete |
 | **Kanata Rivington (Fujiwara)** | Toyota 86 GT (ZN6) | Rojo *(Lightning Red)* | Coupe | 6 *(Insane)* | Complete |

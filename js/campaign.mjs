@@ -1,10 +1,11 @@
+import {BOSS_TRAITS} from './bosses.mjs';
 // Canonical order and roster transcribed from assets/lista_de_pilotos_y_autos.md.
 // Presentation asset paths live in the generated campaign-media.json manifest.
 export const CAMPAIGN_LEVELS=['Fácil','Medio','Difícil','Profesional','Leyenda'];
 export const DRIVER_STYLES={
-  Grip:{label:'Grip',description:'Potencia y velocidad punta; necesita frenar antes de las curvas.',profile:'power',grip:1.02,max:70,accel:15.8},
-  Skiller:{label:'Skiller',description:'Ligero y preciso. Menor punta, gran velocidad de paso por curva.',profile:'agile',grip:1.19,max:62,accel:14.0},
-  Complete:{label:'Complete',description:'Equilibrio entre peso, aceleración y agarre.',profile:'balanced',grip:1.11,max:67,accel:15.1}
+  Grip:{label:'Grip',description:'Potencia y velocidad punta; necesita frenar antes de las curvas.',profile:'power',grip:1.00,max:76,accel:19.0,brakePower:1.30},
+  Skiller:{label:'Skiller',description:'Ligero y preciso. Menor punta, gran velocidad de paso por curva.',profile:'agile',grip:1.32,max:64,accel:15.4,brakePower:1.08},
+  Complete:{label:'Complete',description:'Equilibrio entre peso, aceleración y agarre.',profile:'balanced',grip:1.16,max:70,accel:17.1,brakePower:1.16}
 };
 export const CAMPAIGN_CHAPTERS=[
   {id:'akina',name:'Akina',folder:'1 akina',track:'akina',tag:'INITIAL D / GUNMA'},
@@ -30,7 +31,7 @@ const rows=[
   ['tsukuba','godfoot','Kozo Hoshino · God Foot','r34','#3f79a8',4,'Grip','Kozo Hoshino'],
   ['tsukuba','godhand-campaign','Toshiya Joshima · God Hand','s2000','#3975a2',4,'Complete','Toshiya Yoshima'],
   ['tsubaki','shinji-campaign','Shinji Inui','ae86coupe','#e7e7dd',4,'Skiller','Shinji'],
-  ['tsubaki','takumi-project','Takumi Fujiwara · Project D','ae86carbon','#e5e5dc',5,'Complete','Takumi'],
+  ['tsubaki','takumi-project','Takumi Fujiwara · Project D','ae86carbon','#e5e5dc',5,'Skiller','Takumi'],
   ['tsubaki','keisuke-project','Keisuke Takahashi · Project D','rx7amemiya','#e7b948',5,'Complete','keisuke D'],
   ['odawara','nozomi','Nozomi Kitahara','alfa4c','#bc3437',2,'Skiller','nozomi'],
   ['odawara','kakeru','Kakeru Yashio','exige','#e7e5dd',2,'Grip','kakeru'],
@@ -39,13 +40,13 @@ const rows=[
   ['ashinoko','maezono','Kazuhiro Maezono','civic','#eeeae4',3,'Grip','maezono'],
   ['ashinoko','akaba','Kaito Akaba','ferrari488','#c62d35',4,'Grip','akaba'],
   ['manazuru','moroboshi','Sena Moroboshi','grsupra','#e8bd42',4,'Complete','moroboshi'],
-  ['manazuru','sawatari','Daigo Sawatari','a110','#3f85b5',4,'Skiller','sawatari'],
+  ['manazuru','sawatari','Daigo Sawatari','a110','#3f85b5',4,'Complete','sawatari'],
   ['manazuru','beckenbauer','Michael Beckenbauer','cayman','#eeeae4',5,'Complete','beckenbauer'],
   ['manazuru','kanata-final','Kanata Rivington (Fujiwara)','gt86','#ca493f',5,'Complete','kanata']
 ];
 const bodyStyles=['Liftback / Coupé','Coupé','Liftback / Hatchback','Coupé','Coupé','Sedán','Targa / Motor central','Coupé','Liftback','Coupé','Roadster','Sedán 2 puertas','Liftback / Capó de carbono','Coupé / RE Amemiya','Coupé','Coupé','Coupé','Coupé','Hatchback','Coupé','Coupé','Coupé','Coupé','Coupé'];
 const colorNames=['Blanco','Verde lima / Perla','Blanco y negro Panda','Naranja metalizado','Amarillo Competition','Negro Pyrenees','Azul Victoria','Verde lima / Perla','Azul Impact Blue','Azul Bayside / Jade','Azul Long Beach','Blanco','Panda / Capó de carbono','Amarillo','Rojo','Blanco','Azul / Blanco','Blanco','Blanco Championship','Rojo Rosso Corsa','Amarillo','Azul Alpine','Blanco','Rojo Lightning'];
-export const CAMPAIGN_STAGES=rows.map(([chapter,id,name,car,color,level,style,folder,unlock],index)=>({chapter,id,name,car,color,colorName:colorNames[index],body:bodyStyles[index],level,style,folder,unlock,index,track:CAMPAIGN_CHAPTERS.find(c=>c.id===chapter).track,short:name.split(' · ')[0].replace(' (Inicial)',''),code:'',team:CAMPAIGN_CHAPTERS.find(c=>c.id===chapter).name,quote:DRIVER_STYLES[style].description}));
+export const CAMPAIGN_STAGES=rows.map(([chapter,id,name,car,color,level,style,folder,unlock],index)=>({chapter,id,name,car,color,boss:BOSS_TRAITS[id]?id:null,signature:BOSS_TRAITS[id]||null,colorName:colorNames[index],body:bodyStyles[index],level,style,folder,unlock,index,track:CAMPAIGN_CHAPTERS.find(c=>c.id===chapter).track,short:name.split(' · ')[0].replace(' (Inicial)',''),code:'',team:CAMPAIGN_CHAPTERS.find(c=>c.id===chapter).name,quote:DRIVER_STYLES[style].description}));
 export const campaignStage=id=>CAMPAIGN_STAGES.find(stage=>stage.id===id);
 export function stageAvailable(stage,cleared){return stage.index===0||cleared.includes(CAMPAIGN_STAGES[stage.index-1].id);}
 export function focusUnlocks(cleared){return CAMPAIGN_STAGES.filter(s=>s.unlock&&cleared.includes(s.id)).map(s=>s.unlock);}

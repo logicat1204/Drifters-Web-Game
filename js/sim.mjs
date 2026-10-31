@@ -3,18 +3,22 @@ import {createSkillState,updateCornerSkill} from './skill.mjs';
 import {FOCUS,focusType,createFocus,cancelFocus,updateFocus} from './focus.mjs';
 import {EXTRA_CARS} from './vehicles.mjs';
 import {CAMPAIGN_TRACKS,DRIVER_STYLES} from './campaign.mjs';
+import {createBossState,updateBossState} from './bosses.mjs';
+import {driveRival,createAIDriver,rivalLevel,rivalStyle} from './rival-ai.mjs';
+import {createDraft,clearDraft,updateSlipstream,draftSpeedMultiplier,SLIPSTREAM,vehiclePose,resolveVehicleContact} from './traffic.mjs';
+import {applyBuild} from './tuning.mjs';
 export { TRACKS, RIVALS };
 export const ALL_TRACKS=[...TRACKS,...CAMPAIGN_TRACKS];
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export const mix = (a, b, t) => a + (b - a) * t;
-export const HANDLING_VERSION='v6';
+export const HANDLING_VERSION='v8';
 export function steeringAngle(speed){return .5/(1+Math.max(0,speed)*.045);}
 export function lateralGrip(car,wet=false){return 18*car.grip*(wet?.75:1);}
 export function cornerSpeed(car,curve,wet=false){return Math.sqrt(lateralGrip(car,wet)/Math.max(.00001,Math.abs(curve)));}
 export function toggleHeadlights(r){r.headlights=!r.headlights;return r.headlights;}
 export function repositionRace(r){
   if(r.finished||r.countdown>0||r.resetCooldown>0)return false;
-  cancelFocus(r);
+  cancelFocus(r);clearDraft(r);r.contactCooldown=0;
   Object.assign(r,{lateral:0,speed:0,yaw:0,yawRate:0,travelYaw:0,lateralV:0,steer:0,gripUsage:0,understeer:0,driftAssist:0,slipAngle:0,drift:0,combo:0,gear:1,rpm:1000,handbrakeDown:false,braking:true,collision:0,wallCooldown:0,wallContact:0,wallTouch:0,wallSlow:0,blindArmed:false,blindTime:0,resetHold:.45,resetCooldown:2,resetId:(r.resetId||0)+1});
   Object.assign(r.skill,{chain:0,intensity:0,level:0,corner:false,clean:false,quiet:0,cornerPoints:0,peak:0,award:null,flash:0});
   return true;
@@ -64,64 +68,49 @@ export function worldAt(track, s, lateral = 0) {
   return p;
 }
 export function createRace(car, track, opts = {}) {
+  if(opts.build)car=applyBuild(car,opts.build);
   const mode=opts.mode||'battle',rival=opts.rival||RIVALS[track.rival];
-  return { car, track, rival, campaignStage:opts.campaignStage||null,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, difficulty: opts.difficulty || 'normal' };
+  return { car, track, rival,draft:createDraft(),contactCooldown:0,boss:createBossState(rival),aiDriver:opts.aiDriver?createAIDriver(opts.aiDriver):null, campaignStage:opts.campaignStage||null,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, rivalLevel:rivalLevel(rival) };
 }
-export function rivalCar(rival){
-  const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0];
-  if(rival.level){const style=DRIVER_STYLES[rival.style];return {...base,...style,id:rival.car,color:rival.color};}
-  // Rivals keep their calibrated setups independently of the playable garage.
-  const tune={ae86:{max:62,accel:13.8,grip:1.08},rx7:{max:68,accel:15.3,grip:1.12},mr2:{max:62,accel:14,grip:1.09},sileighty:{max:62,accel:13.8,grip:1.08},s2000:{max:64,accel:14.1,grip:1.12},ae86coupe:{max:62,accel:13.8,grip:1.09},gt86:{max:64,accel:14.3,grip:1.12}}[rival.car]||{};
-  return {...base,...tune,id:rival.car,color:rival.color};
-}
-export function rivalDriverInput(r,o,dt){
-  const level=r.difficulty,tune={keisuke:.85,godhand:.87,kanata:.91}[r.rival.id]??.92,baseGrip=r.rival.id==='keisuke'?.61:.67;
-  const campaignLevel=r.rival.level;
-  const gripUse=campaignLevel?[0,.43,.48,.56,.65,.71][campaignLevel]:baseGrip+(level==='easy'?-.09:level==='hard'?.12:0),maxUse=campaignLevel?[0,.68,.74,.84,.92,.96][campaignLevel]:clamp(tune+(level==='easy'?-.07:level==='hard'?.075:0),.7,1);
-  const grip=lateralGrip(o.car,o.wet),p=sample(o.track,o.s),v=o.speed;
-  let target=o.car.max*maxUse;
-  for(let ahead=0;ahead<=210;ahead+=10){const c=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*gripUse/Math.max(.0001,c));target=Math.min(target,Math.sqrt(safe*safe+2*13* ahead));}
-  const gap=o.s-r.s,visible=!r.night||r.headlights;
-  let line=clamp(.15+sample(o.track,o.s+22).curve*38,-.9,1.2);
-  if(visible&&gap>4&&gap<25&&r.speed>v+1)line=clamp(line+(r.lateral-line)*.18,-1.25,1.25);
-  o.targetLine=(o.targetLine??o.lateral)+(line-(o.targetLine??o.lateral))*(1-Math.exp(-dt*1.2));
-  const brake=v>target+.3,throttle=!brake&&v<target+.15;
-  const desiredTravel=clamp(-(o.lateral-o.targetLine)*.055,-.18,.18),roadRate=p.curve*v*Math.cos(o.travelYaw)/clamp(1-p.curve*o.lateral,.65,1.35);
-  const travelRate=roadRate+(desiredTravel-o.travelYaw)*3.3,alignment=(brake&&Math.abs(o.steer)>.32?6.2:9.5)*(1-o.driftAssist*.28),desiredBody=o.travelYaw+travelRate/alignment;
-  const bodyRate=roadRate+(desiredBody-o.yaw)*9,wheelbase=o.car.id==='r32'?2.62:o.car.id==='rx7'?2.43:2.4;
-  return {steer:-clamp(Math.atan(bodyRate*wheelbase/Math.max(2,v))/steeringAngle(v),-1,1),throttle,brake,handbrake:false};
-}
-export function updateRace(r, input, dt) {
+export function rivalCar(rival){const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0],style=DRIVER_STYLES[rivalStyle(rival)];return {...base,...style,id:rival.car,color:rival.color};}
+export function rivalDriverInput(r,o,dt){return driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,clamp});}
+export function updateRace(r, input, dt, traffic=null) {
   if (r.finished) return;
   dt = clamp(dt, 0, .05);
   if (r.countdown > 0) { r.countdown = Math.max(0, r.countdown - dt); return; }
+  const beforePlayer=vehiclePose(r),frameStartS=r.s;
+  if(r.mode!=='time'&&!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false,aiDriver:r.rival});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
+  const beforeOpponent=r.opponent?vehiclePose(r.opponent):null;
+  r.contactCooldown=Math.max(0,(r.contactCooldown||0)-dt);
+  updateSlipstream(r,traffic||(r.opponent?[beforeOpponent]:[]),dt,worldAt);
   r.elapsed += dt; r.timeLeft -= dt; r.collision = Math.max(0, r.collision - dt * 2); r.wallCooldown -= dt;
   const resetHeld=r.resetHold>0;r.resetHold=Math.max(0,r.resetHold-dt);r.resetCooldown=Math.max(0,r.resetCooldown-dt);
   if(resetHeld)input={steer:0,throttle:false,brake:true,handbrake:false};
   r.wallSlow=Math.max(0,r.wallSlow-dt);r.wallTouch=Math.max(0,r.wallTouch-dt);if(r.wallTouch===0)r.wallContact=0;
-  const concentrating=r.focus.remaining>0&&r.focus.enabled!==false&&r.collision===0,power=focusType(r),maxSpeed=r.car.max*(concentrating?power.topSpeed:1);
+  const concentrating=r.focus.remaining>0&&r.focus.enabled!==false&&r.collision===0,power=focusType(r),counter=r.aiDriver?.counter,undraftedMax=r.car.max*(concentrating?power.topSpeed:1)*(counter?.topSpeed||1),maxSpeed=undraftedMax*draftSpeedMultiplier(r);
   const p = sample(r.track, r.s), speed = r.speed;
   // The +Z camera sees world +X on its left; positive player input is screen-right.
   const targetSteer = -clamp(input.steer || 0, -1, 1);
-  r.steer = mix(r.steer, targetSteer, 1 - Math.exp(-dt * 16));
+  r.steer = mix(r.steer, targetSteer, 1 - Math.exp(-dt * (r.aiDriver?.style==='Skiller'?26:16)));
   const handbrake=!!input.handbrake&&speed>8,braking=!!input.brake;
   r.braking=braking;
-  const baseGrip=lateralGrip(r.car,r.wet),grip=baseGrip*(concentrating?power.grip:1),wheelbase=r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4;
+  const baseGrip=lateralGrip(r.car,r.wet)*(counter?.grip||1),grip=baseGrip*(concentrating?power.grip:1),wheelbase=r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4;
   const brakeInitiation=braking&&Math.abs(r.steer)>.32&&speed>16;
   if(handbrake&&!r.handbrakeDown&&Math.abs(targetSteer)>.15){r.driftAssist=1;r.yawRate+=Math.sign(targetSteer)*1.1;}
   if(handbrake&&Math.abs(r.steer)>.15)r.driftAssist=1;
   else if(brakeInitiation)r.driftAssist=Math.max(r.driftAssist,.45);
   r.handbrakeDown=handbrake;
+  if(r.aiDriver?.style==='Skiller')r.driftAssist=Math.max(r.driftAssist,r.aiDriver.slide*.85);
   if(!handbrake)r.driftAssist=Math.max(0,r.driftAssist-dt*1.25);
   // The friction budget limits the *velocity direction*, independently of body
   // rotation. More steering cannot create more lateral force at excessive speed.
-  const budget=grip*(input.throttle?.91:braking?.96:1)*(handbrake?.66:1);
+  const budget=grip*(input.throttle?(r.aiDriver?.style==='Skiller'?.98:.91):braking?.96:1)*(handbrake?.66:1);
   const requestedRate=speed/wheelbase*Math.tan(r.steer*steeringAngle(speed));
-  const yawBudget=budget/Math.max(6,speed)*(1+r.driftAssist*.75);
+  const yawBudget=budget/Math.max(6,speed)*(1+r.driftAssist*(r.aiDriver?.style==='Skiller'?1.35:.75));
   const bodyRate=clamp(requestedRate,-yawBudget,yawBudget);
-  r.yawRate=mix(r.yawRate,bodyRate,1-Math.exp(-dt*(r.driftAssist>0?12:10)));
+  r.yawRate=mix(r.yawRate,bodyRate,1-Math.exp(-dt*(r.aiDriver?.style==='Skiller'?24:r.driftAssist>0?12:10)));
   const alignment=(handbrake?2.7:brakeInitiation?6.2:9.5)*(1-r.driftAssist*.28)*(concentrating?power.alignment:1);
-  const travelRate=clamp((r.yaw-r.travelYaw)*alignment,-budget/Math.max(6,speed),budget/Math.max(6,speed));
+  const travelRate=clamp((r.yaw-r.travelYaw-(r.aiDriver?.slip||0))*alignment,-budget/Math.max(6,speed),budget/Math.max(6,speed));
   const progressRate=speed*Math.cos(r.travelYaw)/clamp(1-p.curve*r.lateral,.65,1.35);
   const roadRate=p.curve*Math.max(0,progressRate);
   r.yaw=clamp(r.yaw+(r.yawRate-roadRate)*dt,-1.4,1.4);
@@ -138,9 +127,9 @@ export function updateRace(r, input, dt) {
   r.lateral+=r.lateralV*dt;
   const gearMax = [0, 20, 33, 44, 55, maxSpeed];
   if (!r.manual) { while (r.gear < 5 && speed > gearMax[r.gear] * .91) r.gear++; while (r.gear > 1 && speed < gearMax[r.gear - 1] * .72) r.gear--; }
-  const accel = r.car.accel * Math.max(.15, 1 - speed / (maxSpeed * 1.13))*(concentrating?power.acceleration:1);
+  const accel = r.car.accel * Math.max(.15, 1 - speed / (maxSpeed * 1.13))*(concentrating?power.acceleration:1)*(counter?.acceleration||1);
   const overrev = r.manual && speed > gearMax[r.gear] ? 0 : 1;
-  r.speed += ((input.throttle&&!braking ? accel * overrev : -1.05) - (braking ? 19*(concentrating?power.braking:1) : 0) - (handbrake ? 13 : 0) - .00048 * speed * speed - r.understeer*3.2 - Math.abs(r.slipAngle)*speed*.10 - r.drift*1.2) * dt;
+  r.speed += ((input.throttle&&!braking ? accel * overrev : -1.05) - (braking ? 19*(r.car.brakePower||1)*(concentrating?power.braking:1)*(counter?.braking||1) : 0) - (handbrake ? 13 : 0) - .00048 * speed * speed * (1-r.draft.strength*SLIPSTREAM.dragReduction) - r.understeer*3.2 - (Math.abs(r.slipAngle)*speed*.10+r.drift*1.2)*(r.aiDriver?.style==='Skiller'?1-r.aiDriver.level*.13:1)) * dt;
   if (Math.abs(r.lateral) > 4.1) r.speed -= dt * 5;
   const wallSide=Math.sign(r.lateral),scraping=r.wallTouch>0&&r.wallContact===wallSide&&Math.abs(r.lateral)>4.45&&wallSide*(r.travelYaw+r.yaw)>0;
   if (Math.abs(r.lateral)>=4.65 || scraping) {
@@ -157,7 +146,10 @@ export function updateRace(r, input, dt) {
     r.lateralV=Math.sin(r.travelYaw)*Math.max(0,r.speed);r.slipAngle=r.yaw-r.travelYaw;r.driftAssist=0;r.drift=Math.min(r.drift,.15);r.understeer=Math.min(r.understeer,.35);
   }
   if(r.wallSlow>0){const bend=Math.max(Math.abs(p.curve),Math.abs(sample(r.track,r.s+32).curve));r.speed=Math.min(r.speed,Math.max(9,Math.min(r.car.max*.5,Math.sqrt(baseGrip/Math.max(.00001,bend))*.6)));}
-  r.speed = clamp(r.speed, 0, maxSpeed);
+  // Leaving the wake removes its force, not the momentum already earned.
+  // Extra speed coasts down; it cannot grow or exceed the 5% draft ceiling.
+  const draftCoast=r.draft.strength>0?Math.min(undraftedMax*(1+SLIPSTREAM.topSpeed),speed-dt*.25):0;
+  r.speed = clamp(r.speed, 0, Math.max(maxSpeed,draftCoast));
   r.rpm = clamp(1000 + r.speed / gearMax[r.gear] * 7000, 900, 8500);
   r.s+=r.speed*Math.max(.12,Math.cos(r.travelYaw))/clamp(1-p.curve*r.lateral,.65,1.35)*dt;
   if (r.drift > .25 && Math.abs(r.slipAngle)>.09 && r.speed > 12 && Math.abs(r.lateral) < 4.2) { r.combo += dt * r.speed * r.drift * 7; r.driftPoints += dt * r.speed * r.drift * 7; r.bestCombo = Math.max(r.bestCombo, r.combo); } else r.combo = Math.max(0, r.combo - dt * 180);
@@ -167,15 +159,16 @@ export function updateRace(r, input, dt) {
   updateFocus(r,dt,p.curve,baseGrip);
   r.blindAward=Math.max(0,r.blindAward-dt);
   if(r.mode!=='time'){
-    if(!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
     const previousGap=r.rivalS-r.s;
-    updateRace(r.opponent,rivalDriverInput(r,r.opponent,dt),dt);
-    const o=r.opponent;r.rivalS=o.s;r.rivalSpeed=o.speed;r.rivalLateral=o.lateral;r.rivalYaw=o.yaw;r.rivalBraking=o.braking;r.rivalSteer=o.steer;r.rivalFinished=o.finished;
+    const opponentStartS=r.opponent.s;
+    const sensedPlayer={...beforePlayer,lateralV:Math.sin(beforePlayer.travelYaw)*beforePlayer.speed,rival:r.rival,boss:r.boss,night:r.night,headlights:r.headlights};
+    updateRace(r.opponent,rivalDriverInput(sensedPlayer,r.opponent,dt),dt,[beforePlayer]);
+    resolveVehicleContact(r,r.opponent,beforePlayer,beforeOpponent);
+    const o=r.opponent;r.rivalS=o.s;r.rivalSpeed=o.speed;r.rivalLateral=o.lateral;r.rivalYaw=o.yaw;r.rivalBraking=o.braking;r.rivalSteer=o.steer;r.rivalFinished=o.finished;r.rivalFinishFraction=o.s>=r.track.length?clamp((r.track.length-opponentStartS)/Math.max(.00001,o.s-opponentStartS),0,1):1;r.rivalDrift=o.drift;r.rivalSlip=o.slipAngle;updateBossState(r,dt,sample(o.track,o.s).curve);
     if(r.night&&!r.headlights&&r.speed>18&&previousGap>4.5&&previousGap<45&&r.collision===0){r.blindTime+=dt;if(r.blindTime>1)r.blindArmed=true;}
     else r.blindTime=Math.max(0,r.blindTime-dt*2);
     if(r.blindArmed&&!r.headlights&&r.night&&r.s>r.rivalS+6&&r.collision===0){r.blindPasses++;r.blindAward=2.5;r.skill.points+=600;r.blindArmed=false;}
     if(r.headlights||!r.night||r.collision>0||r.rivalS-r.s>65){r.blindArmed=false;r.blindTime=0;}
-    if(!resetHeld&&Math.abs(r.s-r.rivalS)<4.1&&Math.abs(r.lateral-r.rivalLateral)<1.7&&r.wallCooldown<=0){r.speed*=.87;o.speed*=.94;r.lateral+=r.lateral>r.rivalLateral?.35:-.35;r.collision=.55;r.wallCooldown=1;}
   }
-  if (r.s >= r.track.length || r.timeLeft <= 0 || (r.mode!=='time'&&r.rivalFinished)) { r.finished = true; r.won = r.s >= r.track.length && (r.mode === 'time' || !r.rivalFinished); }
+  if (r.s >= r.track.length || r.timeLeft <= 0 || (r.mode!=='time'&&r.rivalFinished)) { r.finished = true; r.won = r.s >= r.track.length && (r.mode === 'time' || !r.rivalFinished || (r.track.length-frameStartS)/Math.max(.00001,r.s-frameStartS)<r.rivalFinishFraction); }
 }
