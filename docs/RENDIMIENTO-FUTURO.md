@@ -1,6 +1,6 @@
-# Evaluación futura: 60 FPS y contador de rendimiento
+# Evaluación original: 60 FPS y contador de rendimiento
 
-30 de octubre de 2026. **Propuesta técnica; no implementada.**
+30 de octubre de 2026. **Propuesta histórica.** La primera implementación se completó el 31 de octubre: monitor, calidad automática, sectores visibles y retrovisor GPU. La documentación vigente y las mediciones están en [RENDIMIENTO-60FPS.md](RENDIMIENTO-60FPS.md). Se conserva abajo la evaluación original.
 
 ## Viabilidad
 
@@ -36,4 +36,4 @@ Además de FPS convendría mostrar tiempo de imagen, promedio y percentil 95, re
 4. Comparar imagen y fluidez con las pruebas de conducción/replay y sin retirar señales útiles de curvas o faros.
 5. Evaluar migración de renderizador únicamente si esas mediciones muestran una limitación que no resulta razonable corregir aquí. Mantener la simulación, catálogo, cuentas y protocolo separados del nuevo renderizador permitiría un cambio gradual.
 
-Actualmente no se ha elegido una biblioteca sustituta, no se ha implementado un contador y no se promete una cifra de FPS. El diseño permite realizar esa evaluación más adelante sin rehacer el gameplay.
+Al redactar esta propuesta todavía no se había elegido una biblioteca sustituta ni implementado un contador. La primera fase posterior conserva WebGL y añade medición y optimizaciones, sin prometer un mínimo universal de FPS.

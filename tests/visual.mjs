@@ -19,6 +19,6 @@ $('day').onclick=()=>{day=!day;r.night=!day;$('day').textContent=day?'Cambiar a 
 $('focus').onclick=()=>activateFocus(r);$('reset').onclick=()=>repositionRace(r);
 $('motion').onclick=()=>{motion=!motion;$('motion').textContent=motion?'Efectos ON':'Efectos OFF';};
 function frame(now){const dt=Math.min(.05,(now-previous)/1000);previous=now;if(playing){acc+=dt;while(acc>=1/120){updateRace(r,driverInput(r),1/120);acc-=1/120;}}else acc=0;
-  renderer.render(r,'race',dt,{day,shake:false});cockpit.draw(r,true,dt,{mirror:renderer.mirrorReady?renderer.mirrorCanvas:null});effects.draw(r,true,playing?dt:0,motion);
+  renderer.render(r,'race',dt,{day,shake:false});cockpit.draw(r,true,dt,{gpuMirror:renderer.mirrorReady});effects.draw(r,true,playing?dt:0,motion);
   $('status').textContent=['','CLEAN LINE','APEX FLOW','FUJIWARA ZONE'][r.skill.level]+' · '+Math.round(r.speed*3.6)+' km/h · '+Math.floor(r.skill.points)+' pts · CONCENTRACIÓN '+Math.floor(r.focus.charge)+'% · '+r.focus.remaining.toFixed(1)+' s';requestAnimationFrame(frame);
 }requestAnimationFrame(frame);

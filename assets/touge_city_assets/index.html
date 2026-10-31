@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Touge & City Assets — visor</title>
+<style>body{margin:0;background:#111;color:#ddd;font:13px sans-serif}#i{position:fixed;top:8px;left:8px}</style>
+<div id="i">Arrastra para orbitar · rueda para zoom · los modelos están en /models</div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const names=['guardrail_segment','streetlight','utility_pole','tree_cedar','tree_autumn','sign_chevron','torii_gate','vending_machine','traffic_light','retaining_wall','cliff_face','tunnel_segment','building_shop','building_apartment','building_office','building_office_night','road_mountain_segment','road_city_segment'];
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0x8fb4d8);s.fog=new THREE.Fog(0x8fb4d8,60,260);
+s.add(new THREE.HemisphereLight(0xffffff,0x445533,1.1));const d=new THREE.DirectionalLight(0xfff0d0,1.6);d.position.set(30,60,20);s.add(d);
+const c=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,600);c.position.set(40,25,60);
+const o=new OrbitControls(c,r.domElement);o.target.set(40,5,0);
+const L=new GLTFLoader();names.forEach((n,i)=>L.load(`models/${n}.glb`,g=>{g.scene.position.set((i%6)*22,0,Math.floor(i/6)*-26);s.add(g.scene)}));
+(function a(){requestAnimationFrame(a);r.render(s,c)})();
+</script></html>
