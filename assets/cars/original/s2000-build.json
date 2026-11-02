@@ -1,0 +1,116 @@
+{
+  "id": "s2000",
+  "rig": {
+    "track": 0.777,
+    "wheelY": 0.316,
+    "radius": 0.31,
+    "front": 1.2249999999999999,
+    "rear": -1.175,
+    "popupAngle": 0.65,
+    "id": "s2000",
+    "size": [
+      4.135,
+      1.75,
+      1.285
+    ],
+    "label": "S2000 AP1"
+  },
+  "reference": "https://www.honda.co.jp/factbook/auto/s2000/199904/050.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 4980
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 1568
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 1092
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 224
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1568
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1225
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 416
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 180
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 24
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 420
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 56
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 161
+    }
+  ]
+}

@@ -5,6 +5,8 @@ import {FOCUS_TYPES} from './focus.mjs';
 import {chunkVisible,viewPlanes,mirrorLayout} from './render-performance.mjs';
 import {createEnvironment} from './environment.mjs';
 import {TEXTURES} from './scenery-assets.mjs';
+import {MenuModel} from './menu-model.mjs';
+import {VehicleModels,ORIGINAL_CARS} from './vehicle-model.mjs';
 
 const V = (x=0,y=0,z=0) => [x,y,z];
 const sub = (a,b) => a.map((v,i)=>v-b[i]);
@@ -132,7 +134,7 @@ function meshCar(gl,color,modelId,build={}) {
     g.quad(V(x+side*.002,.48,-1.6),V(x+side*.002,.48,.35),V(x+side*.002,.63,-.15),V(x+side*.002,.63,-1.8),'#397dbb');
   }
   if(build.spoiler==='gt'){g.box(0,1.48,-1.91,w*1.06,.07,.38,'#232b35');for(const x of [-.59,.59])g.box(x,1.12,-1.91,.055,.68,.09,'#313a42');for(const side of [-1,1])g.box(side*w*.53,1.50,-1.91,.035,.18,.42,'#232b35');}
-  return g.upload(gl);
+  const mesh=g.upload(gl);mesh.vehicle={id:modelId,color,build};return mesh;
 }
 
 export class Renderer {
@@ -154,6 +156,7 @@ export class Renderer {
       uniform vec3 uFog,uEye,uCar,uRivalCar;uniform vec2 uForward,uRivalForward;
       uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];
       uniform float uDay,uAlpha,uFogStart,uFogEnd,uFogFromCar,uHeadlights,uRivalLights,uLampState,uBrake;
+      uniform float uVehicle,uCarbon;uniform vec3 uVehiclePaint,uWheelColor;
       float beam(vec3 car,vec2 forward){
         vec2 delta=vWorld.xz-car.xz;float ahead=dot(delta,forward);
         float across=abs(delta.x*forward.y-delta.y*forward.x);
@@ -165,6 +168,7 @@ export class Renderer {
         vec4 texel=vec4(1.);float tile=-1.;if(vSurface.z>=0.){tile=floor((uDay>.5?vSurface.z:vSurface.w)+.5);if(uAtlasReady<.5){if(tile>=29.&&tile<=32.)discard;texel=vec4(.6,.65,.55,1.);}else {vec2 cell=vec2(mod(tile,8.),floor(tile/8.)),uv=(cell*256.+8.+vec2(fract(vSurface.x),1.-fract(vSurface.y))*240.)/2048.;
         ${this.textureGrad?'vec2 dx=dFdx(vSurface.xy)*vec2(240./2048.,-240./2048.),dy=dFdy(vSurface.xy)*vec2(240./2048.,-240./2048.);dx*=min(1.,.0078125/max(length(dx),.000001));dy*=min(1.,.0078125/max(length(dy),.000001));texel=texture2DGradEXT(uAtlas,uv,dx,dy);':'texel=texture2D(uAtlas,uv);'}
         if(texel.a<.45)discard;}}
+        if(uBackdrop>1.5){gl_FragColor=vec4(texel.rgb*vColor.rgb,uAlpha);return;}
         if(uBackdrop>.5){gl_FragColor=vec4(mix(texel.rgb*vColor.rgb*mix(.13,.95,uDay),uFog,uFogEnd<250.?1.:.32),uAlpha);return;}
         if(f>=1.){gl_FragColor=vec4(uFog,uAlpha);return;}
         vec3 n=normalize(vNormal);float sun=max(0.,dot(n,normalize(vec3(-.35,.85,.4))));
@@ -176,18 +180,25 @@ export class Renderer {
         float grain=abs(n.y)>.7?.96+noise*.08:1.;
         float lamp=1.;if(vColor.a>.8&&vColor.r>.6&&vColor.g>.6&&vColor.b>.5)lamp=uLampState;
         float brake=1.;if(vColor.a>.8&&vColor.r>.6&&vColor.g<.2)brake=.55+uBrake*.65;
-        vec3 base=vColor.rgb*texel.rgb,c=mix(base*(light+headlights)*grain,base*1.35*brake,vColor.a*lamp);
+        vec3 base=vColor.rgb*texel.rgb;float kind=floor(-vSurface.z+.5);
+        if(uVehicle>.5){grain=1.;if(kind==2.||kind==8.)base=uVehiclePaint;if(kind==7.)base=uWheelColor;if(kind==8.&&uCarbon>.5){float weave=mod(floor(vSurface.x*100.)+floor(vSurface.y*100.),2.);base=mix(vec3(.055,.065,.08),vec3(.075,.085,.10),weave);}}
+        vec3 c=mix(base*(light+headlights)*grain,base*1.35*brake,vColor.a*lamp);float opacity=uAlpha;
+        if(uVehicle>.5){vec3 view=normalize(uEye-vWorld),h=normalize(view+normalize(vec3(-.35,.85,.4)));float fresnel=pow(1.-abs(dot(n,view)),4.),shine=pow(max(0.,dot(n,h)),kind==4.?70.:100.);float visibility=mix(.075,1.,daylight)+headlights*.22;
+         if(kind==2.||kind==8.||kind==7.||kind==4.)c+=vec3(.66,.80,1.)*(fresnel*.18+shine*.38)*visibility;
+         if(kind==3.){c=base*mix(.09,.35,daylight)+mix(vec3(.16,.22,.31),vec3(.53,.67,.8),max(0.,n.y))*(.25+fresnel*.5)*visibility;opacity*=vSurface.w;}
+        }
         if(uDay<.5&&((tile>=5.&&tile<=10.)||tile==17.)){float window=smoothstep(.55,.8,texel.r)*smoothstep(.5,.7,texel.g)*(1.-smoothstep(.75,.95,texel.b));c+=texel.rgb*window*.65;}
-        gl_FragColor=vec4(mix(c,uFog,f),uAlpha);}`;
+        gl_FragColor=vec4(mix(c,uFog,f),opacity);}`;
     const compile=(type,src)=>{const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;};
     this.program=gl.createProgram();gl.attachShader(this.program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(this.program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(this.program);
     if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));gl.useProgram(this.program);
     this.attrs={};for(const name of ['aPos','aNormal','aColor','aSurface'])this.attrs[name]=gl.getAttribLocation(this.program,name);
     this.uniforms={};for(const name of ['uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uAtlas','uAtlasReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     this.initAtlas();
     gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    this.cars={};this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
+    this.cars={};this.vehicleModels=new VehicleModels(gl);this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
     this.resolutionScale=1;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
     const shadow=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2;shadow.triangle(V(0,.045,0),V(Math.cos(a)*1.22,.045,Math.sin(a)*2.55),V(Math.cos(b)*1.22,.045,Math.sin(b)*2.55),'#000000');}this.shadow=shadow.upload(gl);
     const moon=new Geometry();for(let i=0;i<32;i++){const a=i/32*Math.PI*2,b=(i+1)/32*Math.PI*2;moon.triangle(V(0,0,0),V(Math.cos(a)*30,Math.sin(a)*30,0),V(Math.cos(b)*30,Math.sin(b)*30,0),[.92,.94,.81,1]);}this.moon=moon.upload(gl);
@@ -237,8 +248,8 @@ export class Renderer {
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
       if(boss.blur>.02&&!still){
         // Local afterimages of this rival only; the road, braking markers and HUD stay sharp.
-        for(let i=4;i>=1;i--){const old=worldAt(this.track,r.rivalS-i*1.6,r.rivalLateral);this.draw(this.cars['rival-'+r.rival.id],transform(old.x,old.y+.05,old.z,old.heading+r.rivalYaw),boss.blur*(.13-i*.022));}
-        for(const side of [-1,1])this.draw(this.cars['rival-'+r.rival.id],transform(q.x+Math.cos(angle)*side*.09,q.y+.04,q.z-Math.sin(angle)*side*.09,angle),boss.blur*.08);
+        for(let i=4;i>=1;i--){const old=worldAt(this.track,r.rivalS-i*1.6,r.rivalLateral);this.drawCar('rival-'+r.rival.id,transform(old.x,old.y+.05,old.z,old.heading+r.rivalYaw),{s:r.rivalS,steer:r.rivalSteer},boss.blur*(.13-i*.022));}
+        for(const side of [-1,1])this.drawCar('rival-'+r.rival.id,transform(q.x+Math.cos(angle)*side*.09,q.y+.04,q.z-Math.sin(angle)*side*.09,angle),{s:r.rivalS,steer:r.rivalSteer},boss.blur*.08);
       }
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
       if(boss.wings>0)this.draw(this.focusAuras.drift,transform(q.x,q.y+.08,q.z,angle),still?.18:.55*Math.min(1,boss.wings/.4));
@@ -252,18 +263,17 @@ export class Renderer {
   buildMenuScene(){
     const gl=this.gl,g=new Geometry(),sky=new Geometry(),hills=new Geometry(),lights=new Geometry();
     // A separate overlook leaves the race geometry and collision corridors untouched.
-    sky.quad(V(-2200,-400,-1400),V(2200,-400,-1400),V(2200,900,-1400),V(-2200,900,-1400),[.13,.20,.29,1]);
-    const colorQuad=(a,b,c,d,low,high)=>{const normal=[0,0,1];for(const [v,col]of [[a,low],[b,low],[c,high],[a,low],[c,high],[d,high]])sky.data.push(...v,...normal,...col);};
-    colorQuad(V(-2200,-100,-1300),V(2200,-100,-1300),V(2200,430,-1300),V(-2200,430,-1300),[.61,.58,.57,1],[.12,.19,.29,1]);
+    sky.surface(V(-2200,-600,-1400),V(2200,-600,-1400),V(2200,1500,-1400),V(-2200,1500,-1400),TEXTURES.sky_sunset,[[0,0],[1,0],[1,1],[0,1]],[1,1,1,0]);
     this.menuSky=sky.upload(gl);
     let seed=826;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
     for(let layer=0;layer<4;layer++){
-      const z=-1000+layer*205,step=110-layer*15,colors=['#75818a','#5a6d7d','#3c5365','#293f50'];
-      let a=V(-1800,40+rand()*130-layer*25,z);
-      for(let i=1;i<40;i++){const b=V(-1800+i*step,20+rand()*(145-layer*12)-layer*18,z+rand()*12);hills.quad(V(a[0],-280,a[2]),V(b[0],-280,b[2]),b,a,colors[layer]);a=b;}
+      const z=-1000+layer*205,step=60,colors=['#9aa9ba','#718b9e','#496979','#294c55'],height=x=>70-layer*38+(70-layer*14)*Math.sin(x/500+layer*.9)+(16-layer*2)*Math.sin(x/170+layer*1.3)+5*Math.cos(x/90+layer);
+      let a=V(-2800,height(-2800),z);
+      for(let i=1;i<=95;i++){const x=-2800+i*step,b=V(x,height(x),z);hills.quad(V(a[0],-280,a[2]),V(b[0],-280,b[2]),b,a,colors[layer]);a=b;}
     }
     this.menuHills=hills.upload(gl);
-    g.quad(V(-80,-.03,-45),V(80,-.03,-45),V(80,-.03,60),V(-80,-.03,60),'#3c4249');
+    g.surface(V(-80,-.005,-45),V(80,-.005,-45),V(80,-.005,60),V(-80,-.005,60),TEXTURES.asphalt,[[0,0],[32,0],[32,21],[0,21]],[1.1,1.1,1.1,0]);
+    g.surface(V(-80,-.01,-45),V(80,-.01,-45),V(120,-75,-110),V(-130,-75,-110),TEXTURES.rock_cliff,[[0,0],[12,0],[12,8],[0,8]],[.6,.7,.6,0]);
     // Parking marks and the low concrete edge of the viewing point.
     for(let i=-3;i<5;i++)g.box((i+.5)*3.9,.006,-.3,.07,.012,7.9,'#a3a8ac');
     g.box(0,.009,-4.25,36,.018,.09,'#a3a8ac');
@@ -274,7 +284,7 @@ export class Renderer {
       g.box(x-1.18,5.6,-7,.64,.09,.36,[1,.72,.36,1]);
       for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2;lights.triangle(V(x-1.1,.025,-6),V(x-1.1+Math.cos(a)*4.8,.025,-6+Math.sin(a)*4),V(x-1.1+Math.cos(b)*4.8,.025,-6+Math.sin(b)*4),[.91,.78,.58,1]);}
     }
-    for(const [x,z,h]of [[-27,-8,15],[-34,-12,19],[24,-16,16],[30,-18,21],[-42,-22,24],[39,-24,22]]){
+    for(const [x,z,h]of [[-27,-8,10],[-34,-12,13],[24,-16,14],[30,-18,17],[-42,-22,18],[39,-24,18]]){
       g.box(x,h*.36,z,.52,h*.72,.52,'#45494a');
       for(let i=0;i<4;i++)g.cone(x,h*(.18+i*.16),z,h*(.25-i*.045),h*.45,i%2?'#253d40':'#2b4245',9);
     }
@@ -283,25 +293,31 @@ export class Renderer {
     this.menuGround=g.upload(gl);this.menuLightPools=lights.upload(gl);
   }
   renderMenu(mode,w,h){
-    const gl=this.gl,u=this.uniforms,mobile=w/h<.85,garage=mode==='garage',workshop=mode==='workshop';
+    const gl=this.gl,u=this.uniforms,mobile=w/h<.85,garage=mode==='garage',workshop=mode==='workshop',exhibition=mode==='menu';
+    if(exhibition&&!this.menuModel){this.menuModel=new MenuModel(gl);this.menuModel.load().then(()=>{this.boundBuffer=null;});}
     const drift=this.reducedMotion?.matches?0:Math.sin(this.time*.08)*.24;
-    const eye=mobile?(workshop?[8.5,3.4,12.3]:[9.5,3.8,13.8]):[8.4+drift,2.65,10.8-drift],target=mobile?(workshop?[0,.4,.3]:[-.2,1.8,.3]):[workshop?2.5:garage?0:-3.1,.95,1.35];
+    const eye=mobile?(workshop?[8.5,3.4,12.3]:exhibition?[7.8,3.0,11.3]:[9.5,3.8,13.8]):exhibition?[6.4+drift,2.1,8.2-drift]:[8.4+drift,2.65,10.8-drift],target=mobile?(workshop?[0,.4,.3]:exhibition?[-1.1,1.8,.3]:[-.2,1.8,.3]):exhibition?[-2.6,.65,.9]:[workshop?2.5:garage?0:-3.1,.95,1.35];
     this.eye=eye;this.target=target;
-    gl.uniformMatrix4fv(u.uView,false,lookAt(eye,target));gl.uniformMatrix4fv(u.uProjection,false,perspective((mobile?49:38)*Math.PI/180,w/h,.15,2500));
-    gl.uniform3fv(u.uFog,[.20,.28,.36]);gl.uniform3fv(u.uEye,eye);gl.uniform1f(u.uDay,.9);gl.uniform1f(u.uTunnel,0);gl.uniform4fv(u['uStreetLights[0]'],new Float32Array(12));gl.uniform1f(u.uFogStart,240);gl.uniform1f(u.uFogEnd,1600);gl.uniform1f(u.uFogFromCar,0);
+    const view=lookAt(eye,target),projection=perspective((mobile?49:38)*Math.PI/180,w/h,.15,4000);
+    gl.uniformMatrix4fv(u.uView,false,view);gl.uniformMatrix4fv(u.uProjection,false,projection);
+    gl.uniform3fv(u.uFog,[.39,.48,.58]);gl.uniform3fv(u.uEye,eye);gl.uniform1f(u.uDay,.9);gl.uniform1f(u.uTunnel,0);gl.uniform4fv(u['uStreetLights[0]'],new Float32Array(12));gl.uniform1f(u.uFogStart,240);gl.uniform1f(u.uFogEnd,1800);gl.uniform1f(u.uFogFromCar,0);
     gl.uniform3fv(u.uCar,[0,0,0]);gl.uniform2fv(u.uForward,[0,1]);gl.uniform1f(u.uHeadlights,1);gl.uniform1f(u.uRivalLights,0);
     gl.uniform4fv(u['uNetCars[0]'],new Float32Array(12));gl.uniform2fv(u['uNetForward[0]'],new Float32Array(6));gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,0);
-    gl.disable(gl.DEPTH_TEST);gl.depthMask(false);this.draw(this.menuSky);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
-    this.draw(this.menuHills);this.draw(this.moon,transform(-650,150,-900,0,.4));this.draw(this.menuGround);
-    this.draw(this.shadow,transform(0,0,0),.55);this.draw(this.cars[this.car.id],transform(0,.035,0));
+    gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.uniform1f(u.uBackdrop,2);this.draw(this.menuSky);this.draw(this.moon,transform(-900,180,-1000,.73,1.65),.025);this.draw(this.moon,transform(-900,180,-1000,.73,1.25),.055);this.draw(this.moon,transform(-900,180,-1000,.73,.85));gl.uniform1f(u.uBackdrop,0);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
+    this.draw(this.menuHills);this.draw(this.menuGround);
+    if(exhibition){for(const [size,alpha]of [[1.1,.06],[.97,.1],[.84,.14]])this.draw(this.shadow,transform(0,0,0,0,size),alpha);}else this.draw(this.shadow,transform(0,0,0),.4);
+    if(exhibition&&this.menuModel.status==='ready'){const stats=this.menuModel.draw(view,projection,eye);this.stats.drawCalls+=stats.drawCalls;this.stats.vertices+=stats.vertices;this.showcaseActive=true;gl.useProgram(this.program);this.boundBuffer=null;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.activeTexture(gl.TEXTURE0);}
+    else if(exhibition){this.menuFallback??=meshCar(gl,CARS[0].color,CARS[0].id);this.boundBuffer=null;this.draw(this.menuFallback,transform(0,.035,0));}
+    else this.drawCar(this.car.id,transform(0,.035,0),{headlights:true});
     gl.depthMask(false);this.draw(this.menuLightPools,identity(),.12);gl.depthMask(true);
   }
   setCar(car) {this.car=car;this.meshLooks??={};const key=car.id,look=appearanceKey(car);if(!this.cars[key]||this.meshLooks[key]!==look){if(this.cars[key])this.gl.deleteBuffer?.(this.cars[key].buffer);this.cars[key]=meshCar(this.gl,car.color,car.id,car.build);this.meshLooks[key]=look;}}
+  drawCar(key,model,pose={},alpha=1){const mesh=this.cars[key];if(!mesh)return;const assets=this.vehicleModels;if(assets&&ORIGINAL_CARS.has(mesh.vehicle.id)){const status=assets.statusFor(mesh.vehicle.id);if(status==='idle')assets.load(mesh.vehicle.id).then(()=>{this.boundBuffer=null;});if(status==='ready'){assets.draw(this,key,mesh.vehicle,model,pose,alpha);return;}}this.draw(mesh,model,alpha);}
   setNetworkPlayers(players){
     this.meshLooks??={};const keep=new Set();for(const p of players){const base=CARS.find(c=>c.id===p.car);if(!base)continue;const car=applyBuild(base,p.build),key='network-'+(p.id||car.id),look=appearanceKey(car);keep.add(key);
       if(!this.cars[key]||this.meshLooks[key]!==look){if(this.cars[key])this.gl.deleteBuffer?.(this.cars[key].buffer);this.cars[key]=meshCar(this.gl,car.color,car.id,car.build);this.meshLooks[key]=look;}
     }
-    for(const key of this.networkKeys||[])if(!keep.has(key)&&!CARS.some(c=>key==='network-'+c.id)){this.gl.deleteBuffer?.(this.cars[key]?.buffer);delete this.cars[key];delete this.meshLooks[key];}this.networkKeys=keep;
+    for(const key of this.networkKeys||[])if(!keep.has(key)&&!CARS.some(c=>key==='network-'+c.id)){this.gl.deleteBuffer?.(this.cars[key]?.buffer);this.vehicleModels?.forget(key);delete this.cars[key];delete this.meshLooks[key];}this.networkKeys=keep;
   }
   setRival(rival){this.rival=rival;const key='rival-'+rival.id;if(!this.cars[key])this.cars[key]=meshCar(this.gl,rival.color,rival.car);}
   setTrack(track) {
@@ -368,10 +384,10 @@ export class Renderer {
     gl.uniform1f(u.uBackdrop,1);this.draw(this.backdrop,transform(eye[0],eye[1]-100,eye[2]));gl.uniform1f(u.uBackdrop,0);
     if(!day)this.draw(this.moon,transform(eye[0]+310,eye[1]+245,eye[2]+850));
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2);
-    if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.draw(this.cars[this.car.id],transform(p.x,p.y+.04,p.z,angle));if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
+    if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.drawCar(this.car.id,transform(p.x,p.y+.04,p.z,angle),{s:race?.s||0,steer:race?.steer,headlights:!racing||race.headlights});if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
     gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,race?.rivalBraking?1:0);
-    if(rival){this.draw(this.shadow,transform(rival.x,rival.y,rival.z,ra),.4);this.draw(this.cars['rival-'+race.rival.id],transform(rival.x,rival.y+.04,rival.z,ra));this.drawBoss(race,rival,ra);}
-    for(const o of others){const q=o.world,a=q.heading+o.yaw;gl.uniform1f(u.uLampState,o.headlights?1:0);gl.uniform1f(u.uBrake,o.braking?1:0);this.draw(this.shadow,transform(q.x,q.y,q.z,a),.4);this.draw(this.cars['network-'+o.id]||this.cars['network-'+o.carId],transform(q.x,q.y+.04,q.z,a));if(o.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[o.focus.type]||this.focusAuras.balance,transform(q.x,q.y+.08,q.z,a),.19);gl.depthMask(true);}}
+    if(rival){this.draw(this.shadow,transform(rival.x,rival.y,rival.z,ra),.4);this.drawCar('rival-'+race.rival.id,transform(rival.x,rival.y+.04,rival.z,ra),{s:race.rivalS,steer:race.rivalSteer});this.drawBoss(race,rival,ra);}
+    for(const o of others){const q=o.world,a=q.heading+o.yaw;gl.uniform1f(u.uLampState,o.headlights?1:0);gl.uniform1f(u.uBrake,o.braking?1:0);this.draw(this.shadow,transform(q.x,q.y,q.z,a),.4);this.drawCar(this.cars['network-'+o.id]?'network-'+o.id:'network-'+o.carId,transform(q.x,q.y+.04,q.z,a),{s:o.s,steer:o.steer,headlights:o.headlights});if(o.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[o.focus.type]||this.focusAuras.balance,transform(q.x,q.y+.08,q.z,a),.19);gl.depthMask(true);}}
     gl.uniform1f(u.uLampState,1);
     gl.uniform1f(u.uBrake,0);
   }
@@ -406,7 +422,7 @@ export class Renderer {
   render(race,mode,dt,options={}) {
     if(!this.track||!this.car)return;
     this.time+=dt;const gl=this.gl,u=this.uniforms,canvas=this.canvas;
-    this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
+    this.showcaseActive=false;this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
     const dpr=Math.min(window.devicePixelRatio||1,this.quality)*this.resolutionScale,w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
     Object.assign(this.stats,{width:w,height:h,scale:this.resolutionScale});
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);
@@ -431,7 +447,7 @@ export class Renderer {
     }
     const shake=racing&&options.shake!==false?race.collision*.12:0;
     const actualEye=this.eye.map((v,i)=>v+(i<2?Math.sin(this.time*95+i)*shake:0));
-    const demo=mode==='title'?{mode:'time',headlights:true,netOpponents:[{carId:'rx7',s:s+18,lateral:1.4,yaw:0,headlights:true},{carId:'r32',s:s+38,lateral:-1.5,yaw:0,headlights:true}]}:null;
+    const demo=mode==='title'?{s,speed:32,mode:'time',headlights:true,netOpponents:[{carId:'rx7',s:s+18,lateral:1.4,yaw:0,headlights:true},{carId:'r32',s:s+38,lateral:-1.5,yaw:0,headlights:true}]}:null;
     this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,racing?(this.cameraMode===3?65:58)+race.speed*.18:49,mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,racing&&[1,3].includes(this.cameraMode));
     if(racing&&race.drift>.3&&race.speed>12&&mode==='race')for(const side of [-1,1])if(this.particles.length<48&&Math.random()<1-Math.exp(-dt*63))this.particles.push({x:p.x+Math.cos(angle)*side*.8-Math.sin(angle)*1.3,y:p.y+.32,z:p.z-Math.sin(angle)*side*.8-Math.cos(angle)*1.3,life:1,size:.2+Math.random()*.2});
     gl.depthMask(false);this.particles=this.particles.filter(v=>v.life>0);for(const v of this.particles){v.life-=dt*.85;v.y+=dt*.35;v.size+=dt*.65;this.draw(this.smoke,transform(v.x,v.y,v.z,v.life,v.size),v.life*.13);}gl.depthMask(true);

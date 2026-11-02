@@ -1,0 +1,116 @@
+{
+  "id": "grsupra",
+  "rig": {
+    "track": 0.8290000000000001,
+    "wheelY": 0.34,
+    "radius": 0.334,
+    "front": 1.26,
+    "rear": -1.2100000000000002,
+    "popupAngle": 0.65,
+    "id": "grsupra",
+    "size": [
+      4.379,
+      1.854,
+      1.292
+    ],
+    "label": "GR SUPRA DB42"
+  },
+  "reference": "https://global.toyota/en/newsroom/toyota/28110994.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 4838
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 1008
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1808
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 172
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1178
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 180
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 68
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 236
+    }
+  ]
+}

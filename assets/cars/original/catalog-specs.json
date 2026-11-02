@@ -1,0 +1,579 @@
+{
+  "format": 1,
+  "note": "Visual construction dimensions in metres. Stylized original meshes; visual dimensions never feed the simulator.",
+  "cars": [
+    {
+      "id": "rx7",
+      "label": "RX-7 FD3S",
+      "size": [
+        4.285,
+        1.76,
+        1.23
+      ],
+      "wb": 2.425,
+      "radius": 0.307,
+      "shape": "round",
+      "roof": [
+        0.74,
+        0.08,
+        -0.7,
+        -1.48
+      ],
+      "belt": 0.715,
+      "nose": 0.5,
+      "lights": "popup",
+      "tail": "fd",
+      "spokes": 5,
+      "wing": "pedestal",
+      "source": "https://www2.mazda.com/en/100th/cars/detail_025_rx7.html"
+    },
+    {
+      "id": "rx7amemiya",
+      "label": "RX-7 PROJECT D",
+      "size": [
+        4.285,
+        1.79,
+        1.23
+      ],
+      "wb": 2.425,
+      "radius": 0.31,
+      "shape": "round",
+      "roof": [
+        0.74,
+        0.08,
+        -0.7,
+        -1.48
+      ],
+      "belt": 0.715,
+      "nose": 0.49,
+      "lights": "amemiya",
+      "tail": "fd",
+      "spokes": 6,
+      "wing": "gt",
+      "vents": "amemiya",
+      "source": "https://www2.mazda.com/en/100th/cars/detail_025_rx7.html"
+    },
+    {
+      "id": "r32",
+      "label": "SKYLINE GT-R R32",
+      "size": [
+        4.545,
+        1.755,
+        1.34
+      ],
+      "wb": 2.615,
+      "radius": 0.316,
+      "shape": "edge",
+      "roof": [
+        0.83,
+        0.22,
+        -0.82,
+        -1.41
+      ],
+      "belt": 0.795,
+      "nose": 0.7,
+      "lights": "r32",
+      "tail": "skyline",
+      "spokes": 5,
+      "wing": "pedestal",
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/skyline_gt-r_1989.html"
+    },
+    {
+      "id": "r34",
+      "label": "SKYLINE GT-R R34",
+      "size": [
+        4.6,
+        1.785,
+        1.36
+      ],
+      "wb": 2.665,
+      "radius": 0.329,
+      "shape": "edge",
+      "roof": [
+        0.85,
+        0.26,
+        -0.75,
+        -1.35
+      ],
+      "belt": 0.825,
+      "nose": 0.73,
+      "lights": "r34",
+      "tail": "skyline",
+      "spokes": 6,
+      "wing": "tall",
+      "vents": "r34",
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/2000.html"
+    },
+    {
+      "id": "mr2",
+      "label": "MR2 SW20",
+      "size": [
+        4.17,
+        1.695,
+        1.24
+      ],
+      "wb": 2.4,
+      "radius": 0.302,
+      "shape": "wedge",
+      "roof": [
+        0.77,
+        0.1,
+        -0.6,
+        -1.04
+      ],
+      "belt": 0.735,
+      "nose": 0.54,
+      "lights": "popup",
+      "tail": "mr2",
+      "spokes": 5,
+      "wing": "pedestal",
+      "vents": "mid",
+      "targa": true,
+      "source": "https://www.toyota-global.com/company/history_of_toyota/75years/vehicle_lineage/car/id60000728/index.html"
+    },
+    {
+      "id": "s2000",
+      "label": "S2000 AP1",
+      "size": [
+        4.135,
+        1.75,
+        1.285
+      ],
+      "wb": 2.4,
+      "radius": 0.31,
+      "shape": "round",
+      "roof": [
+        0.35,
+        -0.08,
+        -0.78,
+        -1.13
+      ],
+      "belt": 0.745,
+      "nose": 0.59,
+      "lights": "s2000",
+      "tail": "s2000",
+      "spokes": 5,
+      "wing": "lip",
+      "open": true,
+      "source": "https://www.honda.co.jp/factbook/auto/s2000/199904/050.html"
+    },
+    {
+      "id": "silvia",
+      "label": "SILVIA S13",
+      "size": [
+        4.47,
+        1.69,
+        1.29
+      ],
+      "wb": 2.475,
+      "radius": 0.3,
+      "shape": "edge",
+      "roof": [
+        0.77,
+        0.15,
+        -0.76,
+        -1.3
+      ],
+      "belt": 0.755,
+      "nose": 0.64,
+      "lights": "s13",
+      "tail": "s13",
+      "spokes": 5,
+      "wing": "lip",
+      "twoTone": true,
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/silvia_qs.html"
+    },
+    {
+      "id": "180sx",
+      "label": "180SX RPS13",
+      "size": [
+        4.52,
+        1.69,
+        1.29
+      ],
+      "wb": 2.475,
+      "radius": 0.3,
+      "shape": "wedge",
+      "roof": [
+        0.77,
+        0.15,
+        -0.76,
+        -1.68
+      ],
+      "belt": 0.755,
+      "nose": 0.53,
+      "lights": "popup",
+      "tail": "180sx",
+      "spokes": 5,
+      "wing": "lip",
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/silvia_gazelle.html"
+    },
+    {
+      "id": "sileighty",
+      "label": "SILEIGHTY IMPACT BLUE",
+      "size": [
+        4.52,
+        1.69,
+        1.29
+      ],
+      "wb": 2.475,
+      "radius": 0.3,
+      "shape": "wedge",
+      "roof": [
+        0.77,
+        0.15,
+        -0.76,
+        -1.68
+      ],
+      "belt": 0.755,
+      "nose": 0.64,
+      "lights": "s13",
+      "tail": "180sx",
+      "spokes": 5,
+      "wing": "lip",
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/silvia_gazelle.html"
+    },
+    {
+      "id": "s14",
+      "label": "SILVIA S14 ZENKI",
+      "size": [
+        4.5,
+        1.73,
+        1.295
+      ],
+      "wb": 2.525,
+      "radius": 0.308,
+      "shape": "round",
+      "roof": [
+        0.77,
+        0.1,
+        -0.78,
+        -1.32
+      ],
+      "belt": 0.77,
+      "nose": 0.64,
+      "lights": "s14",
+      "tail": "s14",
+      "spokes": 5,
+      "wing": "lip",
+      "source": "https://www.nissan-global.com/EN/HERITAGE_COLLECTION/silvia_gazelle.html"
+    },
+    {
+      "id": "supra",
+      "label": "SUPRA JZA80",
+      "size": [
+        4.52,
+        1.81,
+        1.275
+      ],
+      "wb": 2.55,
+      "radius": 0.325,
+      "shape": "round",
+      "roof": [
+        0.81,
+        0.05,
+        -0.72,
+        -1.52
+      ],
+      "belt": 0.765,
+      "nose": 0.53,
+      "lights": "supra",
+      "tail": "supra",
+      "spokes": 5,
+      "wing": "hoop",
+      "source": "https://www.toyota-global.com/company/history_of_toyota/75years/vehicle_lineage/car/id60006850/index.html"
+    },
+    {
+      "id": "evo3",
+      "label": "LANCER EVOLUTION III",
+      "size": [
+        4.31,
+        1.695,
+        1.42
+      ],
+      "wb": 2.51,
+      "radius": 0.309,
+      "shape": "edge",
+      "roof": [
+        0.86,
+        0.35,
+        -0.74,
+        -1.27
+      ],
+      "belt": 0.83,
+      "nose": 0.73,
+      "lights": "evo",
+      "tail": "evo",
+      "spokes": 6,
+      "wing": "tall",
+      "vents": "evo",
+      "doors": 4,
+      "source": "https://www.mitsubishi-motors.com/en/brand/motorsports/wrc/"
+    },
+    {
+      "id": "alfa4c",
+      "label": "4C LAUNCH EDITION",
+      "size": [
+        3.99,
+        1.868,
+        1.184
+      ],
+      "wb": 2.38,
+      "radius": 0.324,
+      "shape": "round",
+      "roof": [
+        0.7,
+        0.15,
+        -0.62,
+        -1.18
+      ],
+      "belt": 0.73,
+      "nose": 0.49,
+      "lights": "4c",
+      "tail": "4c",
+      "spokes": 5,
+      "wheelStyle": "telephone",
+      "wing": "lip",
+      "vents": "mid",
+      "source": "https://alfaromeo-tools.fcaab.com.au/vehicles/4C-Buyers-Guide.pdf"
+    },
+    {
+      "id": "exige",
+      "label": "EXIGE S V6",
+      "size": [
+        4.084,
+        1.802,
+        1.129
+      ],
+      "wb": 2.37,
+      "radius": 0.322,
+      "shape": "round",
+      "roof": [
+        0.81,
+        0.22,
+        -0.52,
+        -1.15
+      ],
+      "belt": 0.7,
+      "nose": 0.46,
+      "lights": "exige",
+      "tail": "exige",
+      "spokes": 6,
+      "wing": "gt",
+      "vents": "exige",
+      "source": "https://www.lotuscars.com/en-GB/lotus-story/road-cars/exige"
+    },
+    {
+      "id": "gt3rs",
+      "label": "911 GT3 RS 991",
+      "size": [
+        4.545,
+        1.88,
+        1.291
+      ],
+      "wb": 2.457,
+      "radius": 0.347,
+      "shape": "porsche",
+      "roof": [
+        0.98,
+        0.25,
+        -0.71,
+        -1.65
+      ],
+      "belt": 0.78,
+      "nose": 0.57,
+      "lights": "911",
+      "tail": "porsche",
+      "spokes": 10,
+      "wing": "gt",
+      "vents": "911",
+      "source": "https://newsroom.porsche.com/en/products/porsche-911-gt3-rs-race-car-circuit-racetrack-everyday-driving-2015-10051.html"
+    },
+    {
+      "id": "r8",
+      "label": "R8 V10 PLUS 4S",
+      "size": [
+        4.426,
+        1.94,
+        1.24
+      ],
+      "wb": 2.65,
+      "radius": 0.342,
+      "shape": "modern",
+      "roof": [
+        0.94,
+        0.36,
+        -0.54,
+        -1.3
+      ],
+      "belt": 0.78,
+      "nose": 0.57,
+      "lights": "r8",
+      "tail": "r8",
+      "spokes": 10,
+      "wing": "pedestal",
+      "vents": "r8",
+      "source": "https://www.audi-mediacenter.com/en/audi-r8-33"
+    },
+    {
+      "id": "civic",
+      "label": "CIVIC TYPE R FK8",
+      "size": [
+        4.557,
+        1.877,
+        1.434
+      ],
+      "wb": 2.699,
+      "radius": 0.335,
+      "shape": "modern",
+      "roof": [
+        1,
+        0.4,
+        -0.77,
+        -1.73
+      ],
+      "belt": 0.84,
+      "nose": 0.69,
+      "lights": "civic",
+      "tail": "civic",
+      "spokes": 10,
+      "wing": "tall",
+      "vents": "civic",
+      "doors": 4,
+      "source": "https://hondanews.eu/eu/lv/cars/media/pressreleases/108909/2017-honda-civic-type-r1",
+      "backHeight": 1,
+      "rearGlassHeight": 1.045,
+      "rearTailY": 0.96
+    },
+    {
+      "id": "ferrari488",
+      "label": "488 GTB",
+      "size": [
+        4.568,
+        1.952,
+        1.213
+      ],
+      "wb": 2.65,
+      "radius": 0.343,
+      "shape": "round",
+      "roof": [
+        1.03,
+        0.38,
+        -0.58,
+        -1.3
+      ],
+      "belt": 0.755,
+      "nose": 0.48,
+      "lights": "488",
+      "tail": "488",
+      "spokes": 5,
+      "wing": "lip",
+      "vents": "488",
+      "source": "https://www.ferrari.com/en-EN/auto/488-gtb"
+    },
+    {
+      "id": "grsupra",
+      "label": "GR SUPRA DB42",
+      "size": [
+        4.379,
+        1.854,
+        1.292
+      ],
+      "wb": 2.47,
+      "radius": 0.334,
+      "shape": "round",
+      "roof": [
+        0.52,
+        -0.05,
+        -0.87,
+        -1.52
+      ],
+      "belt": 0.79,
+      "nose": 0.57,
+      "lights": "grsupra",
+      "tail": "grsupra",
+      "spokes": 10,
+      "wing": "ducktail",
+      "vents": "grsupra",
+      "source": "https://global.toyota/en/newsroom/toyota/28110994.html"
+    },
+    {
+      "id": "a110",
+      "label": "A110S",
+      "size": [
+        4.18,
+        1.798,
+        1.248
+      ],
+      "wb": 2.419,
+      "radius": 0.326,
+      "shape": "round",
+      "roof": [
+        0.81,
+        0.21,
+        -0.7,
+        -1.4
+      ],
+      "belt": 0.755,
+      "nose": 0.53,
+      "lights": "a110",
+      "tail": "a110",
+      "spokes": 10,
+      "wing": "lip",
+      "vents": "mid",
+      "source": "https://media.alpinecars.com/alpine-unveils-new-alpine-a110s/?lang=fra"
+    },
+    {
+      "id": "cayman",
+      "label": "718 CAYMAN",
+      "size": [
+        4.379,
+        1.801,
+        1.295
+      ],
+      "wb": 2.475,
+      "radius": 0.335,
+      "shape": "porsche",
+      "roof": [
+        0.85,
+        0.19,
+        -0.73,
+        -1.55
+      ],
+      "belt": 0.77,
+      "nose": 0.55,
+      "lights": "cayman",
+      "tail": "porsche",
+      "spokes": 10,
+      "wing": "lip",
+      "vents": "cayman",
+      "source": "https://newsroom.porsche.com/en/products/718.html"
+    },
+    {
+      "id": "gt86",
+      "label": "86 GT ZN6",
+      "size": [
+        4.24,
+        1.775,
+        1.285
+      ],
+      "wb": 2.57,
+      "radius": 0.312,
+      "shape": "round",
+      "roof": [
+        0.72,
+        0.05,
+        -0.81,
+        -1.4
+      ],
+      "belt": 0.77,
+      "nose": 0.56,
+      "lights": "gt86",
+      "tail": "gt86",
+      "spokes": 10,
+      "wing": "lip",
+      "vents": "gt86",
+      "source": "https://global.toyota/en/detail/173965"
+    }
+  ]
+}

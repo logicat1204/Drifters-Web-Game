@@ -1,0 +1,116 @@
+{
+  "id": "exige",
+  "rig": {
+    "track": 0.803,
+    "wheelY": 0.328,
+    "radius": 0.322,
+    "front": 1.21,
+    "rear": -1.1600000000000001,
+    "popupAngle": 0.65,
+    "id": "exige",
+    "size": [
+      4.084,
+      1.802,
+      1.129
+    ],
+    "label": "EXIGE S V6"
+  },
+  "reference": "https://www.lotuscars.com/en-GB/lotus-story/road-cars/exige",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 6222
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 840
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1616
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1459
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 156
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 162
+    }
+  ]
+}

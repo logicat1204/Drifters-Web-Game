@@ -1,5 +1,6 @@
 import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix,sample} from './sim.mjs';
 import {vehiclePose,resolveVehicleContact} from './traffic.mjs';
+import {remotePoses} from './presentation.mjs';
 const $=id=>document.getElementById(id);
 export function roomCode(value){try{const url=new URL(value,location.origin);const code=url.searchParams.get('room')||value.trim();return /^[A-F\d]{8}$/i.test(code)?code.toUpperCase():null;}catch{return null;}}
 export class OnlineClient {
@@ -112,10 +113,7 @@ export class OnlineClient {
     if(!resetChanged&&state.resetHold===0&&state.collision===0&&Math.abs(old.s-r.s)<10&&Math.abs(old.lateral-r.lateral)<2&&!state.finished&&state.countdown===0){r.s=mix(old.s,r.s,.45);r.lateral=mix(old.lateral,r.lateral,.45);r.yaw=mix(old.yaw,r.yaw,.45);}
     r.netPlace=self.place;r.netDnf=self.dnf;r.netFinished=state.finished;r.netPlayers=message.players;
   }
-  opponents(){
-    if(!this.snapshots.length)return [];const at=performance.now()-100,frames=this.snapshots;let a=frames[0],b=frames.at(-1);
-    for(let i=1;i<frames.length;i++)if(frames[i].received>=at){a=frames[i-1];b=frames[i];break;}
-    const t=b.received>a.received?clamp((at-a.received)/(b.received-a.received),0,1):1;
-    return b.players.filter(p=>p.id!==this.id&&p.connected&&!p.dnf).map(p=>{const prev=a.players.find(v=>v.id===p.id)?.state||p.state;return {...p,...p.state,s:mix(prev.s,p.state.s,t),lateral:mix(prev.lateral,p.state.lateral,t),yaw:mix(prev.yaw,p.state.yaw,t),carId:p.car};});
+  opponents(track=null){
+    return remotePoses(this.snapshots,performance.now()-100,track).filter(p=>p.id!==this.id);
   }
 }

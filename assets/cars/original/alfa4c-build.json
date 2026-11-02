@@ -1,0 +1,116 @@
+{
+  "id": "alfa4c",
+  "rig": {
+    "track": 0.8360000000000001,
+    "wheelY": 0.33,
+    "radius": 0.324,
+    "front": 1.2149999999999999,
+    "rear": -1.165,
+    "popupAngle": 0.65,
+    "id": "alfa4c",
+    "size": [
+      3.99,
+      1.868,
+      1.184
+    ],
+    "label": "4C LAUNCH EDITION"
+  },
+  "reference": "https://alfaromeo-tools.fcaab.com.au/vehicles/4C-Buyers-Guide.pdf",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5727
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 840
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 3248
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1248
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 156
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 560
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 212
+    }
+  ]
+}

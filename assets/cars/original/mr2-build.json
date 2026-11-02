@@ -1,0 +1,136 @@
+{
+  "id": "mr2",
+  "rig": {
+    "track": 0.7495,
+    "wheelY": 0.308,
+    "radius": 0.302,
+    "front": 1.2249999999999999,
+    "rear": -1.175,
+    "popupAngle": 0.65,
+    "id": "mr2",
+    "size": [
+      4.17,
+      1.695,
+      1.24
+    ],
+    "label": "MR2 SW20"
+  },
+  "reference": "https://www.toyota-global.com/company/history_of_toyota/75years/vehicle_lineage/car/id60000728/index.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 6118
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 864
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1568
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 180
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "popup_r",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1408
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 465
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 212
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 420
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 86
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "popup_r",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 171
+    }
+  ]
+}

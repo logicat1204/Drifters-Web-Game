@@ -1,0 +1,116 @@
+{
+  "id": "gt3rs",
+  "rig": {
+    "track": 0.842,
+    "wheelY": 0.353,
+    "radius": 0.347,
+    "front": 1.2534999999999998,
+    "rear": -1.2035,
+    "popupAngle": 0.65,
+    "id": "gt3rs",
+    "size": [
+      4.545,
+      1.88,
+      1.291
+    ],
+    "label": "911 GT3 RS 991"
+  },
+  "reference": "https://newsroom.porsche.com/en/products/porsche-911-gt3-rs-race-car-circuit-racetrack-everyday-driving-2015-10051.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5828
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 756
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1808
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 136
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1440
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 132
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 52
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 192
+    }
+  ]
+}

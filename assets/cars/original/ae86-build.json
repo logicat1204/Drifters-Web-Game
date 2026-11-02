@@ -1,0 +1,296 @@
+{
+  "reference": {
+    "length": 4.205,
+    "width": 1.625,
+    "height": 1.335,
+    "wheelbase": 2.4
+  },
+  "parts": [
+    {
+      "name": "LOD0_body",
+      "part": "body",
+      "lod": 0,
+      "triangles": 8444,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_hood",
+      "part": "hood",
+      "lod": 0,
+      "triangles": 18,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_body_hatch",
+      "part": "body_hatch",
+      "lod": 0,
+      "triangles": 1420,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_glass_hatch",
+      "part": "glass_hatch",
+      "lod": 0,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_body_coupe",
+      "part": "body_coupe",
+      "lod": 0,
+      "triangles": 1292,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_glass_coupe",
+      "part": "glass_coupe",
+      "lod": 0,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_popup_l",
+      "part": "popup_l",
+      "lod": 0,
+      "triangles": 408,
+      "pivot": [
+        -0.5400000214576721,
+        -1.309999942779541,
+        0.7419999837875366
+      ]
+    },
+    {
+      "name": "LOD0_popup_r",
+      "part": "popup_r",
+      "lod": 0,
+      "triangles": 408,
+      "pivot": [
+        0.5400000214576721,
+        -1.309999942779541,
+        0.7419999837875366
+      ]
+    },
+    {
+      "name": "LOD0_wheel",
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1776,
+      "pivot": [
+        0.0,
+        0.0,
+        0.2980000078678131
+      ]
+    },
+    {
+      "name": "LOD0_spoiler_gt",
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 540,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_vinyl_twin",
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 12,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_vinyl_apex",
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD0_lettering",
+      "part": "lettering",
+      "lod": 0,
+      "triangles": 1176,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_body",
+      "part": "body",
+      "lod": 1,
+      "triangles": 2092,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_hood",
+      "part": "hood",
+      "lod": 1,
+      "triangles": 18,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_body_hatch",
+      "part": "body_hatch",
+      "lod": 1,
+      "triangles": 488,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_glass_hatch",
+      "part": "glass_hatch",
+      "lod": 1,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_body_coupe",
+      "part": "body_coupe",
+      "lod": 1,
+      "triangles": 444,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_glass_coupe",
+      "part": "glass_coupe",
+      "lod": 1,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_popup_l",
+      "part": "popup_l",
+      "lod": 1,
+      "triangles": 112,
+      "pivot": [
+        -0.5400000214576721,
+        -1.309999942779541,
+        0.7419999837875366
+      ]
+    },
+    {
+      "name": "LOD1_popup_r",
+      "part": "popup_r",
+      "lod": 1,
+      "triangles": 112,
+      "pivot": [
+        0.5400000214576721,
+        -1.309999942779541,
+        0.7419999837875366
+      ]
+    },
+    {
+      "name": "LOD1_wheel",
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 656,
+      "pivot": [
+        0.0,
+        0.0,
+        0.2980000078678131
+      ]
+    },
+    {
+      "name": "LOD1_spoiler_gt",
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 188,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_vinyl_twin",
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 12,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_vinyl_apex",
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "LOD1_lettering",
+      "part": "lettering",
+      "lod": 1,
+      "triangles": 1176,
+      "pivot": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ]
+}

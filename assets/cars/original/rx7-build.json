@@ -1,0 +1,136 @@
+{
+  "id": "rx7",
+  "rig": {
+    "track": 0.782,
+    "wheelY": 0.313,
+    "radius": 0.307,
+    "front": 1.2374999999999998,
+    "rear": -1.1875,
+    "popupAngle": 0.65,
+    "id": "rx7",
+    "size": [
+      4.285,
+      1.76,
+      1.23
+    ],
+    "label": "RX-7 FD3S"
+  },
+  "reference": "https://www2.mazda.com/en/100th/cars/detail_025_rx7.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 4994
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1568
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 180
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 152
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "popup_r",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1083
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 200
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 420
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 86
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "popup_r",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 166
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "id": "rx7amemiya",
+  "rig": {
+    "track": 0.797,
+    "wheelY": 0.316,
+    "radius": 0.31,
+    "front": 1.2374999999999998,
+    "rear": -1.1875,
+    "popupAngle": 0.65,
+    "id": "rx7amemiya",
+    "size": [
+      4.285,
+      1.79,
+      1.23
+    ],
+    "label": "RX-7 PROJECT D"
+  },
+  "reference": "https://www2.mazda.com/en/100th/cars/detail_025_rx7.html",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 4974
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 1376
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1616
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 152
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1175
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 396
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 202
+    }
+  ]
+}

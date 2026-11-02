@@ -1,0 +1,116 @@
+{
+  "id": "a110",
+  "rig": {
+    "track": 0.801,
+    "wheelY": 0.332,
+    "radius": 0.326,
+    "front": 1.2345,
+    "rear": -1.1845,
+    "popupAngle": 0.65,
+    "id": "a110",
+    "size": [
+      4.18,
+      1.798,
+      1.248
+    ],
+    "label": "A110S"
+  },
+  "reference": "https://media.alpinecars.com/alpine-unveils-new-alpine-a110s/?lang=fra",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5774
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 840
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1808
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1349
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 156
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 125
+    }
+  ]
+}

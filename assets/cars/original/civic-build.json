@@ -1,0 +1,116 @@
+{
+  "id": "civic",
+  "rig": {
+    "track": 0.8405,
+    "wheelY": 0.341,
+    "radius": 0.335,
+    "front": 1.3744999999999998,
+    "rear": -1.3245,
+    "popupAngle": 0.65,
+    "id": "civic",
+    "size": [
+      4.557,
+      1.877,
+      1.434
+    ],
+    "label": "CIVIC TYPE R FK8"
+  },
+  "reference": "https://hondanews.eu/eu/lv/cars/media/pressreleases/108909/2017-honda-civic-type-r1",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5076
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 1024
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1808
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 180
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 136
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1298
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 384
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 86
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 52
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 204
+    }
+  ]
+}

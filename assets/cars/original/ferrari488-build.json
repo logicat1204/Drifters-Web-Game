@@ -1,0 +1,116 @@
+{
+  "id": "ferrari488",
+  "rig": {
+    "track": 0.878,
+    "wheelY": 0.34900000000000003,
+    "radius": 0.343,
+    "front": 1.3499999999999999,
+    "rear": -1.3,
+    "popupAngle": 0.65,
+    "id": "ferrari488",
+    "size": [
+      4.568,
+      1.952,
+      1.213
+    ],
+    "label": "488 GTB"
+  },
+  "reference": "https://www.ferrari.com/en-EN/auto/488-gtb",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5988
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 728
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1568
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 132
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1378
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 132
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 420
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 52
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 181
+    }
+  ]
+}
