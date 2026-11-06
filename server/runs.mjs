@@ -13,7 +13,8 @@ export class Runs {
     const car=CARS.find(c=>c.id===data.car),track=TRACKS.find(t=>t.id===(stage?.track||data.track));
     if(!car||!user.cars.includes(car.id)||!track||!['time','battle','arcade','campaign'].includes(data.mode))throw Error('Configuración de carrera inválida o coche no comprado.');
     const chapter=stage?CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter):null;
-    const options={build:this.store.vehicleBuild(userId,car.id),mode:data.mode,manual:data.manual===true,wet:stage?!!chapter.wet:data.wet===true,night:stage?stage.index<14:data.night!==false,...this.store.loadout(userId),...(stage?{campaignStage:stage.id,rival:{...stage,code:CARS.find(c=>c.id===stage.car).code},fog:!!chapter.fog}:{})},id=randomUUID();
+    const rematch=!!stage&&user.campaign.some(result=>result.id===stage.id);
+    const options={build:this.store.vehicleBuild(userId,car.id),mode:data.mode,manual:data.manual===true,wet:stage?rematch||!!chapter.wet:data.wet===true,night:stage?stage.index<14:data.night!==false,...this.store.loadout(userId),...(stage?{campaignStage:stage.id,rematch,rival:{...stage,code:CARS.find(c=>c.id===stage.car).code},fog:!!chapter.fog}:{})},id=randomUUID();
     this.pending.set(id,{userId,car,track,options,created:this.now(),busy:false});return {id,track:track.id,options};
   }
   async submit(userId,id,frames){

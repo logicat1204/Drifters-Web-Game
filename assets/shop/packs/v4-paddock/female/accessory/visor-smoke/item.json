@@ -1,0 +1,12 @@
+{
+  "base": "female",
+  "rig": "portrait-v2-female",
+  "slot": "accessory",
+  "name": "Gafas Smoke · Mujer",
+  "price": 230,
+  "rarity": "rare",
+  "layers": {
+    "image": "image.png"
+  },
+  "id": "female.accessory.visor-smoke"
+}

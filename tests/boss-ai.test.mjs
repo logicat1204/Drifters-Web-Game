@@ -6,12 +6,15 @@ import {CAMPAIGN_STAGES} from '../js/campaign.mjs';
 import {createBossState,updateBossState,KANATA_COUNTER} from '../js/bosses.mjs';
 import {Store} from '../server/store.mjs';
 import {Runs} from '../server/runs.mjs';
+import {driverInput} from './helpers/reference-driver.mjs';
 const stage=id=>CAMPAIGN_STAGES.find(s=>s.id===id);
 function fixture(id){
  const rival=stage(id),r=createRace(CARS[1],makeTrack(ALL_TRACKS.find(t=>t.id===rival.track)),{rival});r.countdown=0;r.timeLeft=1000;
  r.opponent=createRace(rivalCar(rival),r.track,{mode:'time',aiDriver:rival,focusEnabled:false});
  Object.assign(r.opponent,{countdown:0,s:100,speed:40,lateral:.3,cornerSpeed:45});r.s=90;return r;
 }
+const windup=r=>{for(let i=0;i<100;i++)updateBossState(r,.05,0);};
+
 test('Takumi D keeps Skiller while final Sawatari and Kanata use Complete; retired difficulty is absent',()=>{
  assert.equal(stage('takumi-project').style,'Skiller');assert.equal(stage('kanata-final').style,'Complete');assert.equal(stage('sawatari').style,'Complete');
  assert.equal(CAMPAIGN_STAGES.filter(s=>s.boss).length,5);
@@ -50,50 +53,69 @@ test('Keisuke needs sustained smooth speed in a bend; Beckenbauer always has his
  for(let i=0;i<20;i++)updateBossState(r,.05,.004);assert.ok(r.boss.flow>1);assert.equal(r.boss.eventId,1);
  const b=createBossState(stage('beckenbauer'));assert.equal(b.id,'beckenbauer');assert.equal(createBossState(stage('kenji')),null);
 });
-test('Kanata reacts to a confirmed pass with a delayed bounded boost and a chase-only crimson aura',()=>{
+test('Kanata waits five seconds before Fireball, without early aura or power and without stacking',()=>{
  const r=fixture('kanata-final');updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);
- r.s=102;updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);
- r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.enraged,true);assert.equal(r.boss.boostCount,1);assert.equal(r.boss.boost,0);
- for(let i=0;i<12;i++)updateBossState(r,.05,0);assert.equal(r.boss.boost,0);
- updateBossState(r,.051,0);assert.ok(r.boss.boost>6.9);assert.equal(r.opponent.aiDriver.counter,KANATA_COUNTER);
+ r.s=102;updateBossState(r,.01,0);assert.equal(r.boss.windup,0);
+ r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.windup,5);assert.equal(r.boss.boostCount,1);assert.equal(r.boss.boost,0);
+ for(let i=0;i<499;i++)updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.boost,0);assert.equal(r.opponent.aiDriver.counter,null);assert.equal(r.boss.eventId,0);
+ updateBossState(r,.01,0);assert.equal(r.boss.enraged,true);assert.equal(r.boss.windup,0);assert.equal(r.boss.boost,7);assert.equal(r.opponent.aiDriver.counter,KANATA_COUNTER);assert.match(r.boss.message,/FIREBALL/);
  for(let i=0;i<30;i++){r.s=i%2?95:105;updateBossState(r,.05,0);}assert.equal(r.boss.boostCount,1);
- for(let i=0;i<180;i++)updateBossState(r,.05,0);assert.equal(r.boss.boost,0);assert.equal(r.opponent.aiDriver.counter,null);assert.equal(r.boss.enraged,false);
- r.s=95;updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.boostCount,2);
+ r.s=90;for(let i=0;i<100;i++)updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.boost,0);assert.equal(r.opponent.aiDriver.counter,null);
+ r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.boostCount,2);assert.equal(r.boss.windup,5);assert.equal(r.boss.enraged,false);
 });
+
 test('starting ahead or recovering cannot manufacture Kanata counterattacks or Takumi wings',()=>{
  for(const id of ['kanata-final','takumi-project']){const r=fixture(id);r.s=110;updateBossState(r,.05,0);assert.equal(r.boss.boostCount,0);assert.equal(r.boss.wings,0);r.resetHold=.4;r.s=90;updateBossState(r,.05,0);r.s=110;updateBossState(r,.05,0);assert.equal(r.boss.boostCount,0);assert.equal(r.boss.wings,0);}
 });
 test('Kanata boost changes acceleration through physics without teleportation or unbounded speed',()=>{
- const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);for(let i=0;i<14;i++)updateBossState(r,.05,0);
- const boosted=structuredClone(r),normal=structuredClone(r);normal.boss.boost=0;normal.opponent.aiDriver.counter=null;
- for(let i=0;i<120;i++){const before=boosted.opponent.s;updateRace(boosted,{},1/120);updateRace(normal,{},1/120);assert.ok(boosted.opponent.s-before<.8);assert.ok(boosted.opponent.speed<=boosted.opponent.car.max*KANATA_COUNTER.topSpeed);}
+ const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);windup(r);r.s=300;r.lateral=-2.5;
+ const boosted=structuredClone(r),normal=structuredClone(r);normal.boss.enraged=false;normal.boss.boost=0;normal.opponent.aiDriver.counter=null;
+ for(let i=0;i<120;i++){const before=boosted.opponent.s;updateRace(boosted,{},1/120);updateRace(normal,{},1/120);assert.ok(boosted.opponent.s-before<=boosted.opponent.car.max*KANATA_COUNTER.topSpeed*1.05/120+.001);assert.ok(boosted.opponent.speed<=boosted.opponent.car.max*KANATA_COUNTER.topSpeed);}
  assert.ok(boosted.opponent.speed>normal.opponent.speed+1);assert.ok(boosted.opponent.s>normal.opponent.s+1);
 });
 test('a final-stretch pass can finish before Kanata responds, and same-tick finish order is fair',()=>{
  const r=fixture('kanata-final'),end=r.track.length;r.s=end-18;r.opponent.s=end-12;r.opponent.speed=20;r.speed=64;r.lateral=-2.5;r.boss.confirmedSide=-1;
- for(let i=0;i<120&&!r.finished;i++)updateRace(r,{throttle:true},1/120);assert.ok(r.won);assert.ok(r.boss.enraged);assert.equal(r.boss.boost,0);
+ for(let i=0;i<120&&!r.finished;i++)updateRace(r,{throttle:true},1/120);assert.ok(r.won);assert.equal(r.boss.enraged,false);assert.ok(r.boss.windup>0);assert.equal(r.boss.boost,0);
  for(const playerFirst of [true,false]){const q=fixture('takumi-project');q.s=q.track.length-(playerFirst?.1:.35);q.opponent.s=q.track.length-(playerFirst?.35:.1);q.speed=q.opponent.speed=40;q.lateral=-2.5;updateRace(q,{throttle:true},.01);assert.ok(q.finished);assert.equal(q.won,playerFirst);}
 });
 test('server fixes rival identity and rejects client-only AI power fields',async()=>{
- const store=new Store(':memory:');try{const user=await store.register('BossSecurity24','password-2026');const run=new Runs(store).start(user.id,{car:'ae86',mode:'campaign',campaignStage:'kenji',difficulty:'easy',rival:{id:'kanata-final',level:0},aiDriver:{counter:KANATA_COUNTER},boss:{boost:999}});assert.equal(run.options.rival.id,'kenji');assert.equal(run.options.rival.level,1);for(const key of ['difficulty','aiDriver','boss'])assert.equal(run.options[key],undefined);}finally{store.close();}
+ const store=new Store(':memory:');try{const user=await store.register('BossSecurity24','password-2026');store.updateProfile(user.id,{complete:true});const run=new Runs(store).start(user.id,{car:'ae86',mode:'campaign',campaignStage:'kenji',difficulty:'easy',rival:{id:'kanata-final',level:0},aiDriver:{counter:KANATA_COUNTER},boss:{boost:999}});assert.equal(run.options.rival.id,'kenji');assert.equal(run.options.rival.level,1);for(const key of ['difficulty','aiDriver','boss'])assert.equal(run.options[key],undefined);}finally{store.close();}
 });
 test('Kanata aura and all counter power stop exactly one continuous second after he retakes the lead',()=>{
- const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);for(let i=0;i<15;i++)updateBossState(r,.05,0);
+ const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);windup(r);
  assert.ok(r.boss.enraged&&r.boss.boost>0);r.s=90;
  for(let i=0;i<99;i++)updateBossState(r,.01,0);
  assert.ok(r.boss.enraged);assert.ok(r.boss.boost>0);assert.equal(r.opponent.aiDriver.counter,KANATA_COUNTER);
  updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.boost,0);assert.equal(r.boss.windup,0);assert.equal(r.opponent.aiDriver.counter,null);assert.ok(r.boss.cooldown>0);
 });
-test('a temporary Kanata lead does not accumulate toward the one-second grace period',()=>{
- const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);
+test('temporary leads do not accumulate and a recovered-position cycle gives another full warning',()=>{
+ const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);windup(r);
  r.s=99;for(let i=0;i<60;i++)updateBossState(r,.01,0);assert.ok(r.boss.enraged);
  r.s=101;updateBossState(r,.01,0);assert.equal(r.boss.leadTime,0);
  r.s=99;for(let i=0;i<99;i++)updateBossState(r,.01,0);assert.ok(r.boss.enraged);
- updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);
- // Narrow but sustained leads can end the mode without trapping the pass detector.
- assert.equal(r.boss.confirmedSide,-1);r.s=105;updateBossState(r,.01,0);assert.ok(r.boss.enraged);assert.equal(r.boss.boostCount,1,'cooldown prevents stacking a second impulse');
- for(let i=0;i<250;i++)updateBossState(r,.05,0);r.s=90;for(let i=0;i<20;i++)updateBossState(r,.05,0);r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.boostCount,2);
+ updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.confirmedSide,-1);
+ r.s=105;updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.windup,5);assert.equal(r.boss.boostCount,2);windup(r);assert.ok(r.boss.enraged);
 });
+
+test('Kanata recovering before the warning ends cancels the pending Fireball with the usual one-second grace',()=>{
+ const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);for(let i=0;i<60;i++)updateBossState(r,.05,0);
+ r.s=99;for(let i=0;i<99;i++)updateBossState(r,.01,0);assert.ok(r.boss.windup>0);assert.equal(r.boss.enraged,false);
+ updateBossState(r,.01,0);assert.equal(r.boss.windup,0);assert.equal(r.boss.boost,0);assert.equal(r.opponent.aiDriver.counter,null);
+ for(let i=0;i<300;i++)updateBossState(r,.01,0);assert.equal(r.boss.enraged,false);assert.equal(r.boss.eventId,0);
+});
+
+test('Odawara uses Difficult Nozomi and Yashio followed by Professional Jackson',()=>{
+ assert.deepEqual(CAMPAIGN_STAGES.filter(s=>s.chapter==='odawara').map(s=>[s.id,s.level,s.style]),[['nozomi',3,'Skiller'],['kakeru',3,'Grip'],['jackson',4,'Complete']]);
+});
+
+test('Fireball catches and passes a fully upgraded fast car on Manazuru without wall or bumper impacts',()=>{
+ const rival=stage('kanata-final'),track=makeTrack(ALL_TRACKS.find(t=>t.id===rival.track)),r=createRace(CARS[2],track,{rival,mode:'campaign',build:{engine:3,chassis:3,brakes:3},focusEnabled:false,night:false});
+ Object.assign(r,{s:500,speed:r.car.max*.98,lateral:0,countdown:0,timeLeft:1000});r.opponent=createRace(rivalCar(rival),track,{mode:'time',aiDriver:rival,focusEnabled:false});Object.assign(r.opponent,{s:430,speed:70,lateral:0,countdown:0,timeLeft:1000});r.boss.confirmedSide=-1;
+ let activeAt=null,passedAt=null,peak=0,hits=0,walls=0;
+ for(let i=0;i<15*120;i++){const contact=r.contactCooldown,wall=r.opponent.wallCooldown;updateRace(r,driverInput({...r,lateral:r.lateral+r.lateralV*.45},{line:0,gripUse:.9}),1/120);if(r.boss.enraged)activeAt??=r.elapsed;peak=Math.max(peak,r.rivalSpeed);if(r.contactCooldown>contact+.1)hits++;if(r.opponent.wallCooldown>wall+.1)walls++;if(r.rivalS>r.s+11){passedAt=r.elapsed;break;}}
+ assert.ok(activeAt>=5&&activeAt<5.02);assert.ok(passedAt&&passedAt-activeAt<7,'the strengthened attack must recover before its impulse ends');assert.ok(peak>r.car.max*1.20);assert.equal(hits,0);assert.equal(walls,0);
+});
+
 test('final-course Complete drivers improve straight speed and full-course time without any wall contacts',()=>{
  for(const id of ['sawatari','kanata-final']){
   const metrics=[];for(const style of ['Skiller','Complete']){

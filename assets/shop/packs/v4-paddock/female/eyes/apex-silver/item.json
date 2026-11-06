@@ -1,0 +1,12 @@
+{
+  "base": "female",
+  "rig": "portrait-v2-female",
+  "slot": "eyes",
+  "name": "Mirada Apex Silver · Mujer",
+  "price": 290,
+  "rarity": "rare",
+  "layers": {
+    "image": "image.png"
+  },
+  "id": "female.eyes.apex-silver"
+}

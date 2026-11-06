@@ -1,0 +1,11 @@
+{
+ "akina":{"x":22,"y":26,"region":"Gunma"},
+ "akagi":{"x":43,"y":18,"region":"Gunma"},
+ "iroha":{"x":70,"y":14,"region":"Tochigi"},
+ "usui":{"x":14,"y":46,"region":"Gunma / Nagano"},
+ "tsukuba":{"x":81,"y":40,"region":"Ibaraki"},
+ "tsubaki":{"x":27,"y":68,"region":"Kanagawa"},
+ "odawara":{"x":57,"y":65,"region":"Kanagawa"},
+ "ashinoko":{"x":39,"y":84,"region":"Hakone"},
+ "manazuru":{"x":76,"y":84,"region":"Kanagawa"}
+}

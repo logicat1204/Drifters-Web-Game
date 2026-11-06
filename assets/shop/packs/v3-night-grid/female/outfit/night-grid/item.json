@@ -1,0 +1,13 @@
+{
+  "base": "female",
+  "rig": "portrait-v2-female",
+  "slot": "outfit",
+  "name": "Chaqueta Night Grid · Mujer",
+  "price": 520,
+  "rarity": "rare",
+  "layers": {
+    "color": "color.png",
+    "lines": "lines.png"
+  },
+  "id": "female.outfit.night-grid"
+}

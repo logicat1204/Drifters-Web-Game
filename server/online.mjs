@@ -18,7 +18,7 @@ export class OnlineRooms {
   }
   send(c,message){c.send(message);}
   broadcast(room,message){for(const p of room.players.values())if(p.connected)this.send(p.client,message);}
-  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,ready:p.ready,connected:p.connected}))};}
+  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,connected:p.connected}))};}
   publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,players:r.players.size,maxPlayers:4}));}
   details(c,data){if(!this.store)return profile(data);const user=this.store.user(c.identity?.id);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:this.store.vehicleBuild(user.id,user.defaultCar)};}
   revoke(userId){for(const c of this.clients)if(c.identity?.id===userId){this.disconnect(c);c.close(4001,'Sesión cerrada');}}
@@ -49,7 +49,9 @@ export class OnlineRooms {
       if(data.type==='profile'){
         if(room.phase!=='lobby')throw Error('El coche queda bloqueado al comenzar.');Object.assign(p,this.details(c,data),{ready:false});this.publish(room);
       }else if(data.type==='ready'){
-        if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');p.ready=data.ready===true;this.publish(room);
+        if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');p.ready=data.ready===true;
+        if(p.ready)p.manual=data.manual===true;
+        this.publish(room);
       }else if(data.type==='config'){
         if(room.hostId!==c.id)throw Error('Solo el anfitrión puede elegir el circuito.');if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');room.config=config(data.config||{});for(const other of room.players.values())other.ready=false;this.publish(room);
       }else if(data.type==='start'){
@@ -58,7 +60,7 @@ export class OnlineRooms {
         room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.phase='racing';room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
         for(const other of room.players.values()){
           if(this.store)other.build=this.store.vehicleBuild(other.userId,other.car);
-          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',build:this.store?this.store.vehicleBuild(other.userId,other.car):undefined,night:room.config.night,wet:room.config.wet,...(this.store?this.store.loadout(other.userId):{})});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
+          const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',manual:!!other.manual,build:this.store?this.store.vehicleBuild(other.userId,other.car):undefined,night:room.config.night,wet:room.config.wet,...(this.store?this.store.loadout(other.userId):{})});r.s=24-Math.floor(i/2)*7;r.lateral=i%2?2:-2;r.countdown=3;r.timeLeft=Math.ceil(room.track.length/20)+90;other.input={...IDLE_INPUT};other.inputAt=now;other.place=null;other.dnf=false;other.saved=false;i++;
         }
         this.publish(room);this.snapshot(room);return;
       }else if(data.type==='reposition'||data.type==='focus'){
@@ -71,7 +73,7 @@ export class OnlineRooms {
       }else if(data.type==='input'){
         if(room.phase!=='racing'||p.dnf||p.race.finished)return;
         if(!Number.isSafeInteger(data.seq)||data.seq<=p.sequence||typeof data.steer!=='number'||!Number.isFinite(data.steer))return;
-        p.sequence=data.seq;p.inputAt=now;p.input={steer:clamp(data.steer,-1,1),throttle:data.throttle===true,brake:data.brake===true,handbrake:data.handbrake===true};
+        p.sequence=data.seq;p.inputAt=now;p.input={steer:clamp(data.steer,-1,1),throttle:data.throttle===true,brake:data.brake===true,handbrake:data.handbrake===true,gear:Number.isInteger(data.gear)&&data.gear>=1&&data.gear<=5?data.gear:undefined,gearEpoch:data.gearEpoch};
         p.race.headlights=data.headlights!==false;
       }else if(data.type==='rematch'){
         if(room.hostId!==c.id)throw Error('Solo el anfitrión puede abrir la revancha.');if(room.phase!=='results')throw Error('La carrera todavía no terminó.');

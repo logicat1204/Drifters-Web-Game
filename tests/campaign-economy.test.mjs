@@ -8,11 +8,28 @@ import {CARS,ALL_CARS,ALL_TRACKS,createRace,makeTrack,updateRace} from '../js/si
 import {activateFocus,updateFocus,FOCUS_TYPES} from '../js/focus.mjs';
 import {defaultAvatar,COSMETICS} from '../js/avatar.mjs';
 import {RunRecorder} from '../js/replay.mjs';
-import {driverInput} from './helpers/reference-driver.mjs';
+import {driverInput,kanataLateInput} from './helpers/reference-driver.mjs';
 const media=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',import.meta.url)));
 function stageRace(stage,car=CARS[2]){const chapter=CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter);return createRace(car,makeTrack(ALL_TRACKS.find(t=>t.id===stage.track)),{mode:'campaign',campaignStage:stage.id,rival:stage,wet:!!chapter.wet,fog:!!chapter.fog,focusEnabled:false});}
 function win(store,user,stage,index=0,points=9000){const race=stageRace(stage);Object.assign(race,{s:race.track.length,elapsed:160,finished:true,won:true});race.skill.points=points;return store.addRun('win-'+stage.id+'-'+index,user.id,race);}
-async function fixture(){const store=new Store(':memory:'),user=await store.register('CampaignDriver','night-password-24');return {store,user};}
+async function fixture(defaultCar='ae86'){const store=new Store(':memory:'),account=await store.register('CampaignDriver','night-password-24');const user=store.updateProfile(account.id,{complete:true,defaultCar});return {store,user};}
+test('only a cleared campaign stage becomes a rain rematch, regardless of client weather',async()=>{
+  const {store,user}=await fixture();
+  try {
+    const runs=new Runs(store);
+    const start=(campaignStage,wet,rematch)=>runs.start(user.id,{car:'ae86',mode:'campaign',campaignStage,wet,rematch}).options;
+    const first=start('kenji',true,true);
+    assert.equal(first.wet,false);
+    assert.equal(first.rematch,false);
+    win(store,user,CAMPAIGN_STAGES[0]);
+    const next=start('iketani-akina',true,true);
+    assert.equal(next.wet,false);
+    assert.equal(next.rematch,false);
+    const retry=start('kenji',false,false);
+    assert.equal(retry.wet,true);
+    assert.equal(retry.rematch,true);
+  } finally {store.close();}
+});
 test('the guide has 24 ordered opponents, nine campaigns and real portrait/comic files',()=>{
   assert.equal(CAMPAIGN_STAGES.length,24);assert.equal(CAMPAIGN_CHAPTERS.length,9);assert.equal(CAMPAIGN_LEVELS.length,5);assert.equal(new Set(CAMPAIGN_STAGES.map(s=>s.id)).size,24);
   for(const stage of CAMPAIGN_STAGES){assert.ok(stage.level>=1&&stage.level<=5);assert.ok(DRIVER_STYLES[stage.style]);assert.ok(ALL_CARS.some(c=>c.id===stage.car));assert.ok(ALL_TRACKS.some(t=>t.id===stage.track));for(const src of [media.stages[stage.id].portrait,...media.stages[stage.id].comics])assert.ok(existsSync(new URL('..'+decodeURIComponent(src),import.meta.url)),src);}
@@ -53,11 +70,11 @@ test('purchases are permanent, gender-scoped, atomic and idempotent',async()=>{
   }finally{store.close();}
 });
 test('a real campaign replay grants the first clear, while fabricated focus actions fail for a locked account',async()=>{
-  let now=0;const {store,user}=await fixture(),runs=new Runs(store,{now:()=>now});try{
+  let now=0;const {store,user}=await fixture('r32'),runs=new Runs(store,{now:()=>now});try{
     const attempt=runs.start(user.id,{car:'r32',mode:'campaign',campaignStage:'kenji',difficulty:'normal'}),r=createRace(CARS[2],makeTrack(ALL_TRACKS.find(t=>t.id===attempt.track)),attempt.options),recorder=new RunRecorder();
     for(let i=0;i<120*900&&!r.finished;i++)updateRace(r,recorder.capture(r,driverInput(r,{line:-2.5,gripUse:.90})),1/120);assert.equal(r.won,true);now=900000;
     const saved=await runs.submit(user.id,attempt.id,recorder.frames);assert.equal(saved.user.campaign[0].id,'kenji');assert.ok(saved.reward.coins>=300);assert.equal((await runs.submit(user.id,attempt.id,[])).user.coins,saved.user.coins);
-    const bad=runs.start(user.id,{car:'ae86',track:'usui',mode:'time',difficulty:'normal'});await assert.rejects(runs.submit(user.id,bad.id,[[1,0,1,1,1]]),/concentración inválida/);
+    const bad=runs.start(user.id,{car:'r32',track:'usui',mode:'time',difficulty:'normal'});await assert.rejects(runs.submit(user.id,bad.id,[[1,0,1,1,1]]),/concentración inválida/);
   }finally{store.close();}
 });
 test('Ashinoko forces rain and fog and ignores a submitted dry daytime setup',async()=>{
@@ -79,7 +96,7 @@ test('each campaign stage can be won with a starter machine and a physically dri
   for(const stage of CAMPAIGN_STAGES){let won=false;
     for(const type of ['time','drift']){for(const line of [-2.5,2.5,0]){for(const car of CARS.slice(0,3)){
       const r=stageRace(stage,car);r.countdown=0;r.timeLeft=10000;r.focus.enabled=stage.index>=3;r.focus.type=stage.index>=7?type:stage.index>=5?'time':'balance';
-      for(let i=0;i<108000&&!r.finished;i++){if(r.focus.charge>=60)activateFocus(r);updateRace(r,driverInput(r,{line,gripUse:.90}),1/120);}
+      for(let i=0;i<108000&&!r.finished;i++){const final=stage.id==='kanata-final';if(r.focus.charge>=60&&(!final||r.track.length-r.s<320))activateFocus(r);updateRace(r,final?kanataLateInput(r,{line,gripUse:.90}):driverInput(r,{line,gripUse:.90}),1/120);}
       if(r.won){won=true;break;}
     }if(won)break;}if(won)break;}
     assert.ok(won,stage.id+' must be beatable without purchases');
@@ -89,7 +106,7 @@ test('the five difficulty levels have strictly increasing physical pace on the s
   const times=[];for(let level=1;level<=5;level++){const r=stageRace({...CAMPAIGN_STAGES[2],level});r.countdown=0;r.timeLeft=10000;for(let i=0;i<108000&&!r.rivalFinished;i++)updateRace(r,{},1/120);assert.ok(r.rivalFinished);times.push(r.elapsed);}for(let i=1;i<times.length;i++)assert.ok(times[i]<times[i-1],JSON.stringify(times));
 });
 test('a complete Kanata counterattack duel replays identically on the authoritative server',async()=>{
- let now=0;const {store,user}=await fixture();try{
+ let now=0;const {store,user}=await fixture('r32');try{
   for(const stage of CAMPAIGN_STAGES.slice(0,-1))win(store,user,stage);
   store.updateProfile(user.id,{focusType:'time'});const runs=new Runs(store,{now:()=>now}),attempt=runs.start(user.id,{car:'r32',mode:'campaign',campaignStage:'kanata-final'});
   const r=createRace(CARS[2],makeTrack(ALL_TRACKS.find(t=>t.id===attempt.track)),attempt.options),recorder=new RunRecorder();let counterSeen=false;
@@ -98,7 +115,7 @@ test('a complete Kanata counterattack duel replays identically on the authoritat
    updateRace(r,recorder.capture(r,driverInput(r,{line:-2.5,gripUse:.90})),1/120);
    counterSeen||=(r.boss.boost>0);
   }
-  assert.ok(r.finished);assert.ok(r.won);assert.ok(r.boss.enraged);assert.ok(counterSeen);now=900000;
-  const result=await runs.submit(user.id,attempt.id,recorder.frames);assert.ok(result.user.campaign.some(s=>s.id==='kanata-final'));assert.ok(result.reward.coins>0);
+  assert.ok(r.finished);assert.equal(r.won,false,'an early attack must now lose to Fireball');assert.ok(counterSeen);now=900000;
+  const result=await runs.submit(user.id,attempt.id,recorder.frames);assert.equal(result.won,r.won);assert.equal(result.time,r.elapsed);assert.equal(result.user.campaign.some(s=>s.id==='kanata-final'),false);assert.equal(result.reward.coins,0);
  }finally{store.close();}
 });

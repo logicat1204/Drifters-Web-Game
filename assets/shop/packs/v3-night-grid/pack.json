@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "v3-night-grid",
+  "items": [
+    "male/outfit/night-grid/item.json",
+    "male/hair/midnight-flow/item.json",
+    "female/outfit/night-grid/item.json",
+    "female/hair/midnight-flow/item.json"
+  ]
+}

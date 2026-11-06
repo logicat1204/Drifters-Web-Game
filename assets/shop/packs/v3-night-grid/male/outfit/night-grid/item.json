@@ -1,0 +1,13 @@
+{
+  "base": "male",
+  "rig": "portrait-v2-male",
+  "slot": "outfit",
+  "name": "Chaqueta Night Grid · Hombre",
+  "price": 520,
+  "rarity": "rare",
+  "layers": {
+    "color": "color.png",
+    "lines": "lines.png"
+  },
+  "id": "male.outfit.night-grid"
+}

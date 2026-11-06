@@ -1,0 +1,12 @@
+{
+  "base": "male",
+  "rig": "portrait-v2-male",
+  "slot": "accessory",
+  "name": "Gafas Smoke · Hombre",
+  "price": 230,
+  "rarity": "rare",
+  "layers": {
+    "image": "image.png"
+  },
+  "id": "male.accessory.visor-smoke"
+}

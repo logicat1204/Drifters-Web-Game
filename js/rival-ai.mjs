@@ -98,8 +98,11 @@ export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,clamp}){
   o.aiDriver??=createAIDriver(r.rival);
   const level=AI_LEVELS[rivalLevel(r.rival)],styleName=rivalStyle(r.rival),style=AI_STYLES[styleName],driver=o.aiDriver;
   const boost=driver?.counter,grip=lateralGrip(o.car,o.wet)*(boost?.grip||1),p=sample(o.track,o.s),v=o.speed;
+  // Rematch rivals use more of the available wet grip and brake closer to the bend.
+  const cornerGrip=level.grip*style.corner*(r.rematch?1.12:1);
+  const brakePlan=style.brakePlan*(r.rematch?1.14:1);
   let target=o.car.max*level.speed*(boost?.topSpeed||1)*draftSpeedMultiplier(o);
-  for(let ahead=0;ahead<=style.preview;ahead+=8){const bend=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*level.grip*style.corner/Math.max(.0001,bend));target=Math.min(target,Math.sqrt(safe*safe+2*style.brakePlan*ahead));}
+  for(let ahead=0;ahead<=style.preview;ahead+=8){const bend=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*cornerGrip/Math.max(.0001,bend));target=Math.min(target,Math.sqrt(safe*safe+2*brakePlan*ahead));}
   if(driver){
     const slide=styleName==='Skiller'&&Math.abs(p.curve)>.0014&&v>15?Math.min(1,Math.abs(p.curve)/.004):0;
     driver.slide+=(slide-driver.slide)*(1-Math.exp(-dt*(slide?5:7)));
@@ -109,7 +112,7 @@ export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,clamp}){
   }
   const normalLine=clamp(.1+sample(o.track,o.s+26).curve*style.line*40,-.65,.85),plan=planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp});
   target=plan.target;
-  if(plan.maneuver&&Math.abs(plan.line-o.lateral)>.3&&Math.abs(p.curve)>.001)target=Math.min(target,Math.sqrt(grip*level.grip*style.corner*plan.reserve/Math.abs(p.curve)));
+  if(plan.maneuver&&Math.abs(plan.line-o.lateral)>.3&&Math.abs(p.curve)>.001)target=Math.min(target,Math.sqrt(grip*cornerGrip*plan.reserve/Math.abs(p.curve)));
   driver.targetSpeed=target;
   const change=(plan.line-(o.targetLine??o.lateral))*(1-Math.exp(-dt*(plan.maneuver?2.6:1.4)));
   o.targetLine=(o.targetLine??o.lateral)+(plan.maneuver?clamp(change,-plan.laneRate*dt,plan.laneRate*dt):change);

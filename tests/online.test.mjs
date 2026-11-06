@@ -31,6 +31,32 @@ test('the countdown closes admission immediately and preserves profile and car',
 test('the server accepts controls but ignores forged positions, speed and race results',()=>{
   const f=fixture(),g=f.join();for(const c of [f.host,g])f.send(c,'ready',{ready:true});f.send(f.host,'start');const p=f.room.players.get(g.id);p.race.countdown=0;f.send(g,'input',{seq:1,steer:0,throttle:true,s:999999,speed:99999,finished:true,place:1,headlights:false});f.service.step();assert.ok(p.race.s<25);assert.ok(p.race.speed<1);assert.equal(p.place,null);assert.equal(p.race.headlights,false);f.send(g,'input',{seq:1,steer:1,throttle:false});assert.equal(p.input.throttle,true);f.send(g,'input',{seq:2,steer:Infinity});assert.equal(p.sequence,1);
 });
+test('online manual gear changes are authoritative, bounded and scoped to the current recovery',()=>{
+  const f=fixture(),guest=f.join();
+  f.send(f.host,'ready',{ready:true,manual:true});
+  f.send(guest,'ready',{ready:true});
+  f.send(f.host,'start');
+  const hostRace=f.room.players.get(f.host.id).race,guestRace=f.room.players.get(guest.id).race;
+  f.step(4,false);
+  assert.equal(hostRace.manual,true);
+  assert.equal(guestRace.manual,false);
+  f.send(f.host,'input',{seq:1,steer:0,gear:4,gearEpoch:0});
+  f.send(guest,'input',{seq:1,steer:0,gear:4,gearEpoch:0});
+  f.service.step();
+  assert.equal(hostRace.gear,4);
+  assert.equal(guestRace.gear,1);
+  f.send(f.host,'input',{seq:2,steer:0,gear:8,gearEpoch:0});
+  f.service.step();
+  assert.equal(hostRace.gear,4);
+  f.send(f.host,'reposition');
+  f.step(.6,false);
+  f.send(f.host,'input',{seq:3,steer:0,gear:3,gearEpoch:0});
+  f.service.step();
+  assert.equal(hostRace.gear,1);
+  f.send(f.host,'input',{seq:4,steer:0,gear:3,gearEpoch:1});
+  f.service.step();
+  assert.equal(hostRace.gear,3);
+});
 test('stale controls brake the car instead of leaving a disconnected accelerator held',()=>{
   const f=fixture(),g=f.join();for(const c of [f.host,g])f.send(c,'ready',{ready:true});f.send(f.host,'start');const p=f.room.players.get(g.id);p.race.countdown=0;p.race.speed=30;f.send(g,'input',{seq:1,steer:0,throttle:true});f.advance(400);f.service.step();assert.equal(p.race.braking,true);assert.ok(p.race.speed<30);
 });

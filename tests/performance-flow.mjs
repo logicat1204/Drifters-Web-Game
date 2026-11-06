@@ -1,3 +1,4 @@
+import {openPlayMode} from './helpers/play-mode.mjs';
 // Real menu/drive flow, followed by pixel comparisons of culled vs full geometry.
 // All accounts and attempts exist only in the disposable in-memory server.
 import assert from 'node:assert/strict';
@@ -23,7 +24,7 @@ try{
  await page.locator('#main-menu-actions [data-action=settings]').click();assert.equal(await page.locator('#auto-quality').isChecked(),true);assert.equal(await page.locator('#performance-display').inputValue(),'detailed');
  await page.locator('#auto-quality').uncheck();await page.locator('#performance-display').selectOption('off');assert.equal(await page.locator('#performance-overlay').isVisible(),false);
  await page.locator('#settings-panel [data-action=close]').click();await page.keyboard.press('F8');assert.equal(await page.locator('#performance-overlay').isVisible(),true);await page.keyboard.press('F8');assert.equal(await page.locator('#performance-details').isVisible(),true);
- await page.locator('#main-menu-actions [data-action=offline]').click();await page.locator('#mode').selectOption('time');await page.locator('#start').click();await page.waitForFunction(()=>window.touge?.state.screen==='race');await page.waitForFunction(()=>window.touge.state.race.countdown===0,null,{timeout:30000});
+ await openPlayMode(page,'offline');await page.locator('#start').click();await page.waitForFunction(()=>window.touge?.state.screen==='race');await page.waitForFunction(()=>window.touge.state.race.countdown===0,null,{timeout:30000});
  await page.keyboard.down('ArrowUp');await page.waitForFunction(()=>window.touge.state.race.speed>8);await page.waitForFunction(()=>window.touge.state.race.elapsed>=10,null,{timeout:30000});await page.keyboard.up('ArrowUp');
  await page.waitForFunction(()=>window.touge.performance.samples>30);const telemetry=await page.evaluate(()=>window.touge.performance);
  assert.ok(telemetry.fps>0&&telemetry.frameMs>0&&telemetry.p95Ms>=telemetry.frameMs*.5);assert.ok(telemetry.vertices>0&&telemetry.drawCalls>0&&telemetry.width>0);assert.equal(telemetry.scale,1);assert.equal(telemetry.automatic,false);assert.equal(await page.evaluate(()=>window.__mirrorReadbacks),0,'production driving performs zero GPU readbacks');
@@ -54,7 +55,7 @@ try{
    const track=sim.makeTrack(sim.ALL_TRACKS.find(t=>t.id==='akina')),rival=CAMPAIGN_STAGES[0];renderer.setTrack(track);renderer.setRival(rival);renderer.cameraMode=3;
    const r=sim.createRace(sim.CARS[0],track,{rival,night:false});Object.assign(r,{s:100,speed:0,countdown:0,rivalS:86,rivalLateral:1.8});
    const render=visible=>{r.mode=visible?'battle':'time';renderer.resetCamera=true;renderer.mirrorTime=-1;renderer.render(r,'race',0,{day:true,shake:false});return pixels();};
-   const on=render(true),off=render(false),bw=gl.drawingBufferWidth,bh=gl.drawingBufferHeight,cw=renderer.canvas.clientWidth,ch=renderer.canvas.clientHeight,m=performanceModule.mirrorLayout(cw,ch),x=Math.round(m.x*m.scale*bw/cw),y=Math.round(m.y*m.scale*bh/ch),w=Math.floor(m.width*m.scale*bw/cw),h=Math.floor(m.height*m.scale*bh/ch);let changed=0;
+   const on=render(true),off=render(false),bw=gl.drawingBufferWidth,bh=gl.drawingBufferHeight,cw=renderer.canvas.clientWidth,ch=renderer.canvas.clientHeight,m=renderer.cabinActive?renderer.cabin.mirrorBounds:performanceModule.mirrorLayout(cw,ch),x=Math.round(m.x*m.scale*bw/cw),y=Math.round(m.y*m.scale*bh/ch),w=Math.floor(m.width*m.scale*bw/cw),h=Math.floor(m.height*m.scale*bh/ch);let changed=0;
    for(let py=y+2;py<y+h-2;py++)for(let px=x+2;px<x+w-2;px++){const i=((bh-1-py)*bw+px)*4;if(Math.max(Math.abs(on[i]-off[i]),Math.abs(on[i+1]-off[i+1]),Math.abs(on[i+2]-off[i+2]))>6)changed++;}
    return {changed,reads,error:gl.getError(),width:bw,height:bh};
   };

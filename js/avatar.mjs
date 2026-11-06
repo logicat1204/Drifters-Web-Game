@@ -53,6 +53,16 @@ export function validateAvatar(value){
 }
 export const cosmeticId=(base,slot,key)=>`${base}.${slot}.${key}`;
 export const COSMETICS=Object.entries(AVATAR_CATALOGS).flatMap(([base,slots])=>Object.entries(slots).flatMap(([slot,items])=>items.map(([key,name])=>{const id=cosmeticId(base,slot,key),price=cosmeticPrices.get(id)||0;return {id,slot,key,name,price,rarity:name.includes('Legendario')||['f1','silk'].includes(key)?'legendary':price?'rare':'starter',starter:price===0,bases:[base],rig:`portrait-v2-${base}`};})));
+const builtinItems=COSMETICS.slice(),builtinCatalog=structuredClone(AVATAR_CATALOGS);
+// Install a complete, validated snapshot. IDs remain stable across pack versions.
+export function installCosmetics(items=[]){
+ const extra=[],ids=new Set(builtinItems.map(i=>i.id));
+ for(const item of items){const base=item.bases?.[0];if(!item.pack||!builtinCatalog[base]?.[item.slot]||item.id!==cosmeticId(base,item.slot,item.key)||ids.has(item.id)||!item.layers)continue;ids.add(item.id);extra.push(item);}
+ for(const [base,slots]of Object.entries(builtinCatalog))for(const [slot,options]of Object.entries(slots))AVATAR_CATALOGS[base][slot].splice(0,Infinity,...options.map(o=>o.slice()),...extra.filter(i=>i.bases[0]===base&&i.slot===slot).map(i=>[i.key,i.name]));
+ COSMETICS.splice(0,Infinity,...builtinItems,...extra);
+}
+// Missing/retired packs never prevent a returning pilot from opening their license.
+export function renderableAvatar(value){const a={...defaultAvatar(value?.base==='female'?'female':'male'),...value};for(const [slot,items]of Object.entries(avatarOptions(a.base)))if(['hair','eyes','mouth','outfit','accessory','makeup'].includes(slot)&&!items.some(([id])=>id===a[slot]))a[slot]=defaultAvatar(a.base)[slot];return validateAvatar(a);}
 export function migrateAvatar(value){
   if(value.version===AVATAR_VERSION)return validateAvatar(value);
   if(value.version!==1)throw Error('Versión de avatar inválida.');
@@ -69,9 +79,10 @@ export function migrateAvatar(value){
   return validateAvatar(a);
 }
 export function avatarLayers(value){
-  const a=validateAvatar(value),layer=(id,tint)=>({id:a.base+'/'+id,...(tint?{tint}:{})});
-  return [layer('hair-'+a.hair+'-back',a.hairColor),layer('base-skin',a.skin),layer('base-lines'),
-    layer('outfit-'+a.outfit+'-color',a.outfitColor),layer('outfit-'+a.outfit+'-lines'),
-    layer('eyes-'+a.eyes),layer('mouth-'+a.mouth),layer('hair-'+a.hair+'-front',a.hairColor),layer('hair-'+a.hair+'-lines'),
-    ...(a.accessory==='none'?[]:[layer('accessory-'+a.accessory)]),...(a.makeup==='none'?[]:[layer('makeup-'+a.makeup)])];
+  const a=renderableAvatar(value),layer=(id,tint)=>({id:a.base+'/'+id,...(tint?{tint}:{})});
+  const slot=(name,part,original,tint)=>{const item=COSMETICS.find(i=>i.id===cosmeticId(a.base,name,a[name])&&i.pack);return item?{id:item.id+':'+part,url:item.layers[part],revision:item.revision,...(tint?{tint}:{})}:layer(original,tint);};
+  return [slot('hair','back','hair-'+a.hair+'-back',a.hairColor),layer('base-skin',a.skin),layer('base-lines'),
+    slot('outfit','color','outfit-'+a.outfit+'-color',a.outfitColor),slot('outfit','lines','outfit-'+a.outfit+'-lines'),
+    slot('eyes','image','eyes-'+a.eyes),slot('mouth','image','mouth-'+a.mouth),slot('hair','color','hair-'+a.hair+'-front',a.hairColor),slot('hair','lines','hair-'+a.hair+'-lines'),
+    ...(a.accessory==='none'?[]:[slot('accessory','image','accessory-'+a.accessory)]),...(a.makeup==='none'?[]:[slot('makeup','image','makeup-'+a.makeup)])];
 }

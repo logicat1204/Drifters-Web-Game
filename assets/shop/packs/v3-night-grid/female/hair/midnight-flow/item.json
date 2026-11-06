@@ -1,0 +1,14 @@
+{
+  "base": "female",
+  "rig": "portrait-v2-female",
+  "slot": "hair",
+  "name": "Melena Midnight · Mujer",
+  "price": 360,
+  "rarity": "rare",
+  "layers": {
+    "back": "back.png",
+    "color": "color.png",
+    "lines": "lines.png"
+  },
+  "id": "female.hair.midnight-flow"
+}

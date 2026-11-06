@@ -13,7 +13,7 @@ Para jugar directamente accede tambien a https://drifters-web-game.onrender.com/
 >>>>>>> f2e37f3b2efb4a925ae527483027dabad09538fa
 2. Entra en **http://127.0.0.1:4173**. Mantén la ventana del servidor abierta mientras juegas.
 3. Crea un usuario o inicia sesión. La primera vez confirma tu nombre visible y elige foto o personaliza un avatar.
-4. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, nivel del rival, asfalto, hora y resolución.
+4. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, asfalto, hora y resolución.
 
 El servidor usa la biblioteca WebSocket `ws` y SQLite incluido en Node.js. Ejecuta `npm ci --omit=dev` la primera vez si falta `node_modules/`; JUGAR.bat instala `ws` automáticamente. Después puedes jugar contra este servidor local sin conexión a Internet: el servidor sigue siendo necesario para las cuentas, música y guardado de récords. Necesita un navegador con WebGL y aceleración gráfica. Para detener el servidor pulsa Ctrl+C en su ventana. Si el puerto está ocupado, usa `$env:PORT=4174; npm start` desde PowerShell y abre el puerto indicado.
 
@@ -21,7 +21,7 @@ El servidor usa la biblioteca WebSocket `ws` y SQLite incluido en Node.js. Ejecu
 
 El usuario puede tener entre 3 y 24 letras y números, por ejemplo `TakumiFX24` o `Alvaroo`. El registro comprueba si está libre; las mayúsculas no crean otra cuenta con el mismo nombre. La contraseña debe tener al menos ocho caracteres. No se necesita correo electrónico. El nombre visible del piloto se puede editar por separado.
 
-En tu licencia, accesible mediante el retrato de la cabecera, puedes elegir **foto** o **avatar**. Hay dos bases con rostro y silueta propios y catálogos independientes de hombre y mujer: cada una tiene cuatro cabellos, tres tipos de ojos y labios, tres prendas y tres accesorios, además de seis tonos de piel y colores. Las piezas solo se equipan en su base; las cuentas anteriores se adaptan automáticamente conservando colores y el tipo de ropa. La combinación del avatar se conserva aunque uses una foto. Los siete coches están disponibles desde el principio; el coche elegido en Garaje se guarda como predeterminado del usuario.
+En tu licencia, accesible mediante el retrato de la cabecera, puedes elegir **foto** o **avatar**. Hay dos bases con rostro y silueta propios y catálogos independientes de hombre y mujer: cada una tiene cuatro cabellos, tres tipos de ojos y labios, tres prendas y tres accesorios, además de seis tonos de piel y colores. Las piezas solo se equipan en su base; las cuentas anteriores se adaptan automáticamente conservando colores y el tipo de ropa. La combinación del avatar se conserva aunque uses una foto. Elige un solo coche inicial gratis al completar tu licencia. Puedes escoger el AE86 ágil, el RX-7 equilibrado o el Skyline GT-R de potencia. La Tienda ofrece el catálogo completo y el Garaje muestra los coches que posees.
 
 La pestaña **RÉCORDS** de la licencia muestra tus puntos de conducción, estadísticas, marcas personales y al mejor piloto de cada curso. La clasificación permite elegir curso, coche, individual/online, asfalto, hora y transmisión. Los resultados están ligados al usuario en SQLite. Las carreras individuales se verifican reproduciendo los controles en el servidor; las online usan su simulación autoritativa. Las marcas locales anteriores no se atribuyen a una cuenta nueva.
 
@@ -39,7 +39,7 @@ La pestaña **02 ONLINE**, junto a **01 CORRER**, tiene salas públicas y privad
 4. Todos, incluido el anfitrión, pulsan **ESTOY LISTO**. Solo el anfitrión puede pulsar **INICIAR CARRERA**. El botón se habilita con al menos dos jugadores y todos listos.
 5. Al iniciar, la sala queda cerrada, incluso durante los tres segundos de cuenta atrás: nadie más puede entrar ni cambiar de coche. Después de los resultados el anfitrión puede **ABRIR REVANCHA**, que vuelve al lobby y exige confirmar listo de nuevo.
 
-Los coches usan la física del juego y transmisión automática. El proceso Node.js calcula la carrera a 120 pasos por segundo: posiciones, contactos, faros, puntuación, salida y orden de meta. Los navegadores envían controles mediante WebSocket, reciben estados a 20 Hz y suavizan los coches remotos; el jugador local tiene predicción y corrección con el servidor. Cada jugador conserva su cámara y su música. El retrovisor y los faros muestran a los otros jugadores, y el HUD muestra posiciones y latencia.
+Los coches usan la física del juego. Cada piloto elige su transmisión antes de marcarse como listo. El proceso Node.js calcula la carrera a 120 pasos por segundo: posiciones, contactos, faros, puntuación, salida y orden de meta. Los navegadores envían controles mediante WebSocket, reciben estados a 20 Hz y suavizan los coches remotos; el jugador local tiene predicción y corrección con el servidor. Cada jugador conserva su cámara y su música. El retrovisor y los faros muestran a los otros jugadores, y el HUD muestra posiciones y latencia.
 
 El menú de Escape **no pausa a los demás**; tu coche frena mientras está abierto. Al perder foco o dejar de llegar controles, el servidor también frena el coche. Salir durante la carrera cuenta como DNF. Si el anfitrión se va, el primer jugador conectado hereda el rol y la carrera sigue. Tras la primera llegada hay 45 segundos para terminar; los restantes quedan DNF. Las salas vacías se eliminan y los lobbies caducan después de 30 minutos sin actividad. No hay reconexión automática a una carrera comenzada.
 
@@ -75,7 +75,7 @@ Incluye **Midnight Transmission**, una composición eurobeat original sintetizad
 | Frenar | S / ↓ | LT |
 | Girar | A-D / ←-→ | Stick izquierdo |
 | Iniciar derrape | Espacio | A |
-| Subir / bajar marcha en MT | E / Q | RB / LB |
+| Subir / bajar marcha secuencial | E / Q | RB / LB |
 | Cámara | C | Y |
 | Encender / apagar faros | H | X |
 | Superconcentración | X / botón en pantalla | B |
@@ -84,7 +84,9 @@ Incluye **Midnight Transmission**, una composición eurobeat original sintetizad
 | Reiniciar carrera | R | Botón en pausa |
 | Silenciar música | M | Botón musical en pantalla |
 
-En pantallas táctiles aparecen botones de conducción. El juego pausa al perder el foco o cambiar de pestaña.
+En **Ajustes → Transmisión** puedes elegir automática, manual A secuencial (E/Q), manual B (una tecla asignable por marcha) o manual C (clic o arrastre por la H y suelta en la marcha elegida). En móvil puedes elegir automática o manual secuencial con −/+. En **Personalizar controles en pantalla** puedes mover y redimensionar cada control, elegir entre botones y volante táctil, y guardar distribuciones vertical y horizontal por separado. En escritorio, usa ese mismo editor para colocar la palanca en H.
+
+En **Time Attack → Clima** puedes elegir seco o lluvia antes de salir. El ranking usa el clima seleccionado. En campaña, volver a correr contra un rival vencido activa una revancha en lluvia con frenadas más tardías. El juego pausa al perder el foco o cambiar de pestaña.
 
 Frena antes de entrar a las curvas cerradas. La fuerza lateral disponible es limitada: a mayor velocidad necesitas más espacio para girar y puedes abrirte hacia el guardarraíl. Suelta el freno cerca del vértice y recupera el acelerador al salir. Un toque de freno de mano permite rotar la zaga en horquillas; suéltalo y contravolantea. Mantenerlo pulsado pierde mucha velocidad. Las curvas abiertas pueden tomarse con agarre y sin derrapar. Los guardarraíles y los contactos con el rival reducen la velocidad. Los puntos de control agregan 14 segundos. El asfalto mojado reduce el agarre.
 
@@ -120,7 +122,7 @@ Esta versión usa una nueva tabla local de mejores tiempos por el cambio de fís
 | Equilibrado | RX-7 FD3S, Silvia S13 | Agarre, aceleración y punta intermedios. El Silvia gana un poco de agarre y el FD3S acelera algo más y tiene más punta. |
 | Potencia | Skyline GT-R BNR32, Supra JZA80 | Mayor aceleración y punta; necesitan frenar antes. El Supra tiene más empuje y el GT-R conserva un poco más de agarre. |
 
-Las barras del garaje muestran **aceleración, curvas y velocidad punta**, con puntuaciones calculadas desde los parámetros de la simulación. El perfil y su compromiso se indican junto a las especificaciones. Los CV y el peso son referencias del modelo; los parámetros de conducción se ajustan para el balance arcade y no pretenden reproducir prestaciones de serie. En pantallas estrechas, desliza la lista de coches para ver los siete; se conserva el desplazamiento al elegir. La selección individual se guarda localmente. El selector online ofrece los mismos siete coches y el servidor usa los mismos parámetros.
+Las barras del garaje muestran **aceleración, curvas y velocidad punta**, con puntuaciones calculadas desde los parámetros de la simulación. El perfil y su compromiso se indican junto a las especificaciones. Los CV y el peso son referencias del modelo; los parámetros de conducción se ajustan para el balance arcade y no pretenden reproducir prestaciones de serie. En pantallas estrechas, desliza la lista del garaje para ver tu colección. El coche predeterminado se guarda en tu licencia y también se usa al entrar a una sala online.
 
 El balance de los tres originales también sigue estos perfiles: el AE86 tiene más agarre que el FD3S, y el BNR32 cambia agarre por aceleración y punta. Los rivales especiales conservan sus ajustes y ritmo calibrado por mapa. Este balance inaugura la tabla de mejores tiempos **v5** para comparar marcas con la misma física.
 
@@ -137,6 +139,10 @@ El balance de los tres originales también sigue estos perfiles: el AE86 tiene m
 Los rivales conducen con el mismo modelo físico de agarre, giro, aceleración y frenado que el jugador. Anticipan la curva, frenan antes de entrar, maniobran sobre una trazada y recuperan velocidad al salir; las luces de freno muestran sus frenadas. La lluvia también les reduce el agarre. Los tres niveles modifican su margen de seguridad y su ataque en rectas. Su ritmo base se calibra por recorrido, sin acelerar para alcanzar al jugador ni avanzar por un reloj prefijado. El nivel normal deja algo más de margen para recuperarse de errores pequeños.
 
 ## Curvas, retrovisor y conducción nocturna
+
+**Vista interior 3D:** los 25 coches disponen de configuración de cabina, instrumentos y puesto del conductor. Incluye volante y manos animadas, movimiento de cabeza ajustable, retrovisor integrado, lluvia y limpiaparabrisas. Selecciona Interior 3D en Opciones o cambia con C. Consulta [Cabinas 3D y cámara de piloto](docs/CABINAS-3D.md) para los controles, implementación y comprobaciones de rendimiento.
+
+**Audio, lluvia y crónicas — 4 de noviembre de 2026:** motores con grabaciones reutilizables y perfiles por familia; volúmenes separados, derrape suave, mezcla interior y rivales cercanos. Asfalto mojado con reflejos ligeros y spray. La campaña dispone de atlas regional y prólogos/epílogos propios para sus nueve capítulos, con lectura guardada por usuario. La tienda descubre paquetes de ropa, cabello y rasgos sobre los dos avatares actuales; incluye dos colecciones nuevas con diez cosméticos. Consulta [formatos, carpetas y controles](docs/AUDIO-LLUVIA-PAQUETES-CAMPANAS.md) y [créditos de audio](assets/audio/CREDITS.md). SQLite migra automáticamente a **v6** conservando cuentas, compras y récords.
 
 Una curva rápida y limpia intensifica progresivamente **CLEAN LINE → APEX FLOW → FUJIWARA ZONE**. El sistema compara la velocidad con el agarre y la curvatura reales; también considera la posición en la pista y el deslizamiento. Una entrada pasada de velocidad, ir muy despacio, golpear o avanzar en recta no da el mismo premio. El aura azul/violeta y las líneas de velocidad quedan en los bordes para conservar la lectura del vértice. Al salir se muestra una valoración, los puntos y la cadena de curvas. Los impactos rompen la cadena. La puntuación es visual: no concede un aumento artificial de potencia. Los sonidos de recompensa usan el volumen de efectos/motor y funcionan también con canciones de songs/.
 
@@ -181,6 +187,8 @@ Estructura: `js/sim.mjs` contiene la simulación; `js/courses.mjs`, cursos y riv
 
 
 ## Campaña, tienda y especialidades
+
+**Actualización del 3 de noviembre de 2026:** el botón **Jugar** abre Campaña, Time Attack y Juego Online. Time Attack incluye ranking por trayecto y condiciones. Los recursos de historia y audio se organizan por rival en `campaign_files/`; las canciones comprables se descubren en `songs/shop/`. Consulta [la guía de menús, narrativa y música](docs/JUGAR-NARRATIVA-MUSICA.md), [las carpetas de campaña](campaign_files/README.md) y [el formato de canciones de tienda](songs/shop/README.md). La base de datos se actualiza automáticamente a **v5** conservando los datos anteriores.
 
 La campaña tiene 24 duelos en nueve capítulos, con los retratos y cómics de assets/campanias. Balance se desbloquea al vencer a Takumi en Akina, Time Master tras Keisuke en Akagi y Drift Master tras Kai en Irohazaka. La licencia permite elegir la especialidad. Las victorias verificadas dan monedas para comprar 18 autos nuevos y 30 cosméticos separados por base. Se conservan los siete autos anteriores.
 

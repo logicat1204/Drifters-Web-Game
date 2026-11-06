@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "name": "v4-paddock",
+  "items": [
+    "male/accessory/visor-smoke/item.json",
+    "male/makeup/team-stripe/item.json",
+    "male/eyes/apex-silver/item.json",
+    "female/accessory/visor-smoke/item.json",
+    "female/makeup/rose-night/item.json",
+    "female/eyes/apex-silver/item.json"
+  ]
+}

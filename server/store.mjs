@@ -5,9 +5,9 @@ import {randomBytes,randomUUID,scrypt as scryptCallback,timingSafeEqual,createHa
 import {promisify} from 'node:util';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {CARS,ALL_CARS,HANDLING_VERSION,ALL_TRACKS as TRACKS} from '../js/sim.mjs';
-import {DEFAULT_AVATAR,validateAvatar,migrateAvatar,cosmeticId,avatarLayers,COSMETICS} from '../js/avatar.mjs';
-import {CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward} from '../js/campaign.mjs';
+import {CARS,STARTER_CARS,ALL_CARS,HANDLING_VERSION,ALL_TRACKS as TRACKS} from '../js/sim.mjs';
+import {DEFAULT_AVATAR,defaultAvatar,validateAvatar,migrateAvatar,cosmeticId,avatarLayers,COSMETICS} from '../js/avatar.mjs';
+import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward} from '../js/campaign.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const hashToken=value=>createHash('sha256').update(value).digest('hex');
@@ -17,7 +17,7 @@ export class Store {
   constructor(filename=process.env.DB_PATH||(process.env.NODE_TEST_CONTEXT?':memory:':path.join(process.env.DATA_DIR||path.join(root,'data'),'touge.sqlite')),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>4){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>6){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -40,18 +40,27 @@ export class Store {
         }
       }
       if(version<4)this.db.exec(readFileSync(new URL('./migrations/004-vehicle-garage.sql',import.meta.url),'utf8'));
+      if(version<5)this.db.exec(readFileSync(new URL('./migrations/005-music.sql',import.meta.url),'utf8'));
+      if(version<6)this.db.exec(readFileSync(new URL('./migrations/006-chapter-stories.sql',import.meta.url),'utf8'));
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
   }
   available(name){return !this.db.prepare('SELECT 1 FROM users WHERE username=? COLLATE NOCASE').get(username(name));}
+  syncCosmetics(){const insert=this.db.prepare('INSERT OR IGNORE INTO cosmetics(id,slot,rig) VALUES(?,?,?)');for(const item of COSMETICS)insert.run(item.id,item.slot,item.rig);}
+  markChapterStory(id,chapter,phase){
+    if(!CAMPAIGN_CHAPTERS.some(c=>c.id===chapter)||!['start','end'].includes(phase))throw Error('Escena inválida.');
+    const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter),cleared=this.progression(id).campaign.map(s=>s.id);
+    if(phase==='start'?!stageAvailable(stages[0],cleared):!stages.every(s=>cleared.includes(s.id)))throw Object.assign(Error('Completa los desafíos anteriores para ver esta escena.'),{status:403});
+    this.db.prepare('INSERT OR IGNORE INTO chapter_story_seen VALUES(?,?,?,?)').run(id,chapter,phase,this.now());return this.user(id);
+  }
   async register(name,pass){
     name=username(name);password(pass);if(!this.available(name))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});
     const salt=randomBytes(16).toString('hex'),hash=await scrypt(pass,salt,64,{N:16384,r:8,p:1}),id=randomUUID();
     this.db.exec('BEGIN IMMEDIATE');try{
       this.db.prepare('INSERT INTO users VALUES(?,?,?,?,?)').run(id,name,hash.toString('hex'),salt,this.now());
       this.db.prepare('INSERT INTO profiles(user_id,display_name,avatar) VALUES(?,?,?)').run(id,name,JSON.stringify(DEFAULT_AVATAR));
-      this.db.prepare('INSERT INTO wallets(user_id) VALUES(?)').run(id);const grantCar=this.db.prepare('INSERT INTO owned_cars VALUES(?,?,?)');for(const car of CARS)grantCar.run(id,car.id,this.now());
+      this.db.prepare('INSERT INTO wallets(user_id) VALUES(?)').run(id);
       const grant=this.db.prepare('INSERT INTO inventory VALUES(?,?,?)');for(const item of COSMETICS)if(item.starter)grant.run(id,item.id,this.now());this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');if(/UNIQUE/.test(error.message))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});throw error;}return this.user(id);
   }
@@ -67,27 +76,38 @@ export class Store {
   session(token){if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))return null;const row=this.db.prepare('SELECT user_id,csrf,expires_at FROM sessions WHERE token_hash=? AND expires_at>?').get(hashToken(token),this.now());return row?{user:this.user(row.user_id),csrf:row.csrf,token}:null;}
   logout(token){if(token)this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hashToken(token));}
   updateProfile(id,data){
-    const current=this.user(id);if(!current)throw Error('Usuario inexistente.');
-    const displayName=data.displayName===undefined?current.displayName:typeof data.displayName==='string'?data.displayName.normalize('NFKC').trim():'';
-    if(!displayName||displayName.length>24||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Error('El nombre visible debe tener de 1 a 24 caracteres.');
-    const car=data.defaultCar??current.defaultCar;if(!ALL_CARS.some(c=>c.id===car))throw Error('Coche inválido.');if(!this.db.prepare('SELECT 1 FROM owned_cars WHERE user_id=? AND car_id=?').get(id,car))throw Error('Compra ese coche antes de equiparlo.');
-    const selectedFocus=data.focusType??current.focusType;if(!FOCUS_TYPES[selectedFocus]||selectedFocus!=='balance'&&!current.focusUnlocked.includes(selectedFocus))throw Error('Esa especialidad todavía está bloqueada.');
-    const stage=data.arcadeStage??current.arcadeStage;if(!Number.isInteger(stage)||stage<0||stage>=TRACKS.length)throw Error('Etapa inválida.');
-    const avatar=data.avatar===undefined?current.avatar:validateAvatar(data.avatar);
-    const owned=new Set(this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(x=>x.item_id));
-    for(const slot of ['hair','eyes','mouth','outfit','accessory','makeup'])if(!owned.has(cosmeticId(avatar.base,slot,avatar[slot])))throw Error('Ese cosmético no pertenece a tu inventario.');
-    const mode=data.portraitMode??current.portraitMode;if(!['avatar','photo'].includes(mode))throw Error('Elige foto o avatar.');
-    const hasPhoto=this.db.prepare('SELECT photo IS NOT NULL AS present FROM profiles WHERE user_id=?').get(id).present;
-    if(mode==='photo'&&!hasPhoto)throw Error('Sube una foto antes de continuar.');
-    const onboarded=current.onboarded||data.complete===true;
-    this.db.prepare('UPDATE profiles SET display_name=?,avatar=?,portrait_mode=?,default_car=?,arcade_stage=?,onboarded=?,focus_type=?,photo_version=photo_version+1 WHERE user_id=?').run(displayName,JSON.stringify(avatar),mode,car,stage,Number(onboarded),selectedFocus,id);return this.user(id);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const current=this.user(id);if(!current)throw Error('Usuario inexistente.');
+      const displayName=data.displayName===undefined?current.displayName:typeof data.displayName==='string'?data.displayName.normalize('NFKC').trim():'';
+      if(!displayName||displayName.length>24||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Error('El nombre visible debe tener de 1 a 24 caracteres.');
+      const car=data.defaultCar??current.defaultCar;
+      if(!ALL_CARS.some(c=>c.id===car))throw Error('Coche inválido.');
+      const needsStarter=!current.onboarded&&current.cars.length===0;
+      const grantStarter=needsStarter&&data.complete===true&&STARTER_CARS.some(c=>c.id===car);
+      const editingBeforeChoice=needsStarter&&data.complete!==true&&data.defaultCar===undefined;
+      if(!current.cars.includes(car)&&!grantStarter&&!editingBeforeChoice)throw Error(needsStarter?'Elige un coche inicial para completar tu licencia.':'Compra ese coche antes de equiparlo.');
+      const selectedFocus=data.focusType??current.focusType;if(!FOCUS_TYPES[selectedFocus]||selectedFocus!=='balance'&&!current.focusUnlocked.includes(selectedFocus))throw Error('Esa especialidad todavía está bloqueada.');
+      const stage=data.arcadeStage??current.arcadeStage;if(!Number.isInteger(stage)||stage<0||stage>=TRACKS.length)throw Error('Etapa inválida.');
+      const avatar=data.avatar===undefined?current.avatar:validateAvatar(data.avatar);
+      const owned=new Set(this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(x=>x.item_id));
+      for(const slot of ['hair','eyes','mouth','outfit','accessory','makeup'])if(!owned.has(cosmeticId(avatar.base,slot,avatar[slot])))throw Error('Ese cosmético no pertenece a tu inventario.');
+      const mode=data.portraitMode??current.portraitMode;if(!['avatar','photo'].includes(mode))throw Error('Elige foto o avatar.');
+      const hasPhoto=this.db.prepare('SELECT photo IS NOT NULL AS present FROM profiles WHERE user_id=?').get(id).present;
+      if(mode==='photo'&&!hasPhoto)throw Error('Sube una foto antes de continuar.');
+      const onboarded=current.onboarded||data.complete===true;
+      if(grantStarter)this.db.prepare('INSERT INTO owned_cars VALUES(?,?,?)').run(id,car,this.now());
+      this.db.prepare('UPDATE profiles SET display_name=?,avatar=?,portrait_mode=?,default_car=?,arcade_stage=?,onboarded=?,focus_type=?,photo_version=photo_version+1 WHERE user_id=?').run(displayName,JSON.stringify(avatar),mode,car,stage,Number(onboarded),selectedFocus,id);
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+    return this.user(id);
   }
   setPhoto(id,bytes,mime){this.db.prepare('UPDATE profiles SET photo=?,photo_mime=?,photo_version=photo_version+1 WHERE user_id=?').run(bytes,mime,id);return this.user(id);}
   photo(id){const p=this.db.prepare('SELECT photo,photo_mime FROM profiles WHERE user_id=?').get(id);return p?.photo?{bytes:Buffer.from(p.photo),mime:p.photo_mime}:null;}
   portrait(id){const p=this.db.prepare('SELECT portrait_mode,photo,photo_mime,avatar FROM profiles WHERE user_id=?').get(id);if(!p)return null;if(p.portrait_mode==='photo'&&p.photo)return {bytes:Buffer.from(p.photo),mime:p.photo_mime};return {bytes:Buffer.from(avatarSvg(JSON.parse(p.avatar))),mime:'image/svg+xml'};}
   progression(id){
     const cleared=this.db.prepare('SELECT level_id AS id,best_time AS bestTime,best_points AS bestPoints,reward_coins AS rewardCoins FROM campaign_progress WHERE user_id=?').all(id);
-    return {garage:this.garage(id),coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
+    return {chapterStories:this.db.prepare('SELECT chapter_id,phase FROM chapter_story_seen WHERE user_id=?').all(id).map(s=>s.chapter_id+':'+s.phase),music:this.db.prepare('SELECT song_id FROM owned_music WHERE user_id=?').all(id).map(s=>s.song_id),garage:this.garage(id),coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
   }
   garage(id){
     const parts=this.db.prepare('SELECT car_id,part_id FROM owned_vehicle_parts WHERE user_id=? ORDER BY part_id').all(id),result={};
@@ -134,8 +154,9 @@ export class Store {
   }
   loadout(id){const user=this.user(id);return {focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)};}
   buy(id,kind,key){
+    if(kind==='car'&&!this.db.prepare('SELECT onboarded FROM profiles WHERE user_id=?').get(id)?.onboarded)throw Error('Completa tu licencia y elige tu coche inicial.');
     const item=kind==='car'?ALL_CARS.find(c=>c.id===key):kind==='cosmetic'?COSMETICS.find(c=>c.id===key):null;
-    if(!item||!Number.isInteger(item.price)||item.price<=0)throw Error('Artículo de tienda inválido.');
+    if(!item||item.availableForSale===false||!Number.isInteger(item.price)||item.price<=0)throw Error('Artículo de tienda inválido.');
     this.db.exec('BEGIN IMMEDIATE');try{
       const owns=kind==='car'?this.db.prepare('SELECT 1 FROM owned_cars WHERE user_id=? AND car_id=?').get(id,key):this.db.prepare('SELECT 1 FROM inventory WHERE user_id=? AND item_id=?').get(id,key);
       if(!owns){
@@ -143,6 +164,14 @@ export class Store {
         this.db.prepare(kind==='car'?'INSERT INTO owned_cars VALUES(?,?,?)':'INSERT INTO inventory VALUES(?,?,?)').run(id,key,this.now());
         this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('buy:'+id+':'+kind+':'+key,id,-item.price,kind+':'+key,null,this.now());
       }
+      this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned:!!owns};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  buyMusic(id,song){
+    if(!song||!/^song-[a-f0-9]{24}$/.test(song.id)||!Number.isSafeInteger(song.price)||song.price<1||song.price>1000000)throw Error('Canción de tienda inválida.');
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const owns=this.db.prepare('SELECT 1 FROM owned_music WHERE user_id=? AND song_id=?').get(id,song.id);
+      if(!owns){this.spend(id,song.price);this.db.prepare('INSERT INTO owned_music VALUES(?,?,?)').run(id,song.id,this.now());this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('buy:'+id+':music:'+song.id,id,-song.price,'music:'+song.id,null,this.now());}
       this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned:!!owns};
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
@@ -162,9 +191,9 @@ export class Store {
   }
   runResult(id,userId){const run=this.db.prepare('SELECT * FROM runs WHERE id=? AND user_id=?').get(id,userId);if(!run)return null;const best=this.db.prepare('SELECT MIN(elapsed) AS time FROM runs WHERE user_id=? AND track=? AND car=? AND source=? AND manual=? AND wet=? AND night=? AND handling=? AND build_key=? AND completed=1').get(userId,run.track,run.car,run.source,run.manual,run.wet,run.night,run.handling,run.build_key);return {id,build:JSON.parse(run.vehicle_build),buildKey:run.build_key,time:run.elapsed,points:run.points,drift:run.drift,completed:!!run.completed,won:!!run.won,personalBest:best.time,stats:this.stats(userId),reward:{coins:this.db.prepare('SELECT COALESCE(SUM(delta),0) AS n FROM economy_ledger WHERE user_id=? AND run_id=?').get(userId,id).n,stage:run.campaign_level},user:this.user(userId)};}
   stats(id){return this.db.prepare('SELECT COUNT(*) AS races,COALESCE(SUM(won),0) AS wins,COALESCE(SUM(points),0) AS points,COALESCE(MAX(points),0) AS bestPoints,COALESCE(MAX(drift),0) AS bestDrift FROM runs WHERE user_id=?').get(id);}
-  records({userId=null,track='akina',source='solo',wet=false,night=true,manual=false,car=null}={}){
-    if(!TRACKS.some(t=>t.id===track)||!['solo','online'].includes(source)||car&&!ALL_CARS.some(c=>c.id===car))throw Error('Filtro de récords inválido.');
-    const filters=[HANDLING_VERSION,track,source,Number(wet),Number(night),Number(manual)],extra=(userId?' AND r.user_id=?':'')+(car?' AND r.car=?':'');if(userId)filters.push(userId);if(car)filters.push(car);
+  records({userId=null,track='akina',source='solo',wet=false,night=true,manual=false,car=null,mode=null}={}){
+    if(mode&&!['time','battle','arcade','campaign'].includes(mode)||!TRACKS.some(t=>t.id===track)||!['solo','online'].includes(source)||car&&!ALL_CARS.some(c=>c.id===car))throw Error('Filtro de récords inválido.');
+    const filters=[HANDLING_VERSION,track,source,Number(wet),Number(night),Number(manual)],extra=(userId?' AND r.user_id=?':'')+(car?' AND r.car=?':'')+(mode?' AND r.mode=?':'');if(userId)filters.push(userId);if(car)filters.push(car);if(mode)filters.push(mode);
     return this.db.prepare(`WITH ranked AS (SELECT r.*,u.username,p.display_name,p.photo_version,ROW_NUMBER() OVER(PARTITION BY r.user_id ORDER BY r.elapsed,r.created_at) AS n FROM runs r JOIN users u ON u.id=r.user_id JOIN profiles p ON p.user_id=u.id WHERE r.handling=? AND r.track=? AND r.source=? AND r.wet=? AND r.night=? AND r.manual=? AND r.completed=1${extra}) SELECT user_id AS userId,username,display_name AS displayName,car,elapsed AS time,points,created_at AS createdAt,photo_version AS portraitVersion,build_key AS buildKey,vehicle_build AS vehicleBuild FROM ranked WHERE n=1 ORDER BY elapsed,created_at LIMIT 50`).all(...filters).map(row=>({...row,build:JSON.parse(row.vehicleBuild),portraitUrl:`/api/users/${row.userId}/portrait?v=${row.portraitVersion}`}));
   }
   personal(id){return {stats:this.stats(id),records:this.db.prepare('SELECT track,car,source,manual,wet,night,build_key AS buildKey,MIN(elapsed) AS time,MAX(points) AS points FROM runs WHERE user_id=? AND handling=? AND completed=1 GROUP BY track,car,source,manual,wet,night,build_key ORDER BY track,time').all(id,HANDLING_VERSION)};}
@@ -175,9 +204,11 @@ const layerCache=new Map();
 export function avatarSvg(value){
   const layers=avatarLayers(value),defs=[],images=[];
   for(const [i,layer] of layers.entries()){
-    if(!layerCache.has(layer.id))layerCache.set(layer.id,readFileSync(path.join(root,'assets/avatars/v2/layers',layer.id+'.png')).toString('base64'));
+    const key=layer.id+':'+(layer.revision||''),file=layer.url?path.resolve(root,'.'+decodeURIComponent(layer.url)):path.join(root,'assets/avatars/v2/layers',layer.id+'.png');
+    if(!file.startsWith(path.join(root,'assets')+path.sep))throw Error('Capa inválida.');
+    if(!layerCache.has(key)){if(layerCache.size>512)layerCache.clear();try{layerCache.set(key,readFileSync(file).toString('base64'));}catch(error){if(layer.url)return avatarSvg(defaultAvatar(value.base==='female'?'female':'male'));throw error;}}
     if(layer.tint)defs.push(`<filter id="t${i}" color-interpolation-filters="sRGB"><feFlood flood-color="${layer.tint}"/><feComposite in2="SourceAlpha" operator="in"/></filter>`);
-    images.push(`<image width="512" height="640" href="data:image/png;base64,${layerCache.get(layer.id)}"${layer.tint?` filter="url(#t${i})"`:''}/>`);
+    images.push(`<image width="512" height="640" href="data:image/png;base64,${layerCache.get(key)}"${layer.tint?` filter="url(#t${i})"`:''}/>`);
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 640"><defs>${defs.join('')}</defs><path fill="#273c43" d="M0 0h512v640H0z"/><path fill="#3c5358" d="M0 500 512 80v560H0z"/>${images.join('')}</svg>`;
 }

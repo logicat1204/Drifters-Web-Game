@@ -6,10 +6,9 @@ El menú principal toma la disposición de `854px-Main_Menu_U6.jpg`: título arr
 
 ## Opciones
 
-- **Campaña**: abre los 24 duelos de nueve campañas, con sus retratos, cómics, progreso, premios y especialidades desbloqueables.
-- **Online**: abre las salas públicas, la entrada privada y la creación de sala.
-- **Juego offline**: configura un duelo individual o una contrarreloj. Se juega contra el servidor local si no hay conexión a Internet; las cuentas y el guardado siguen requiriendo ese servidor.
-- **Opciones**: conserva transmisión, cámara, asfalto, hora, dificultad, calidad, audio y pantalla completa. Incluye acceso a la banda sonora.
+- **Jugar**: abre tres tarjetas: Campaña (24 duelos en nueve capítulos), Time Attack (contrarreloj, música y ranking por trayecto) y Juego Online (salas públicas, privadas y creación). Cada tarjeta presenta un diálogo animado con descripción, entrada y cierre. Se retiró Duelo especial del menú de contrarreloj.
+- **Garaje**: selección, preparación y personalización de los coches de la licencia.
+- **Opciones**: conserva transmisión, cámara, asfalto, hora, calidad, audio y pantalla completa. Incluye acceso a la banda sonora. La dificultad de campaña depende del rival.
 - **Perfil**: abre la personalización de licencia y los récords personales.
 - **Salir**: confirma la vuelta al título, abandona la sala si la hay y detiene la música. Conserva la sesión y los datos del usuario. El navegador no necesita cerrar su pestaña.
 
@@ -25,9 +24,9 @@ La pantalla de título aparece también si ya hay una sesión guardada. Tras con
 
 `Renderer.buildMenuScene()` crea un mirador independiente de la carretera de competición: aparcamiento, marcas de asfalto, barrera, cuatro capas de montañas, árboles, luna y farolas cálidas. La escena de presentación no cambia la física ni añade obstáculos a los cursos. `renderMenu()` muestra la misma malla del coche que se utiliza en el juego. El título anima tres coches sobre el curso actual; no altera carreras ni récords.
 
-`npm run test:menu` comprueba título, las seis opciones, navegación de teclado y mando, perfil, coche persistente, salida, invitaciones y vistas de 1440 × 900, 390 × 844 y 844 × 390. Usa un servidor efímero y cuentas en memoria y guarda capturas en `screenshots/menu-*.png`. `npm run test:ui` verifica además el recorrido completo por alta de usuario, personalización, salas de cuatro pilotos y salida individual. Ambos aceptan `PLAYWRIGHT_MODULE` y `BROWSER_EXECUTABLE`.
+`npm run test:menu` comprueba título, las cinco opciones principales y los tres modos bajo Jugar, navegación de teclado y mando, perfil, coche persistente, salida, invitaciones y vistas de 1440 × 900, 390 × 844 y 844 × 390. Usa un servidor efímero y cuentas en memoria y guarda capturas en `screenshots/menu-*.png`. `npm run test:ui` verifica además el recorrido completo por alta de usuario, personalización, salas de cuatro pilotos y salida individual. Ambos aceptan `PLAYWRIGHT_MODULE` y `BROWSER_EXECUTABLE`.
 
 
 ## Actualización: campaña, colección y especialidades
 
-El sistema actual incluye 24 duelos, tres especialidades desbloqueables, monedas verificadas y tienda. El esquema SQLite actual es v3 y el avatar v2 admite maquillaje opcional. Hay 111 capas por piezas en dos rigs, y los artículos de tienda solo se equipan al poseerlos. Consulta [Campaña, tienda y superconcentración](CAMPANIA-TIENDA-FOCUS.md) para las reglas actuales y la migración.
+El sistema actual incluye 24 duelos, tres especialidades desbloqueables, monedas verificadas y tienda. El esquema SQLite actual es v5, con inventario de música, y el avatar v2 admite maquillaje opcional. Hay 111 capas por piezas en dos rigs, y los artículos de tienda solo se equipan al poseerlos. Consulta [Campaña, tienda y superconcentración](CAMPANIA-TIENDA-FOCUS.md) y [Jugar, narrativa y música](JUGAR-NARRATIVA-MUSICA.md) para las reglas, recursos y migraciones.

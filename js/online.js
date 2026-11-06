@@ -12,7 +12,7 @@ export class OnlineClient {
     document.querySelectorAll('[data-online-tab]').forEach(b=>b.onclick=()=>this.selectTab(b.dataset.onlineTab));$('online-refresh').onclick=()=>this.refreshRooms();
     $('online-profile').onsubmit=e=>{e.preventDefault();if(this.room)this.send({type:'profile',...this.profile()});};
     $('online-car').onchange=()=>{this.callbacks.onPreview?.($('online-car').value);if(this.room)this.send({type:'profile',...this.profile()});};
-    $('online-ready').onclick=()=>{if(this.room)this.send({type:'ready',ready:!this.room.players.find(p=>p.id===this.id)?.ready});};
+    $('online-ready').onclick=()=>{if(this.room)this.send({type:'ready',ready:!this.room.players.find(p=>p.id===this.id)?.ready,manual:this.callbacks.manual?.()===true});};
     $('online-start').onclick=()=>this.send({type:'start'});$('online-leave').onclick=()=>this.leave();$('online-copy').onclick=()=>this.copy();
     for(const id of ['online-track','online-night','online-wet'])$(id).onchange=()=>this.send({type:'config',config:this.config()});
     this.pingTimer=setInterval(()=>{if(this.ws?.readyState===WebSocket.OPEN)this.send({type:'ping',at:performance.now()});},2500);
@@ -90,7 +90,7 @@ export class OnlineClient {
   }
   controls(input,race,active){
     this.input=active?input:{steer:0,throttle:false,brake:true,handbrake:false};const now=performance.now();
-    if(this.room?.phase==='racing'&&now-this.lastSend>=1000/30){this.lastSend=now;this.send({type:'input',seq:++this.seq,...this.input,headlights:this.lights});}
+    if(this.room?.phase==='racing'&&now-this.lastSend>=1000/30){this.lastSend=now;this.send({type:'input',seq:++this.seq,...this.input,headlights:this.lights,gear:active&&race.manual?race.requestedGear??race.gear:undefined,gearEpoch:race.resetId});}
   }
   predict(r,input,dt,players=this.snapshots?.at(-1)?.players||[]){
     // Predict from current authoritative traffic, independently of the 100 ms
@@ -101,13 +101,17 @@ export class OnlineClient {
       o.progress=o.speed*Math.max(.12,Math.cos(o.travelYaw))/clamp(1-curve*o.lateral,.65,1.35);
       o.s+=o.progress*advance;o.lateral=clamp(o.lateral+(state.lateralV||0)*advance,-4.65,4.65);return o;
     });
-    const before=vehiclePose(r);updateRace(r,input,dt,traffic);
+    const before=vehiclePose(r);
+    const gear=r.requestedGear??input.gear;
+    updateRace(r,{...input,gear,gearEpoch:r.resetId},dt,traffic);
     for(const o of traffic){const old=vehiclePose(o);o.s+=o.progress*dt;resolveVehicleContact(r,o,before,old);}
   }
   reconcile(r,track,message){
     const self=message.players.find(p=>p.id===this.id);if(!self)return;
-    const state=structuredClone(self.state),predicted=createRace(r.car,track,{mode:'time',night:r.night,wet:r.wet});Object.assign(predicted,state);
+    const state=structuredClone(self.state),predicted=createRace(r.car,track,{mode:'time',manual:r.manual,night:r.night,wet:r.wet});Object.assign(predicted,state);
     const resetChanged=state.resetId!==r.resetId;
+    if(!resetChanged)predicted.requestedGear=r.requestedGear;
+    else r.requestedGear=1;
     let ahead=clamp(r.elapsed-state.elapsed,0,.15);if(state.countdown>0||resetChanged||state.resetHold>0)ahead=0;while(ahead>0&&!predicted.finished){const dt=Math.min(1/120,ahead);this.predict(predicted,this.input,dt,message.players);ahead-=dt;}
     const old={s:r.s,lateral:r.lateral,yaw:r.yaw};Object.assign(r,predicted,{online:true,headlights:this.lights});
     if(!resetChanged&&state.resetHold===0&&state.collision===0&&Math.abs(old.s-r.s)<10&&Math.abs(old.lateral-r.lateral)<2&&!state.finished&&state.countdown===0){r.s=mix(old.s,r.s,.45);r.lateral=mix(old.lateral,r.lateral,.45);r.yaw=mix(old.yaw,r.yaw,.45);}

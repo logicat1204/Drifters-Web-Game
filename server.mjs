@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { createReadStream } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {networkInterfaces} from 'node:os';
@@ -8,35 +8,33 @@ import {attachOnline} from './server/online.mjs';
 import {Store} from './server/store.mjs';
 import {Accounts} from './server/accounts.mjs';
 import {publicOrigin} from './server/origin.mjs';
+import {MediaLibrary} from './server/media.mjs';
+import {CosmeticPacks} from './server/cosmetic-packs.mjs';
+import {installCosmetics} from './js/avatar.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const realRoot=await realpath(root);
 const songsRoot = path.join(root, 'songs');
+export const cosmeticPacks=new CosmeticPacks(root);
+installCosmetics(await cosmeticPacks.reload());
+for(const warning of cosmeticPacks.warnings)console.warn('Paquete cosmético omitido:',warning.pack,warning.error);
 export const store=new Store();
-export const accounts=new Accounts(store);
+export const media=new MediaLibrary(root);
+export const accounts=new Accounts(store,{media,packs:cosmeticPacks});
 let onlineService;
-const audio = new Set(['.mp3', '.ogg', '.wav', '.m4a', '.aac', '.flac', '.opus', '.webm']);
-const types = { '.glb': 'model/gltf-binary', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg', '.webm': 'audio/webm', '.ico': 'image/x-icon' };
-async function listSongs(dir = songsRoot) {
-  let entries;
-  try { entries = await readdir(dir, { withFileTypes: true }); } catch { return []; }
-  const result = [];
-  for (const entry of entries) {
-    if (entry.isSymbolicLink()) continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) result.push(...await listSongs(full));
-    else if (entry.isFile() && audio.has(path.extname(entry.name).toLowerCase())) {
-      const relative = path.relative(songsRoot, full).split(path.sep).join('/');
-      result.push({ id: relative, name: path.parse(entry.name).name, url: '/songs/' + relative.split('/').map(encodeURIComponent).join('/') });
-    }
-  }
-  return result.sort((a, b) => a.name.localeCompare(b.name));
-}
+const types = { '.glb': 'model/gltf-binary', '.gif':'image/gif', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.flac': 'audio/flac', '.opus': 'audio/ogg', '.webm': 'audio/webm', '.ico': 'image/x-icon' };
 export const server = http.createServer(async (req, res) => {
   try {
     const requestUrl=new URL(req.url,'http://localhost');
     if(await accounts.handle(req,res,requestUrl,onlineService))return;
     if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405).end(); return; }
     const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    const ownedSong=/^\/api\/music\/(song-[a-f0-9]{24})$/.exec(pathname);
+    let musicTarget=null;
+    if(ownedSong){
+      try{const {user}=accounts.require(req,true);if(!user.music.includes(ownedSong[1]))throw Object.assign(Error('Compra esta canción en la tienda.'),{status:403});musicTarget=(await media.shopSongs()).find(song=>song.id===ownedSong[1])?.absolute;if(!musicTarget)throw Object.assign(Error('Canción no disponible.'),{status:404});}
+      catch(error){res.writeHead(error.status||400,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({error:error.message}));return;}
+    }
     if(pathname==='/api/online'){
       const port=server.address()?.port||4173,addresses=Object.values(networkInterfaces()).flat().filter(v=>v.family==='IPv4'&&!v.internal).map(v=>v.address);
       const lan=addresses.find(ip=>/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip));
@@ -44,17 +42,20 @@ export const server = http.createServer(async (req, res) => {
       const json=JSON.stringify({online:true,maxPlayers:4,publicUrl,lanUrl:lan?`http://${lan}:${port}`:null});res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(req.method==='HEAD'?undefined:json);return;
     }
     if (pathname === '/api/songs') {
-      const json = JSON.stringify({ songs: await listSongs() });
+      const json = JSON.stringify({ songs: await media.freeSongs() });
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(req.method === 'HEAD' ? undefined : json); return;
     }
     const relative = pathname === '/' ? 'index.html' : pathname.slice(1);
-    if(!['index.html','style.css'].includes(relative)&&!['js/','assets/','songs/',...(process.env.NODE_ENV==='production'?[]:['tests/'])].some(prefix=>relative.startsWith(prefix))){res.writeHead(403).end('Forbidden');return;}
-    const target = path.resolve(root, relative);
+    if(!musicTarget&&!['index.html','style.css'].includes(relative)&&!['js/','assets/','songs/','campaign_files/',...(process.env.NODE_ENV==='production'?[]:['tests/'])].some(prefix=>relative.startsWith(prefix))){res.writeHead(403).end('Forbidden');return;}
+    const target = musicTarget||path.resolve(root, relative);
+    if(!musicTarget&&media.isShopFile(target)){res.writeHead(403).end('Compra esta canción en la tienda.');return;}
+    const actualTarget=await realpath(target);
+    if(!actualTarget.startsWith(realRoot+path.sep)||!musicTarget&&media.isShopFile(actualTarget)){res.writeHead(403).end('Forbidden');return;}
     if (!target.startsWith(root + path.sep) || relative.split(/[\\/]/).some(p => p.startsWith('.')) || !types[path.extname(target).toLowerCase()]) { res.writeHead(403).end('Forbidden'); return; }
     const info = await stat(target);
     if (!info.isFile()) { res.writeHead(404).end(); return; }
-    const headers = { 'Content-Type': types[path.extname(target).toLowerCase()], 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' };
+    const headers = { 'Content-Type': types[path.extname(target).toLowerCase()], 'Accept-Ranges': 'bytes', 'Cache-Control': musicTarget?'private, no-store':'no-cache', 'X-Content-Type-Options': 'nosniff' };
     let start = 0, end = info.size - 1, status = 200;
     if (req.headers.range) {
       const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);

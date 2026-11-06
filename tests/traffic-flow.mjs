@@ -1,3 +1,4 @@
+import {openPlayMode} from './helpers/play-mode.mjs';
 // Disposable online room: two real browsers, production physics and WebSockets.
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
@@ -14,7 +15,7 @@ async function pilot(name){
  const context=await browser.newContext({viewport:{width:1100,height:760}});contexts.push(context);
  const response=await context.request.post(base+'/api/register',{data:{username:name,password:'Slipstream-2026'}});assert.equal(response.status(),200);const account=await response.json();
  assert.equal((await context.request.patch(base+'/api/profile',{headers:{'X-CSRF-Token':account.csrf},data:{displayName:name,defaultCar:'ae86',complete:true}})).status(),200);
- const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await page.waitForFunction(()=>window.touge.state.screen==='menu');await page.locator('#main-menu-actions [data-action=online]').click();return page;
+ const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await page.waitForFunction(()=>window.touge.state.screen==='menu');await openPlayMode(page,'online');return page;
 }
 try{
  const host=await pilot('DraftFollower24');await host.locator('[data-online-tab=create]').click();await host.locator('#online-create').click();await host.locator('#online-room').waitFor({state:'visible'});const code=await host.locator('#online-code-label').innerText();

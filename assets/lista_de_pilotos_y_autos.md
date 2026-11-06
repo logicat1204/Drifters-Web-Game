@@ -64,9 +64,9 @@ Lista detallada de personajes, vehículos (modelo, color, estilo de carrocería)
 
 | Personaje | Vehículo | Color | Estilo de Carrocería | Nivel | Estilo de Conducción |
 | :--- | :--- | :--- | :--- | :---: | :---: |
-| **Nozomi Kitahara** | Alfa Romeo 4C Launch Edition | Rojo | Coupe | 2 | Skiller |
-| **Kakeru Yashio** | Lotus Exige S Series 3 | Blanco | Coupe | 2 | Grip |
-| **Jackson Taylor** | Porsche 911 GT3 RS (991) | Azul / Blanco | Coupe | 3 | Complete |
+| **Nozomi Kitahara** | Alfa Romeo 4C Launch Edition | Rojo | Coupe | 3 | Skiller |
+| **Kakeru Yashio** | Lotus Exige S Series 3 | Blanco | Coupe | 3 | Grip |
+| **Jackson Taylor** | Porsche 911 GT3 RS (991) | Azul / Blanco | Coupe | 4 | Complete |
 
 ---
 

@@ -1,0 +1,146 @@
+[
+  {
+    "campaign": "akina",
+    "level": "kenji",
+    "rival": "Kenji",
+    "path": "campaign_files/akina/kenji"
+  },
+  {
+    "campaign": "akina",
+    "level": "iketani-akina",
+    "rival": "Koichiro Iketani",
+    "path": "campaign_files/akina/iketani-akina"
+  },
+  {
+    "campaign": "akina",
+    "level": "takumi-initial",
+    "rival": "Takumi Fujiwara (Inicial)",
+    "path": "campaign_files/akina/takumi-initial"
+  },
+  {
+    "campaign": "akagi",
+    "level": "kenta",
+    "rival": "Kenta Nakamura",
+    "path": "campaign_files/akagi/kenta"
+  },
+  {
+    "campaign": "akagi",
+    "level": "keisuke-initial",
+    "rival": "Keisuke Takahashi",
+    "path": "campaign_files/akagi/keisuke-initial"
+  },
+  {
+    "campaign": "iroha",
+    "level": "kyoichi",
+    "rival": "Kyoichi Sudo",
+    "path": "campaign_files/iroha/kyoichi"
+  },
+  {
+    "campaign": "iroha",
+    "level": "kai-campaign",
+    "rival": "Kai Kogashiwa",
+    "path": "campaign_files/iroha/kai-campaign"
+  },
+  {
+    "campaign": "usui",
+    "level": "iketani-usui",
+    "rival": "Koichiro Iketani",
+    "path": "campaign_files/usui/iketani-usui"
+  },
+  {
+    "campaign": "usui",
+    "level": "mako-campaign",
+    "rival": "Mako Sato & Sayuki",
+    "path": "campaign_files/usui/mako-campaign"
+  },
+  {
+    "campaign": "tsukuba",
+    "level": "godfoot",
+    "rival": "Kozo Hoshino · God Foot",
+    "path": "campaign_files/tsukuba/godfoot"
+  },
+  {
+    "campaign": "tsukuba",
+    "level": "godhand-campaign",
+    "rival": "Toshiya Joshima · God Hand",
+    "path": "campaign_files/tsukuba/godhand-campaign"
+  },
+  {
+    "campaign": "tsubaki",
+    "level": "shinji-campaign",
+    "rival": "Shinji Inui",
+    "path": "campaign_files/tsubaki/shinji-campaign"
+  },
+  {
+    "campaign": "tsubaki",
+    "level": "takumi-project",
+    "rival": "Takumi Fujiwara · Project D",
+    "path": "campaign_files/tsubaki/takumi-project"
+  },
+  {
+    "campaign": "tsubaki",
+    "level": "keisuke-project",
+    "rival": "Keisuke Takahashi · Project D",
+    "path": "campaign_files/tsubaki/keisuke-project"
+  },
+  {
+    "campaign": "odawara",
+    "level": "nozomi",
+    "rival": "Nozomi Kitahara",
+    "path": "campaign_files/odawara/nozomi"
+  },
+  {
+    "campaign": "odawara",
+    "level": "kakeru",
+    "rival": "Kakeru Yashio",
+    "path": "campaign_files/odawara/kakeru"
+  },
+  {
+    "campaign": "odawara",
+    "level": "jackson",
+    "rival": "Jackson Taylor",
+    "path": "campaign_files/odawara/jackson"
+  },
+  {
+    "campaign": "ashinoko",
+    "level": "sakamoto",
+    "rival": "Motoki Sakamoto",
+    "path": "campaign_files/ashinoko/sakamoto"
+  },
+  {
+    "campaign": "ashinoko",
+    "level": "maezono",
+    "rival": "Kazuhiro Maezono",
+    "path": "campaign_files/ashinoko/maezono"
+  },
+  {
+    "campaign": "ashinoko",
+    "level": "akaba",
+    "rival": "Kaito Akaba",
+    "path": "campaign_files/ashinoko/akaba"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "moroboshi",
+    "rival": "Sena Moroboshi",
+    "path": "campaign_files/manazuru/moroboshi"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "sawatari",
+    "rival": "Daigo Sawatari",
+    "path": "campaign_files/manazuru/sawatari"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "beckenbauer",
+    "rival": "Michael Beckenbauer",
+    "path": "campaign_files/manazuru/beckenbauer"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "kanata-final",
+    "rival": "Kanata Rivington (Fujiwara)",
+    "path": "campaign_files/manazuru/kanata-final"
+  }
+]

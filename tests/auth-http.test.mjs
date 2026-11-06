@@ -19,7 +19,7 @@ test('HTTP registration checks availability, sets an HttpOnly session and requir
 });
 test('CSRF and origin checks protect profile writes; identity and car cannot be forged through protected routes',async()=>{
   const s=await register();assert.equal((await request('/api/profile','PATCH',{complete:true},s,{'X-CSRF-Token':'wrong'})).status,403);assert.equal((await request('/api/profile','PATCH',{complete:true},s,{Origin:'https://attacker.example'})).status,403);
-  const response=await request('/api/profile','PATCH',{complete:true,displayName:'Takumi personalizado',defaultCar:'supra',userId:'another-user'},s);assert.equal(response.status,200);assert.equal((await response.json()).user.defaultCar,'supra');assert.equal(store.user(s.user.id).displayName,'Takumi personalizado');assert.equal((await request('/api/rooms','GET',null,s)).status,200);
+  const response=await request('/api/profile','PATCH',{complete:true,displayName:'Takumi personalizado',defaultCar:'r32',userId:'another-user'},s);assert.equal(response.status,200);assert.equal((await response.json()).user.defaultCar,'r32');assert.equal(store.user(s.user.id).displayName,'Takumi personalizado');assert.equal((await request('/api/rooms','GET',null,s)).status,200);
   assert.equal((await request('/server/store.mjs')).status,403);assert.equal((await request('/data/touge.sqlite')).status,403);
 });
 test('portrait uploads accept bounded images, reject SVG and invalid images, and avatars still work after a photo',async()=>{

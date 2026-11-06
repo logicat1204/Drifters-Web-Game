@@ -106,4 +106,4 @@ Los puntos de conducción actuales son estadísticas verificadas, **no saldo gas
 
 ## Actualización: campaña, colección y especialidades
 
-El sistema actual incluye 24 duelos, tres especialidades desbloqueables, monedas verificadas y tienda. El esquema SQLite actual es v3 y el avatar v2 admite maquillaje opcional. Hay 111 capas por piezas en dos rigs, y los artículos de tienda solo se equipan al poseerlos. Consulta [Campaña, tienda y superconcentración](CAMPANIA-TIENDA-FOCUS.md) para las reglas actuales y la migración.
+El sistema incluye 24 duelos, tres especialidades desbloqueables, monedas verificadas y tienda. El esquema SQLite actual es v6 y el avatar sigue en v2. Las piezas siguen siendo independientes para hombre y mujer y solo se equipan al poseerlas. Desde el 4 de noviembre pueden añadirse paquetes sin editar el catálogo: consulta [formatos de paquetes y campañas](AUDIO-LLUVIA-PAQUETES-CAMPANAS.md). [Campaña, tienda y superconcentración](CAMPANIA-TIENDA-FOCUS.md) documenta las reglas iniciales.

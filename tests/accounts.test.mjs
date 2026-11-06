@@ -12,6 +12,23 @@ import {activateFocus} from '../js/focus.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 import {OnlineRooms} from '../server/online.mjs';
 const complete=(store,user,extra={})=>store.updateProfile(user.id,{displayName:user.username,avatar:DEFAULT_AVATAR,portraitMode:'avatar',complete:true,...extra});
+test('a new license grants one chosen starter and the other cars are purchases',async()=>{
+  const store=new Store(':memory:');
+  try {
+    const user=await store.register('StarterPilot24','starter-password');
+    assert.deepEqual(user.cars,[]);
+    assert.throws(()=>complete(store,user,{defaultCar:'supra'}),/inicial/);
+    assert.throws(()=>complete(store,user,{defaultCar:'r32',portraitMode:'photo'}),/foto/);
+    assert.deepEqual(store.user(user.id).cars,[]);
+    assert.deepEqual(complete(store,user,{defaultCar:'r32'}).cars,['r32']);
+    assert.throws(()=>complete(store,user,{defaultCar:'rx7'}),/Compra/);
+    const price=CARS.find(car=>car.id==='rx7').price;
+    store.db.prepare('UPDATE wallets SET balance=? WHERE user_id=?').run(price,user.id);
+    assert.equal(store.buy(user.id,'car','rx7').user.coins,0);
+    assert.equal(complete(store,user,{defaultCar:'rx7'}).defaultCar,'rx7');
+    assert.deepEqual(new Set(store.user(user.id).cars),new Set(['r32','rx7']));
+  } finally {store.close();}
+});
 test('accounts have case-insensitive unique alphanumeric handles, hashed passwords and expiring revocable sessions',async()=>{
   let now=1000;const store=new Store(':memory:',{now:()=>now});
   try{const [a,b]=await Promise.allSettled([store.register('TakumiFX24','night-pass-24'),store.register('takumifx24','other-pass-24')]);assert.equal([a,b].filter(r=>r.status==='fulfilled').length,1);assert.equal(store.available('TAKUMIFX24'),false);const user=(a.status==='fulfilled'?a:b).value,hash=store.db.prepare('SELECT password_hash,salt FROM users').get();assert.equal(hash.password_hash.length,128);assert.notEqual(hash.password_hash,'night-pass-24');assert.equal(user.password_hash,undefined);
@@ -21,9 +38,9 @@ test('accounts have case-insensitive unique alphanumeric handles, hashed passwor
 });
 test('profiles, inventory, photos, default cars and records persist across database reopen without cross-user leakage',async()=>{
   const folder=await mkdtemp(path.join(tmpdir(),'touge-db-')),filename=path.join(folder,'users.sqlite');let store=new Store(filename);
-  try{const a=await store.register('Alvaroo','password-A24'),b=await store.register('Kanata24','password-B24');complete(store,a,{displayName:'Álvaro',defaultCar:'supra'});complete(store,b,{defaultCar:'mr2'});assert.throws(()=>store.updateProfile(a.id,{avatar:{...DEFAULT_AVATAR,hair:'paid-unknown'}}));assert.throws(()=>store.updateProfile(a.id,{portraitMode:'photo'}),/Sube/);store.setPhoto(a.id,Buffer.from([1,2,3]),'image/png');store.updateProfile(a.id,{portraitMode:'photo'});
-    const r=createRace(CARS[6],makeTrack(TRACKS[0]),{mode:'time'});Object.assign(r,{finished:true,s:r.track.length,elapsed:140,won:true});r.skill.points=800;store.addRun('legitimate-A',a.id,r);store.addRun('legitimate-A',a.id,r);assert.equal(store.stats(a.id).races,1);assert.equal(store.stats(b.id).races,0);assert.equal(store.records()[0].username,'Alvaroo');assert.equal(store.personal(b.id).records.length,0);
-    store.close();store=new Store(filename);assert.equal(store.user(a.id).defaultCar,'supra');assert.equal(store.user(a.id).displayName,'Álvaro');assert.equal(store.user(b.id).defaultCar,'mr2');assert.equal(store.stats(a.id).points,800);assert.deepEqual(store.portrait(a.id).bytes,Buffer.from([1,2,3]));assert.equal((await store.login('ALVAROO','password-A24')).id,a.id);
+  try{const a=await store.register('Alvaroo','password-A24'),b=await store.register('Kanata24','password-B24');complete(store,a,{displayName:'Álvaro',defaultCar:'r32'});complete(store,b,{defaultCar:'rx7'});assert.throws(()=>store.updateProfile(a.id,{avatar:{...DEFAULT_AVATAR,hair:'paid-unknown'}}));assert.throws(()=>store.updateProfile(a.id,{portraitMode:'photo'}),/Sube/);store.setPhoto(a.id,Buffer.from([1,2,3]),'image/png');store.updateProfile(a.id,{portraitMode:'photo'});
+    const r=createRace(CARS[2],makeTrack(TRACKS[0]),{mode:'time'});Object.assign(r,{finished:true,s:r.track.length,elapsed:140,won:true});r.skill.points=800;store.addRun('legitimate-A',a.id,r);store.addRun('legitimate-A',a.id,r);assert.equal(store.stats(a.id).races,1);assert.equal(store.stats(b.id).races,0);assert.equal(store.records()[0].username,'Alvaroo');assert.equal(store.personal(b.id).records.length,0);
+    store.close();store=new Store(filename);assert.equal(store.user(a.id).defaultCar,'r32');assert.equal(store.user(a.id).displayName,'Álvaro');assert.equal(store.user(b.id).defaultCar,'rx7');assert.equal(store.stats(a.id).points,800);assert.deepEqual(store.portrait(a.id).bytes,Buffer.from([1,2,3]));assert.equal((await store.login('ALVAROO','password-A24')).id,a.id);
   }finally{store.close();await rm(folder,{recursive:true,force:true});}
 });
 test('independent avatar catalogs render every item on their own rig and reject mismatched pieces',()=>{
@@ -54,16 +71,16 @@ test('v1 avatars map to the independent catalog without changing colors or outfi
 test('database v1 migration preserves profiles, photos, sessions and records and grants both catalogs exactly once',async()=>{
   const folder=await mkdtemp(path.join(tmpdir(),'touge-avatar-')),filename=path.join(folder,'users.sqlite');let store=new Store(filename);
   try{
-    const user=complete(store,await store.register('LegacyDriver24','password-24'),{displayName:'Piloto anterior',defaultCar:'supra'}),session=store.createSession(user.id);
+    const user=complete(store,await store.register('LegacyDriver24','password-24'),{displayName:'Piloto anterior'}),session=store.createSession(user.id);
     store.setPhoto(user.id,Buffer.from([3,2,1]),'image/png');store.updateProfile(user.id,{portraitMode:'photo'});
     const race=createRace(CARS[0],makeTrack(TRACKS[0]),{mode:'time'});Object.assign(race,{s:race.track.length,elapsed:145,won:true});store.addRun('legacy-record',user.id,race);
     const legacy={...DEFAULT_AVATAR,version:1,base:'female',hair:'spiked',eyes:'round',mouth:'full',accessory:'cap',skin:'#805039',outfit:'hoodie'};
-    store.db.prepare('UPDATE profiles SET avatar=? WHERE user_id=?').run(JSON.stringify(legacy),user.id);
+    store.db.prepare("UPDATE profiles SET avatar=?,default_car='supra' WHERE user_id=?").run(JSON.stringify(legacy),user.id);
     store.db.prepare('DELETE FROM inventory WHERE user_id=?').run(user.id);
     store.db.exec("INSERT INTO cosmetics VALUES('hair.spiked','hair','portrait-v1'); PRAGMA user_version=1;");store.db.prepare('INSERT INTO inventory VALUES(?,?,?)').run(user.id,'hair.spiked',1);
     store.db.exec('DROP TABLE owned_vehicle_parts; DROP TABLE vehicle_builds; ALTER TABLE runs DROP COLUMN vehicle_build; DROP INDEX runs_build; ALTER TABLE runs DROP COLUMN build_key; DROP TABLE economy_ledger; DROP TABLE campaign_progress; DROP TABLE owned_cars; DROP TABLE wallets; ALTER TABLE profiles DROP COLUMN focus_type; ALTER TABLE runs DROP COLUMN campaign_level; ALTER TABLE runs DROP COLUMN focus_type; ALTER TABLE runs DROP COLUMN focus_enabled;');const oldVersion=store.db.prepare('SELECT photo_version FROM profiles WHERE user_id=?').get(user.id).photo_version;store.close();store=new Store(filename);
     const restored=store.user(user.id);assert.deepEqual(restored.avatar,migrateAvatar(legacy));assert.equal(restored.displayName,'Piloto anterior');assert.equal(restored.defaultCar,'supra');assert.equal(restored.onboarded,true);assert.equal(restored.photoVersion,oldVersion+1);assert.equal(store.session(session.token).user.id,user.id);assert.deepEqual(store.portrait(user.id).bytes,Buffer.from([3,2,1]));assert.equal(store.records()[0].time,145);
-    const count=store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n;assert.equal(count,COSMETICS.filter(item=>item.starter).length+1);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,4);
+    const count=store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n;assert.equal(count,COSMETICS.filter(item=>item.starter).length+1);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,6);
     store.close();store=new Store(filename);assert.equal(store.user(user.id).photoVersion,oldVersion+1);assert.equal(store.db.prepare('SELECT COUNT(*) AS n FROM inventory WHERE user_id=?').get(user.id).n,count);
     store.updateProfile(user.id,{portraitMode:'avatar'});assert.equal(store.portrait(user.id).mime,'image/svg+xml');
   }finally{store.close();await rm(folder,{recursive:true,force:true});}
@@ -92,8 +109,8 @@ test('leaderboards pick one fastest run per pilot and separate source, weather, 
   }finally{store.close();}
 });
 test('public rooms omit private, full and started rooms; authenticated identity and default car cannot be forged',async()=>{
-  const store=new Store(':memory:');try{const user=complete(store,await store.register('Takumi24','night-pass-24'),{defaultCar:'supra'}),rooms=new OnlineRooms({store}),out=[],c=rooms.connect(m=>out.push(m),()=>{},user);
-    rooms.receive(c,{type:'create',public:true,name:'Forged',car:'r32'});assert.equal(rooms.publicRooms().length,1);const p=c.room.players.get(c.id);assert.equal(p.name,'Takumi24');assert.equal(p.car,'supra');assert.equal(p.userId,user.id);
+  const store=new Store(':memory:');try{const user=complete(store,await store.register('Takumi24','night-pass-24'),{defaultCar:'rx7'}),rooms=new OnlineRooms({store}),out=[],c=rooms.connect(m=>out.push(m),()=>{},user);
+    rooms.receive(c,{type:'create',public:true,name:'Forged',car:'r32'});assert.equal(rooms.publicRooms().length,1);const p=c.room.players.get(c.id);assert.equal(p.name,'Takumi24');assert.equal(p.car,'rx7');assert.equal(p.userId,user.id);
     c.room.public=false;assert.equal(rooms.publicRooms().length,0);c.room.public=true;c.room.phase='racing';assert.equal(rooms.publicRooms().length,0);c.room.phase='lobby';while(c.room.players.size<4)c.room.players.set('fake'+c.room.players.size,{client:{id:'fake'},name:'Test'});assert.equal(rooms.publicRooms().length,0);
   }finally{store.close();}
 });

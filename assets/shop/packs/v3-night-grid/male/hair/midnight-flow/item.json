@@ -1,0 +1,14 @@
+{
+  "base": "male",
+  "rig": "portrait-v2-male",
+  "slot": "hair",
+  "name": "Flequillo Midnight · Hombre",
+  "price": 360,
+  "rarity": "rare",
+  "layers": {
+    "back": "back.png",
+    "color": "color.png",
+    "lines": "lines.png"
+  },
+  "id": "male.hair.midnight-flow"
+}

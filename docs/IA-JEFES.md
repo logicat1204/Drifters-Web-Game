@@ -1,10 +1,10 @@
 # Diseño técnico: dificultad, estilos y jefes
 
-Actualizado el 30 de octubre de 2026. Física de jefes introducida en `v7`; versión actual `v8` con [rebufo y contactos](REBUFO-CONTACTOS.md).
+Actualizado el 4 de noviembre de 2026. Física de jefes introducida en `v7`; versión actual `v8` con [rebufo y contactos](REBUFO-CONTACTOS.md).
 
 ## Dificultad por piloto
 
-Se elimina el selector global Fácil/Normal/Difícil. Cada rival conserva su nivel de campaña: 1 Fácil, 2 Medio, 3 Difícil, 4 Profesional o 5 Leyenda. Los duelos individuales también tienen un nivel fijo. Los valores antiguos guardados en el navegador o enviados como `difficulty` se ignoran; no modifican la simulación ni la validación del servidor.
+Se elimina el selector global Fácil/Normal/Difícil. Odawara usa ahora Nozomi y Kakeru Yashio en nivel 3 (Difícil), y Jackson en nivel 4 (Profesional). Se mantienen sus estilos y orden. Cada rival conserva su nivel de campaña: 1 Fácil, 2 Medio, 3 Difícil, 4 Profesional o 5 Leyenda. Los duelos individuales también tienen un nivel fijo. Los valores antiguos guardados en el navegador o enviados como `difficulty` se ignoran; no modifican la simulación ni la validación del servidor.
 
 | Nivel | Aprovechamiento del agarre | Objetivo de punta | Respuesta de trayectoria | Deslizamiento Skiller |
 | --- | --- | --- | --- | --- |
@@ -53,11 +53,11 @@ Las mallas se construyen en WebGL sin descargar recursos externos. La luz usa co
 
 El detector registra el orden confirmado de los coches, con una banda de ±4 m para evitar activaciones por contacto o por oscilaciones de sus morros. Empezar delante o reposicionar un coche no cuenta como adelantamiento.
 
-1. Un adelantamiento válido despierta el aura roja mientras Kanata persigue al jugador. Empezar delante no activa la habilidad.
-2. Anticipación de 0,65 s antes de aplicar potencia.
-3. Impulso de 7 s: aceleración ×1,70, punta ×1,12, agarre ×1,06 y frenada ×1,10.
+1. Un adelantamiento válido inicia la preparación de Fireball. Empezar delante no activa la habilidad. Durante la preparación no hay aura, potencia adicional ni la conducta de tráfico carmesí.
+2. Preparación de 5 s de simulación desde el adelantamiento confirmado. Al terminar, se activan a la vez aura, contraataque y aviso Fireball.
+3. Impulso de 7 s: aceleración ×2,50, punta ×1,38, agarre ×1,16 y frenada ×1,35. La punta teórica de su preparación Complete pasa de 70 a 96,6 m/s mientras dura el impulso. Sigue frenando y eligiendo un lado para adelantar.
 4. Cuando Kanata recupera la posición, empieza una gracia de 1 s continuo. Al cumplirse, se apagan aura, impulso y preparación de impulso pendientes; vuelve a la conducción normal. Si el jugador se pone delante durante esa gracia, el contador se reinicia. Incluso una ventaja sostenida menor de 4 m puede completar la recuperación.
-5. Rearme de 9 s desde la activación. Los impulsos no se suman ni se renuevan durante su ejecución. Un nuevo adelantamiento despierta el aura; después del rearme permite también otro impulso. Si Kanata termina la carrera delante, el modo se cierra para evitar un aura de persecución congelada en resultados.
+5. Los impulsos no se suman ni se renuevan durante una persecución existente. Tras recuperar la posición y apagarse, otro adelantamiento confirmado inicia de nuevo cinco segundos completos de preparación. El contador interno cooldown se conserva como estado temporal y no elimina esa nueva ventana. Si Kanata recupera la posición durante la preparación, la misma gracia de un segundo cancela el ataque pendiente. Si termina la carrera delante, el modo se cierra para evitar un aura congelada en resultados.
 
 El impulso actúa en aceleración, límites y decisiones de conducción. No cambia directamente el progreso ni garantiza que Kanata recupere la posición. El jugador puede reservar concentración, salir con más velocidad y adelantar cerca de meta para reducir su ventana de respuesta.
 
@@ -69,6 +69,6 @@ Si ambos coches cruzan en el mismo paso de 1/120 s, se compara la fracción reco
 
 No cambia el esquema SQLite. Los récords anteriores se conservan y las nuevas marcas se agrupan con `HANDLING_VERSION=v8` para evitar mezclar físicas distintas.
 
-La suite verifica los 24 recorridos de IA sin impactos, una victoria posible por nivel con vehículos iniciales y concentración desbloqueada, diferencias medibles entre estilos, cinco niveles crecientes, activaciones por curva/adelantamiento, duración, límites y apagado de Kanata un segundo después de recuperar posición, protección del servidor y orden de llegada. El conductor de referencia aprovecha hasta el 90% del agarre y elige trazada y especialización; demuestra que las carreras son superables, no una estimación de dificultad para jugadores humanos. La percepción final requiere probar con teclado o mando y ajustar a partir de partidas reales.
+La suite verifica los 24 recorridos de IA sin impactos, una victoria posible por nivel con vehículos iniciales y concentración desbloqueada, diferencias medibles entre estilos, cinco niveles crecientes, activaciones por curva/adelantamiento, duración, límites y apagado de Kanata un segundo después de recuperar posición, protección del servidor y orden de llegada. Contra Fireball, el conductor de referencia reserva la concentración y el adelantamiento para los últimos 320 m; el replay de un ataque temprano verifica ahora también una derrota sin recompensa. El conductor de referencia aprovecha hasta el 90% del agarre y elige trazada y especialización; demuestra que las carreras son superables, no una estimación de dificultad para jugadores humanos. La percepción final requiere probar con teclado o mando y ajustar a partir de partidas reales.
 
 `npm run test:boss-visual` genera cinco capturas con el renderizador de producción y comprueba también cámaras alternativas y movimiento reducido. `npm run test:menu` comprueba la ausencia del selector y la compatibilidad con ajustes antiguos.

@@ -31,3 +31,11 @@ export function referenceDrive(cfg,{car=CARS[0],difficulty='normal',attack=true,
   }
   return {race:r,impacts,brakingFrames};
 }
+
+// A strategy fixture, not a game assist: save concentration and time the pass
+// near the finish, instead of trying to outrun Fireball for the whole course.
+export function kanataLateInput(r,{line=-2.5,followLine=r.rivalLateral,followGap=12,gripUse=.9,attackDistance=320}={}){
+ const attack=r.track.length-r.s<attackDistance,input=driverInput(r,{line:attack?line:followLine,gripUse});
+ if(!attack){const target=r.rivalSpeed+(r.rivalS-r.s-followGap)*.8;if(r.speed>target+.25){input.throttle=false;input.brake=true;}else if(r.speed>=target-.1)input.throttle=false;}
+ return input;
+}

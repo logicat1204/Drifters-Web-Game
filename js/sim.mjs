@@ -29,15 +29,16 @@ export const CAR_PROFILES={
   power:{name:'POTENCIA',description:'Más aceleración y punta; frena antes para tomar las curvas.'}
 };
 export const CARS = [
-  { id:'ae86',name:'SPRINTER TRUENO',code:'AE86',brand:'TOYOTA',year:'1983',drive:'FR',power:'130',weight:'940',color:'#e5e5dc',accel:13.8,max:62,grip:1.16,profile:'agile',label:'El maestro de las curvas' },
-  { id:'rx7',name:'RX-7 TYPE R',code:'FD3S',brand:'MAZDA',year:'1991',drive:'FR',power:'255',weight:'1260',color:'#e7b948',accel:15.3,max:68,grip:1.10,profile:'balanced',label:'El equilibrio rotativo' },
-  { id:'r32',name:'SKYLINE GT-R',code:'BNR32',brand:'NISSAN',year:'1989',drive:'4WD',power:'280',weight:'1430',color:'#8794a2',accel:16.1,max:71,grip:1.04,profile:'power',label:'Potencia en las rectas' },
-  { id:'mr2',name:'MR2 G-LIMITED',code:'SW20',brand:'TOYOTA',year:'1989',drive:'MR',power:'165',weight:'1180',color:'#e5e2d5',accel:13.9,max:61,grip:1.18,profile:'agile',label:'Precisión de motor central' },
-  { id:'s2000',name:'S2000',code:'AP1',brand:'HONDA',year:'1999',drive:'FR',power:'250',weight:'1240',color:'#bf3e37',accel:14.2,max:63,grip:1.17,profile:'agile',label:'Agilidad a altas vueltas' },
-  { id:'silvia',name:"SILVIA K’S",code:'S13',brand:'NISSAN',year:'1989',drive:'FR',power:'175',weight:'1120',color:'#6e9796',accel:15.0,max:67,grip:1.11,profile:'balanced',label:'Control y respuesta turbo' },
-  { id:'supra',name:'SUPRA RZ',code:'JZA80',brand:'TOYOTA',year:'1993',drive:'FR',power:'280',weight:'1490',color:'#bdc4c8',accel:16.4,max:73,grip:1.02,profile:'power',label:'El empuje del biturbo' }
+  { id:'ae86',price:750,name:'SPRINTER TRUENO',code:'AE86',brand:'TOYOTA',year:'1983',drive:'FR',power:'130',weight:'940',color:'#e5e5dc',accel:13.8,max:62,grip:1.16,profile:'agile',label:'El maestro de las curvas' },
+  { id:'rx7',price:1100,name:'RX-7 TYPE R',code:'FD3S',brand:'MAZDA',year:'1991',drive:'FR',power:'255',weight:'1260',color:'#e7b948',accel:15.3,max:68,grip:1.10,profile:'balanced',label:'El equilibrio rotativo' },
+  { id:'r32',price:1200,name:'SKYLINE GT-R',code:'BNR32',brand:'NISSAN',year:'1989',drive:'4WD',power:'280',weight:'1430',color:'#8794a2',accel:16.1,max:71,grip:1.04,profile:'power',label:'Potencia en las rectas' },
+  { id:'mr2',price:850,name:'MR2 G-LIMITED',code:'SW20',brand:'TOYOTA',year:'1989',drive:'MR',power:'165',weight:'1180',color:'#e5e2d5',accel:13.9,max:61,grip:1.18,profile:'agile',label:'Precisión de motor central' },
+  { id:'s2000',price:950,name:'S2000',code:'AP1',brand:'HONDA',year:'1999',drive:'FR',power:'250',weight:'1240',color:'#bf3e37',accel:14.2,max:63,grip:1.17,profile:'agile',label:'Agilidad a altas vueltas' },
+  { id:'silvia',price:850,name:"SILVIA K’S",code:'S13',brand:'NISSAN',year:'1989',drive:'FR',power:'175',weight:'1120',color:'#6e9796',accel:15.0,max:67,grip:1.11,profile:'balanced',label:'Control y respuesta turbo' },
+  { id:'supra',price:1300,name:'SUPRA RZ',code:'JZA80',brand:'TOYOTA',year:'1993',drive:'FR',power:'280',weight:'1490',color:'#bdc4c8',accel:16.4,max:73,grip:1.02,profile:'power',label:'El empuje del biturbo' }
 ].map(car=>({...car,stats:[Math.round(car.accel/17*100),Math.round(car.grip/1.20*100),Math.round(car.max/75*100)]}));
 export const ALL_CARS=[...CARS,...EXTRA_CARS];
+export const STARTER_CARS=CARS.slice(0,3);
 export function makeTrack(config) {
   const step = 8, points = [];
   const recipe=config.layout||COURSE_LAYOUTS[config.id],total=recipe.reduce((sum,p)=>sum+p[0],0);
@@ -70,7 +71,7 @@ export function worldAt(track, s, lateral = 0) {
 export function createRace(car, track, opts = {}) {
   if(opts.build)car=applyBuild(car,opts.build);
   const mode=opts.mode||'battle',rival=opts.rival||RIVALS[track.rival];
-  return { car, track, rival,draft:createDraft(),contactCooldown:0,boss:createBossState(rival),aiDriver:opts.aiDriver?createAIDriver(opts.aiDriver):null, campaignStage:opts.campaignStage||null,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, rivalLevel:rivalLevel(rival) };
+  return { car, track, rival,draft:createDraft(),contactCooldown:0,boss:createBossState(rival),aiDriver:opts.aiDriver?createAIDriver(opts.aiDriver):null, campaignStage:opts.campaignStage||null,rematch:opts.rematch===true,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/32)+25, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, rivalLevel:rivalLevel(rival) };
 }
 export function rivalCar(rival){const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0],style=DRIVER_STYLES[rivalStyle(rival)];return {...base,...style,id:rival.car,color:rival.color};}
 export function rivalDriverInput(r,o,dt){return driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,clamp});}
@@ -125,6 +126,7 @@ export function updateRace(r, input, dt, traffic=null) {
   r.cornerSpeed=Math.sqrt(grip/Math.max(.00001,Math.abs(p.curve)));
   r.lateralV=Math.sin(r.travelYaw)*speed;
   r.lateral+=r.lateralV*dt;
+  if(r.manual&&input.gearEpoch===r.resetId&&Number.isInteger(input.gear)&&input.gear>=1&&input.gear<=5)r.gear=input.gear;
   const gearMax = [0, 20, 33, 44, 55, maxSpeed];
   if (!r.manual) { while (r.gear < 5 && speed > gearMax[r.gear] * .91) r.gear++; while (r.gear > 1 && speed < gearMax[r.gear - 1] * .72) r.gear--; }
   const accel = r.car.accel * Math.max(.15, 1 - speed / (maxSpeed * 1.13))*(concentrating?power.acceleration:1)*(counter?.acceleration||1);
@@ -161,7 +163,7 @@ export function updateRace(r, input, dt, traffic=null) {
   if(r.mode!=='time'){
     const previousGap=r.rivalS-r.s;
     const opponentStartS=r.opponent.s;
-    const sensedPlayer={...beforePlayer,lateralV:Math.sin(beforePlayer.travelYaw)*beforePlayer.speed,rival:r.rival,boss:r.boss,night:r.night,headlights:r.headlights};
+    const sensedPlayer={...beforePlayer,lateralV:Math.sin(beforePlayer.travelYaw)*beforePlayer.speed,rival:r.rival,boss:r.boss,night:r.night,headlights:r.headlights,rematch:r.rematch};
     updateRace(r.opponent,rivalDriverInput(sensedPlayer,r.opponent,dt),dt,[beforePlayer]);
     resolveVehicleContact(r,r.opponent,beforePlayer,beforeOpponent);
     const o=r.opponent;r.rivalS=o.s;r.rivalSpeed=o.speed;r.rivalLateral=o.lateral;r.rivalYaw=o.yaw;r.rivalBraking=o.braking;r.rivalSteer=o.steer;r.rivalFinished=o.finished;r.rivalFinishFraction=o.s>=r.track.length?clamp((r.track.length-opponentStartS)/Math.max(.00001,o.s-opponentStartS),0,1):1;r.rivalDrift=o.drift;r.rivalSlip=o.slipAngle;updateBossState(r,dt,sample(o.track,o.s).curve);

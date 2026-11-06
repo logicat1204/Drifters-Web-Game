@@ -1,5 +1,5 @@
-import {ALL_CARS as CARS,ALL_TRACKS as TRACKS} from './sim.mjs';
-import {AVATAR_OPTIONS,DEFAULT_AVATAR,avatarOptions,defaultAvatar,cosmeticId} from './avatar.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,STARTER_CARS,CAR_PROFILES} from './sim.mjs';
+import {AVATAR_OPTIONS,DEFAULT_AVATAR,avatarOptions,defaultAvatar,cosmeticId,installCosmetics,renderableAvatar} from './avatar.mjs';
 import {FOCUS_TYPES} from './focus.mjs';
 const $=id=>document.getElementById(id),time=s=>{const ms=Math.floor(s*1000);return `${Math.floor(ms/60000)}′${String(Math.floor(ms/1000)%60).padStart(2,'0')}″${String(ms%1000).padStart(3,'0')}`;};
 const label={base:'BASE',skin:'TONO DE PIEL',hair:'CABELLO',hairColor:'COLOR DEL CABELLO',eyes:'OJOS',mouth:'LABIOS',outfit:'ROPA',outfitColor:'COLOR DE ROPA',accessory:'ACCESORIO',makeup:'MAQUILLAJE'};
@@ -7,7 +7,7 @@ export class AccountClient {
   constructor(callbacks={}){
     this.callbacks=callbacks;this.user=null;this.csrf=null;this.ready=false;this.authMode='login';this.draft={...DEFAULT_AVATAR};this.recordRequest=0;
     for(const [key,items] of Object.entries(AVATAR_OPTIONS)){const field=document.createElement('label');field.textContent=label[key];const select=document.createElement('select');select.id='avatar-'+key;select.setAttribute('aria-label',label[key]);for(const [id,name] of items)select.add(new Option(name,id));select.onchange=()=>{if(key==='base')this.changeBase(select.value);else this.draft[key]=select.value;this.preview();};field.append(select);$('avatar-options').append(field);}
-    for(const car of CARS)$('profile-car').add(new Option(`${car.brand} ${car.code}`,car.id));
+    $('profile-car').onchange=()=>this.describeCar();
     for(const t of TRACKS)$('records-track').add(new Option(t.name,t.id));for(const c of CARS)$('records-car').add(new Option(c.code,c.id));
     document.querySelectorAll('[data-auth-mode]').forEach(b=>b.onclick=()=>this.mode(b.dataset.authMode));
     $('auth-form').onsubmit=e=>{e.preventDefault();this.authenticate();};$('auth-username').oninput=()=>this.availability();
@@ -21,7 +21,8 @@ export class AccountClient {
     this.init();
   }
   async request(url,options={}){const response=await fetch(url,{...options,headers:{...(options.body?{'Content-Type':'application/json'}:{}),...(this.csrf?{'X-CSRF-Token':this.csrf}:{}),...options.headers}});let data;try{data=await response.json();}catch{throw Error('El servidor no respondió. Revisa que JUGAR.bat siga abierto.');}if(!response.ok){if(response.status===401&&!url.startsWith('/api/login')){this.user=null;this.csrf=null;this.close(true);this.renderIdentity();this.callbacks.onSessionLost?.();}const error=Error(data.error||'No se pudo completar la acción.');error.status=response.status;throw error;}return data;}
-  async init(){try{this.accept(await this.request('/api/session'));$('auth-status').textContent='';$('auth-retry').classList.add('hidden');}catch(error){$('auth-status').textContent=error.message;$('auth-retry').classList.remove('hidden');}finally{this.ready=true;$('auth-submit').disabled=false;}}
+  async refreshCatalog(){const data=await this.request('/api/avatar/catalog');installCosmetics(data.items.filter(i=>i.pack));}
+  async init(){try{await this.refreshCatalog();this.accept(await this.request('/api/session'));$('auth-status').textContent='';$('auth-retry').classList.add('hidden');}catch(error){$('auth-status').textContent=error.message;$('auth-retry').classList.remove('hidden');}finally{this.ready=true;$('auth-submit').disabled=false;}}
   accept(data){this.user=data.user;this.csrf=data.csrf??this.csrf;this.renderIdentity();this.callbacks.onUser?.(this.user);if(this.user&&!this.user.onboarded&&!document.body.classList.contains('title-screen'))this.open(true);}
   renderIdentity(){const user=this.user;document.body.classList.toggle('auth-required',!user?.onboarded);$('auth-gate').classList.toggle('hidden',!!user);$('account-name').textContent=user?.displayName||'MI LICENCIA';$('account-portrait').src=user?.portraitUrl||'/assets/avatars/v2/base-male.png';$('account-close').classList.toggle('hidden',!user?.onboarded);}
   require(){if(this.user?.onboarded)return true;if(this.user)this.open(true);else $('auth-gate').classList.remove('hidden');return false;}
@@ -29,7 +30,21 @@ export class AccountClient {
   availability(){clearTimeout(this.availabilityTimer);const epoch=this.availabilityEpoch=(this.availabilityEpoch||0)+1;$('username-status').textContent='';if(this.authMode!=='register')return;const name=$('auth-username').value;if(!/^[a-zA-Z0-9]{3,24}$/.test(name)){$('username-status').textContent='3–24 letras y números, sin espacios.';return;}this.availabilityTimer=setTimeout(async()=>{try{const data=await this.request('/api/username?name='+encodeURIComponent(name));if(epoch===this.availabilityEpoch)$('username-status').textContent=data.available?'✓ Nombre disponible':'Ese nombre ya está ocupado.';}catch(error){if(epoch===this.availabilityEpoch)$('username-status').textContent=error.message;}},350);}
   async authenticate(){if(!$('auth-form').reportValidity())return;if(this.authMode==='register'&&$('auth-password').value!==$('auth-confirm').value){$('auth-status').textContent='Las contraseñas no coinciden.';return;}$('auth-submit').disabled=true;$('auth-status').textContent='Abriendo tu licencia…';try{const data=await this.request('/api/'+(this.authMode==='register'?'register':'login'),{method:'POST',body:JSON.stringify({username:$('auth-username').value,password:$('auth-password').value})});$('auth-password').value=$('auth-confirm').value='';$('auth-status').textContent='';this.accept(data);}catch(error){$('auth-status').textContent=error.message;}finally{$('auth-submit').disabled=false;}}
   async logout(){try{await this.request('/api/logout',{method:'POST'});this.user=null;this.csrf=null;this.close(true);this.renderIdentity();this.callbacks.onLogout?.();this.mode('login');$('auth-username').focus();}catch(error){$('profile-status').textContent=error.message;}}
-  open(first=false){if(!this.user)return;this.previousFocus=document.activeElement;$('account-panel').classList.remove('hidden');$('license-overlay').classList.remove('hidden');$('account-title').textContent=first?'TU PRIMERA LICENCIA.':'TU LICENCIA.';$('profile-username').textContent='@'+this.user.username;$('profile-display-name').value=this.user.displayName;$('profile-car').value=this.user.defaultCar;$('portrait-mode').value=this.user.portraitMode;this.populateFocus();document.querySelector('.license-shop').disabled=!this.user.onboarded;for(const option of $('profile-car').options)option.disabled=!this.user.cars.includes(option.value);this.draft={...this.user.avatar};this.baseDrafts={};this.refreshAvatarOptions();$('profile-status').textContent=first?'Elige una foto o personaliza tu avatar, y confirma tu nombre.':'';this.tab('profile');this.preview();$('profile-display-name').focus({preventScroll:true});$('account-panel').scrollTop=0;}
+  open(first=false){if(!this.user)return;this.previousFocus=document.activeElement;$('account-panel').classList.remove('hidden');$('license-overlay').classList.remove('hidden');$('account-title').textContent=first?'TU PRIMERA LICENCIA.':'TU LICENCIA.';$('profile-username').textContent='@'+this.user.username;$('profile-display-name').value=this.user.displayName;this.showCarOptions();$('portrait-mode').value=this.user.portraitMode;this.populateFocus();document.querySelector('.license-shop').disabled=!this.user.onboarded;this.draft=renderableAvatar(this.user.avatar);this.baseDrafts={};this.refreshAvatarOptions();$('profile-status').textContent=first?'Confirma tu nombre, personaliza tu retrato y elige tu coche inicial.':'';this.tab('profile');this.preview();$('profile-display-name').focus({preventScroll:true});$('account-panel').scrollTop=0;}
+  showCarOptions(){
+    const select=$('profile-car'),choosing=!this.user.onboarded&&!this.user.cars.length;
+    $('profile-car-label').textContent=choosing?'ELIGE TU COCHE INICIAL':'COCHE PREDETERMINADO';
+    const choices=choosing?STARTER_CARS:CARS.filter(car=>this.user.cars.includes(car.id));
+    select.replaceChildren();
+    if(choosing){const option=new Option('Elige uno de los tres estilos','');option.disabled=true;select.add(option);}
+    for(const car of choices)select.add(new Option(`${car.brand} ${car.code} · ${CAR_PROFILES[car.profile].name}`,car.id));
+    select.value=choosing?'':this.user.defaultCar;
+    this.describeCar();
+  }
+  describeCar(){
+    const car=CARS.find(c=>c.id===$('profile-car').value);
+    $('profile-car-note').textContent=car?CAR_PROFILES[car.profile].description:'Tu primer coche es gratis. Los otros estarán disponibles en la tienda.';
+  }
   refreshAvatarOptions(){for(const [key,items] of Object.entries(avatarOptions(this.draft.base))){const select=$('avatar-'+key);const owned=items.filter(([id])=>!['hair','eyes','mouth','outfit','accessory','makeup'].includes(key)||!this.user?.cosmetics||this.user.cosmetics.includes(cosmeticId(this.draft.base,key,id)));select.replaceChildren(...owned.map(([id,name])=>new Option(name,id)));select.value=this.draft[key];}}
   populateFocus(){const select=$('profile-focus');select.replaceChildren();for(const type of Object.values(FOCUS_TYPES)){const unlocked=this.user.focusUnlocked.includes(type.id),option=new Option(type.name+(unlocked?'':' · BLOQUEADO'),type.id);option.disabled=!unlocked&&type.id!=='balance';select.add(option);}select.value=this.user.focusType;this.focusNote();}
   focusNote(){const type=FOCUS_TYPES[$('profile-focus').value]||FOCUS_TYPES.balance;const unlocked=this.user.focusUnlocked.includes(type.id);$('profile-focus-note').textContent=(unlocked?type.description:'BLOQUEADO · '+type.unlock)+'. Duración: 1,5–5 s según carga.';$('profile-focus-note').style.borderColor=type.color;}

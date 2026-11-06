@@ -37,7 +37,7 @@ test('all campaign rivals pass a slower centered car using a real side lane with
 });
 test('Kanata chooses the open side near either barrier, including with the crimson counterattack',()=>{
  const rival=CAMPAIGN_STAGES.find(s=>s.id==='kanata-final');
- for(const lane of [-3.5,0,3.5]){const r=ready(rival,{lane,aiLane:0,gap:40,berserk:true}),result=runPass(r,{lane});assert.ok(result.passed);assert.ok(result.boost);assert.equal(result.hits,0);assert.equal(result.walls,0);if(lane<0)assert.equal(result.side,1);if(lane>0)assert.equal(result.side,-1);assert.equal(r.boss.enraged,false);}
+ for(const lane of [-3.5,0,3.5]){const r=ready(rival,{lane,aiLane:0,gap:200,berserk:true}),result=runPass(r,{lane});assert.ok(result.passed);assert.ok(result.boost);assert.equal(result.hits,0);assert.equal(result.walls,0);if(lane<0)assert.equal(result.side,1);if(lane>0)assert.equal(result.side,-1);assert.equal(r.boss.enraged,false);}
 });
 test('a close faster rival brakes and makes room instead of repeatedly shoving the player',()=>{
  const rival=CAMPAIGN_STAGES.find(s=>s.id==='kanata-final'),r=ready(rival,{gap:9,playerSpeed:40,aiSpeed:45,berserk:true});const result=runPass(r);assert.ok(result.passed);assert.equal(result.hits,0);assert.equal(result.walls,0);
@@ -74,6 +74,7 @@ test('a real pass, return to center and Kanata counter-pass replay identically o
  const store=new Store(':memory:');let now=0;
  try{
   const user=await store.register('PassingReplay24','passing-password-24');
+  store.updateProfile(user.id,{complete:true,defaultCar:'r32'});
   for(const stage of CAMPAIGN_STAGES.slice(0,-1)){
    const won=createRace(CARS[2],makeTrack(ALL_TRACKS.find(t=>t.id===stage.track)),{mode:'campaign',campaignStage:stage.id,rival:stage});Object.assign(won,{s:won.track.length,elapsed:150,finished:true,won:true});store.addRun('pass-seed-'+stage.id,user.id,won);
   }

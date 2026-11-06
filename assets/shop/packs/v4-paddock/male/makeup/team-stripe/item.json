@@ -1,0 +1,12 @@
+{
+  "base": "male",
+  "rig": "portrait-v2-male",
+  "slot": "makeup",
+  "name": "Marcas Blue Apex · Hombre",
+  "price": 190,
+  "rarity": "rare",
+  "layers": {
+    "image": "image.png"
+  },
+  "id": "male.makeup.team-stripe"
+}

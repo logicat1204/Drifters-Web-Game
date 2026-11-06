@@ -1,14 +1,15 @@
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {WebSocket} from 'ws';
-import {server,online} from '../server.mjs';
+import {server,online,store} from '../server.mjs';
 let base;const sockets=[];
 before(async()=>{await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;});
 after(async()=>{for(const ws of sockets)ws.terminate();for(const ws of online.wss.clients)ws.terminate();await new Promise(resolve=>server.close(resolve));});
 let nextUser=0;
 async function connect(displayName='Piloto',car='ae86'){
   const response=await fetch(base+'/api/register',{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify({username:'SocketUser'+(++nextUser),password:'socket-password-24'})});const account=await response.json(),cookie=response.headers.get('set-cookie').split(';')[0];
-  assert.equal(response.status,200);const profile=await fetch(base+'/api/profile',{method:'PATCH',headers:{'Content-Type':'application/json',Origin:base,Cookie:cookie,'X-CSRF-Token':account.csrf},body:JSON.stringify({displayName,defaultCar:car,complete:true})});assert.equal(profile.status,200);
+  assert.equal(response.status,200);const profile=await fetch(base+'/api/profile',{method:'PATCH',headers:{'Content-Type':'application/json',Origin:base,Cookie:cookie,'X-CSRF-Token':account.csrf},body:JSON.stringify({displayName,defaultCar:'ae86',complete:true})});assert.equal(profile.status,200);
+  if(car!=='ae86'){store.db.prepare('UPDATE wallets SET balance=5000 WHERE user_id=?').run(account.user.id);store.buy(account.user.id,'car',car);store.updateProfile(account.user.id,{defaultCar:car});}
   const ws=new WebSocket(base.replace('http','ws')+'/online',{origin:base,headers:{Cookie:cookie}}),messages=[],waiters=[];sockets.push(ws);ws.on('message',raw=>{const msg=JSON.parse(raw);messages.push(msg);for(const w of [...waiters]){const i=messages.findIndex(m=>m.type===w.type&&w.predicate(m));if(i>=0){waiters.splice(waiters.indexOf(w),1);clearTimeout(w.timer);w.resolve(messages.splice(i,1)[0]);}}});await new Promise((resolve,reject)=>{ws.once('open',resolve);ws.once('error',reject);});return {ws,send:msg=>ws.send(JSON.stringify(msg)),next(type,predicate=()=>true){const i=messages.findIndex(m=>m.type===type&&predicate(m));if(i>=0)return Promise.resolve(messages.splice(i,1)[0]);return new Promise((resolve,reject)=>{const w={type,predicate,resolve,timer:setTimeout(()=>reject(Error('No message: '+type)),3000)};waiters.push(w);});}};}
 test('real WebSockets create, invite, ready four players, start synchronously and reject late joining',async()=>{
   const host=await connect('Host test','supra');const hello=await host.next('hello');host.send({type:'create',name:'Host <test>',car:'supra',config:{track:'akina'}});const room=await host.next('room');assert.equal(room.hostId,hello.id);assert.equal(room.players[0].name,'Host test');assert.equal(room.players[0].car,'supra');const guests=[];
