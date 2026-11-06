@@ -1,0 +1,298 @@
+{
+  "version": 3,
+  "dlc": "verano",
+  "canvas": {
+    "width": 512,
+    "height": 640
+  },
+  "rigs": {
+    "male": {
+      "id": "portrait-v2-male",
+      "face": [
+        256,
+        224
+      ],
+      "neck": [
+        256,
+        365
+      ],
+      "shoulders": [
+        [
+          140,
+          392
+        ],
+        [
+          372,
+          392
+        ]
+      ]
+    },
+    "female": {
+      "id": "portrait-v2-female",
+      "face": [
+        256,
+        220
+      ],
+      "neck": [
+        256,
+        373
+      ],
+      "shoulders": [
+        [
+          176,
+          394
+        ],
+        [
+          336,
+          394
+        ]
+      ]
+    }
+  },
+  "items": [
+    {
+      "id": "female.outfit.tri",
+      "slot": "outfit",
+      "key": "tri",
+      "name": "Bikini triángulo",
+      "price": 400,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.bandeau",
+      "slot": "outfit",
+      "key": "bandeau",
+      "name": "Bikini bandeau",
+      "price": 380,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.tropical",
+      "slot": "outfit",
+      "key": "tropical",
+      "name": "Bikini tropical",
+      "price": 450,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.maillot",
+      "slot": "outfit",
+      "key": "maillot",
+      "name": "Traje de baño entero",
+      "price": 520,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.rashguard",
+      "slot": "outfit",
+      "key": "rashguard",
+      "name": "Licra de surf",
+      "price": 0,
+      "rarity": "starter",
+      "starter": true,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.hawaiana",
+      "slot": "outfit",
+      "key": "hawaiana",
+      "name": "Camisa playera anudada",
+      "price": 480,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "female.outfit.conchas",
+      "slot": "outfit",
+      "key": "conchas",
+      "name": "Bikini de conchas y perlas · Legendario",
+      "price": 1200,
+      "rarity": "legendary",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "female"
+      ],
+      "rig": "portrait-v2-female"
+    },
+    {
+      "id": "male.outfit.hawaiana",
+      "slot": "outfit",
+      "key": "hawaiana",
+      "name": "Camisa hawaiana",
+      "price": 450,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.tirantes",
+      "slot": "outfit",
+      "key": "tirantes",
+      "name": "Camiseta de tirantes",
+      "price": 0,
+      "rarity": "starter",
+      "starter": true,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.rashguard",
+      "slot": "outfit",
+      "key": "rashguard",
+      "name": "Licra de surf",
+      "price": 0,
+      "rarity": "starter",
+      "starter": true,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.chaleco",
+      "slot": "outfit",
+      "key": "chaleco",
+      "name": "Chaleco salvavidas",
+      "price": 520,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.neopreno",
+      "slot": "outfit",
+      "key": "neopreno",
+      "name": "Traje de neopreno · Legendario",
+      "price": 1200,
+      "rarity": "legendary",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    },
+    {
+      "id": "male.outfit.collar",
+      "slot": "outfit",
+      "key": "collar",
+      "name": "Collar de conchas",
+      "price": 350,
+      "rarity": "rare",
+      "starter": false,
+      "dlc": "verano",
+      "bases": [
+        "male"
+      ],
+      "rig": "portrait-v2-male"
+    }
+  ],
+  "options": {
+    "male": {
+      "outfit": [
+        [
+          "hawaiana",
+          "Camisa hawaiana"
+        ],
+        [
+          "tirantes",
+          "Camiseta de tirantes"
+        ],
+        [
+          "rashguard",
+          "Licra de surf"
+        ],
+        [
+          "chaleco",
+          "Chaleco salvavidas"
+        ],
+        [
+          "neopreno",
+          "Traje de neopreno · Legendario"
+        ],
+        [
+          "collar",
+          "Collar de conchas"
+        ]
+      ]
+    },
+    "female": {
+      "outfit": [
+        [
+          "tri",
+          "Bikini triángulo"
+        ],
+        [
+          "bandeau",
+          "Bikini bandeau"
+        ],
+        [
+          "tropical",
+          "Bikini tropical"
+        ],
+        [
+          "maillot",
+          "Traje de baño entero"
+        ],
+        [
+          "rashguard",
+          "Licra de surf"
+        ],
+        [
+          "hawaiana",
+          "Camisa playera anudada"
+        ],
+        [
+          "conchas",
+          "Bikini de conchas y perlas · Legendario"
+        ]
+      ]
+    }
+  }
+}
