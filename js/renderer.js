@@ -188,7 +188,7 @@ export class Renderer {
           }
           gl_FragColor=vec4(mix(backdrop,uFog,uFogEnd<250.?1.:.32),uAlpha);return;
         }
-        if(f>=1.){gl_FragColor=vec4(uFog,uAlpha);return;}
+        if(f>=1.){if(vSurface.z<-19.5&&vSurface.z>-20.5)discard;gl_FragColor=vec4(uFog,uAlpha);return;}
         vec3 n=normalize(vNormal);float sun=max(0.,dot(n,normalize(vec3(-.35,.85,.4))));
         float daylight=uDay*(1.-uTunnel*.85),light=mix(.075+sun*.065,.48+sun*.52,daylight)*(1.-uWet*daylight*.14);
         float headlights=0.;if(daylight<.999){headlights=max(beam(uCar,uForward)*uHeadlights,beam(uRivalCar,uRivalForward)*uRivalLights)*(1.-daylight)*1.85;
@@ -201,6 +201,10 @@ export class Renderer {
         vec3 base=vColor.rgb*texel.rgb;float kind=floor(-vSurface.z+.5);
         if(uVehicle>.5){grain=1.;if(kind==2.||kind==8.)base=uVehiclePaint;if(kind==7.)base=uWheelColor;if(kind==8.&&uCarbon>.5){float weave=mod(floor(vSurface.x*100.)+floor(vSurface.y*100.),2.);base=mix(vec3(.055,.065,.08),vec3(.075,.085,.10),weave);}}
         vec3 c=mix(base*(light+headlights)*grain,base*1.35*brake,vColor.a*lamp);float opacity=uAlpha;
+        if(vSurface.z<-19.5&&vSurface.z>-20.5){
+          float across=(vSurface.x-.5)*4.;
+          opacity*=exp(-across*across)*(1.-smoothstep(.88,1.,vSurface.y));
+        }
         if(uWet>.5&&tile==0.&&abs(n.y)>.65){
           vec3 toEye=uEye-vWorld;
           float eyeDistance=length(toEye);
@@ -280,10 +284,12 @@ export class Renderer {
         g.quad(point(a,.97),point(b,.97),point(b,1.03),point(a,1.03),light(color));
       }
     };
-    const ray=new Geometry();for(const x of [-.65,0,.65]){
-      ray.quad(V(x-.035,.05,0),V(x+.035,.05,0),V(x+.09,8.5,0),V(x-.09,8.5,0),light('#e1f6ff'));
-      ray.quad(V(0,.05,x-.035),V(0,.05,x+.035),V(0,8.5,x+.09),V(0,8.5,x-.09),light('#b3dbff'));
-    }ray.quad(V(-.33,.1,0),V(.33,.1,0),V(.7,8.5,0),V(-.7,8.5,0),light('#487eac'));ring(ray,'#e1f6ff');this.bossRay=ray.upload(this.gl);
+    const trail=new Geometry();
+    for(const x of [-.65,.65])for(const [width,color] of [[.48,'#292415'],[.31,'#51472a'],[.17,'#b9a769'],[.065,'#fff9e5']]){
+      trail.surface(V(x-width,.13,0),V(x+width,.13,0),V(x+width*.8,.13,-2.8),V(x-width*.8,.13,-2.8),-20,undefined,light(color),-20);
+      trail.surface(V(x-width,.42,0),V(x+width,.42,0),V(x+width*.65,.30,-2.8),V(x-width*.65,.30,-2.8),-20,undefined,light(color),-20);
+    }
+    this.bossLightTrail=trail.upload(this.gl);
     const divine=new Geometry();ring(divine,'#fff5c7',true);ring(divine,'#ffffff',false,.2);ring(divine,'#e5c986',false,1.7);
     for(let i=0;i<18;i++){const a=i/18*Math.PI*2,x=Math.cos(a)*1.5,z=Math.sin(a)*2.5;divine.triangle(V(x-.09,.2,z),V(x+.09,.2,z),V(x,2.3+(i%3)*.17,z),light(i%3?'#fff4d5':'#ffffff'));}
     this.bossDivine=divine.upload(this.gl);
@@ -299,7 +305,21 @@ export class Renderer {
     const boss=r.boss;if(!boss)return;const gl=this.gl,still=this.reducedMotion?.matches,clock=still?0:r.elapsed;
     gl.depthMask(false);gl.uniform1f(this.uniforms.uLampState,1);gl.uniform1f(this.uniforms.uBrake,1);
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
-    if(boss.id==='shinji-campaign'&&boss.ray>0)this.draw(this.bossRay,transform(q.x,q.y+.06,q.z,angle),still?.15:.5*Math.min(1,boss.ray/.25));
+    if(boss.id==='shinji-campaign'&&boss.ray>0){
+      const strength=Math.min(1,boss.ray/.25),segments=still?3:9;
+      for(let i=0;i<segments;i++){
+        const old=worldAt(this.track,Math.max(0,r.rivalS-1.8-i*2.4),r.rivalLateral);
+        this.draw(this.bossLightTrail,transform(old.x,old.y+.035,old.z,old.heading+r.rivalYaw*.35),strength*(still ? .12 : .5)*(1-i/segments)**1.4);
+      }
+      if(!still){
+        gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+        for(let i=3;i>=1;i--){
+          const old=worldAt(this.track,r.rivalS-i*1.1,r.rivalLateral);
+          this.drawCar('rival-'+r.rival.id,transform(old.x,old.y+.04,old.z,old.heading+r.rivalYaw),{s:r.rivalS,steer:r.rivalSteer},strength*(.10-i*.022));
+        }
+        gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+      }
+    }
     if(boss.id==='takumi-project'){
       gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
       if(boss.blur>.02&&!still){
@@ -483,14 +503,16 @@ export class Renderer {
     const dpr=Math.min(window.devicePixelRatio||1,this.quality)*this.resolutionScale,w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
     Object.assign(this.stats,{width:w,height:h,scale:this.resolutionScale});
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);
-    const racing=mode==='race'||mode==='paused'||mode==='results';
-    this.cabinActive=false;if(!racing||this.cameraMode!==3)document.body.classList.remove('cabin-3d');
+    const replay=mode==='replay',racing=replay||mode==='race'||mode==='paused'||mode==='results';
+    this.cabinActive=false;if(replay||!racing||this.cameraMode!==3)document.body.classList.remove('cabin-3d');
     const day=options.day?1:0,sky=raceVisibility(racing?race:null,day).color;
     gl.clearColor(...sky,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.uniform1i(u.uAtlas,1);gl.uniform1f(u.uAtlasReady,this.atlasLoaded?1:0);gl.activeTexture(gl.TEXTURE0);
     if(!racing&&mode!=='title'){this.renderMenu(mode,w,h);return;}
     const s=racing?race.s:340+(this.time*32)%Math.max(100,this.track.length-750),lat=racing?race.lateral:-1.7,p=worldAt(this.track,s,lat),angle=p.heading+(racing?race.yaw:Math.sin(this.time*.5)*.025);
     let eye,target,driverPose,driverUp,cabinFov;
-    if(racing) {
+    if(replay&&options.replayCamera){
+      this.eye=options.replayCamera.eye;this.target=options.replayCamera.target;this.resetCamera=false;
+    }else if(racing) {
       const look=worldAt(this.track,s+18,lat*.5),back=8.5+race.speed*.035;
       if(this.cameraMode===3){const profile=cabinProfile(race.car.id);driverPose=this.driverCamera.update(race,mode==='race'?dt:0,{motion:options.cabinMotion,stableHorizon:options.stableHorizon,shake:options.shake,reducedMotion:this.reducedMotion?.matches,active:mode==='race',reset:this.resetCamera});
         const dx=-(profile.seat+driverPose.x),dz=-(.12+driverPose.z),ca=Math.cos(angle),sa=Math.sin(angle),aim=sample(this.track,s+20);eye=[p.x+ca*dx+sa*dz,p.y+profile.height+driverPose.y+Math.sin(this.time*67)*driverPose.kick,p.z-sa*dx+ca*dz];
@@ -506,16 +528,16 @@ export class Renderer {
       eye=[p.x-Math.sin(a)*11+Math.cos(a)*4.5,p.y+3.0,p.z-Math.cos(a)*11-Math.sin(a)*4.5];
       target=[look.x,look.y+1.1,look.z];this.eye=eye;this.target=target;
     }
-    const shake=racing&&this.cameraMode!==3&&options.shake!==false?race.collision*.12:0;
+    const shake=!replay&&racing&&this.cameraMode!==3&&options.shake!==false?race.collision*.12:0;
     const actualEye=this.eye.map((v,i)=>v+(i<2?Math.sin(this.time*95+i)*shake:0));
     const demo=mode==='title'?{s,speed:32,mode:'time',headlights:true,netOpponents:[{carId:'rx7',s:s+18,lateral:1.4,yaw:0,headlights:true},{carId:'r32',s:s+38,lateral:-1.5,yaw:0,headlights:true}]}:null;
-    this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,racing?(cabinFov||58+race.speed*.18):49,mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,racing&&[1,3].includes(this.cameraMode),driverUp);
-    if(racing&&race.speed>12&&mode==='race'){
+    this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,replay?options.replayCamera.fov:racing?(cabinFov||58+race.speed*.18):49,mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,!replay&&racing&&[1,3].includes(this.cameraMode),driverUp);
+    if(racing&&race.speed>12&&(mode==='race'||replay)){
       const emit=(q,a,wet)=>{for(const side of [-1,1])if(this.particles.length<48&&Math.random()<1-Math.exp(-dt*(wet?22:50)))this.particles.push({x:q.x+Math.cos(a)*side*.8-Math.sin(a)*1.4,y:q.y+.25,z:q.z-Math.sin(a)*side*.8-Math.cos(a)*1.4,life:1,size:.18+Math.random()*.16,wet});};
       if(race.wet||race.drift>.3)emit(p,angle,race.wet);
       if(race.wet){const opponents=race.online?race.netOpponents||[]:race.mode!=='time'?[{s:race.rivalS,lateral:race.rivalLateral,yaw:race.rivalYaw,speed:race.rivalSpeed}]:[];for(const o of opponents)if(Math.abs(o.s-race.s)<60&&o.speed>15){const q=worldAt(this.track,o.s,o.lateral);emit(q,q.heading+o.yaw,true);}}
     }
     gl.depthMask(false);this.particles=this.particles.filter(v=>v.life>0);for(const v of this.particles){v.life-=dt*(v.wet?2.8:.85);v.y+=dt*(v.wet?.13:.35);v.size+=dt*(v.wet?1.4:.65);this.draw(v.wet?this.spray:this.smoke,transform(v.x,v.y,v.z,v.life,v.size),v.life*(v.wet?.10:.13));}gl.depthMask(true);
-    if(racing&&this.cameraMode===3){const use3D=this.cabin.status!=='error';this.renderMirror(race,p,angle,day,sky,w,h,!use3D);if(use3D)this.cabinActive=this.cabin.draw(this,race,driverPose,{day,fov:cabinFov,hands:options.cabinHands,song:options.song,reducedMotion:this.reducedMotion?.matches},this.mirrorTexture);if(use3D&&!this.cabinActive)this.renderMirror(race,p,angle,day,sky,w,h);document.body.classList.toggle('cabin-3d',this.cabinActive);}
+    if(!replay&&racing&&this.cameraMode===3){const use3D=this.cabin.status!=='error';this.renderMirror(race,p,angle,day,sky,w,h,!use3D);if(use3D)this.cabinActive=this.cabin.draw(this,race,driverPose,{day,fov:cabinFov,hands:options.cabinHands,song:options.song,reducedMotion:this.reducedMotion?.matches},this.mirrorTexture);if(use3D&&!this.cabinActive)this.renderMirror(race,p,angle,day,sky,w,h);document.body.classList.toggle('cabin-3d',this.cabinActive);}
   }
 }

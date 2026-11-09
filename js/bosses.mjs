@@ -1,7 +1,7 @@
 // Boss rules are deterministic simulation state. Rendering consumes them without
 // deciding passes, rewards, speed, or race results.
 export const BOSS_TRAITS={
-  'shinji-campaign':{name:'Línea de luz',color:'#d9f3ff',description:'Un rayo de luz marca cada curva que completa limpiamente.'},
+  'shinji-campaign':{name:'Estela de luz',color:'#fff0ad',description:'Una estela blanca y dorada, suave y desenfocada, sigue su trazada al completar cada curva limpia.'},
   'takumi-project':{name:'Alas de la montaña',color:'#b8f0ff',description:'Se desdibuja en curvas al límite. Sus alas aparecen cuando te adelanta.'},
   'keisuke-project':{name:'Flujo rotativo',color:'#ffe282',description:'Una curva fluida a velocidad sostenida enciende su aura azul y dorada.'},
   beckenbauer:{name:'Disciplina divina',color:'#fff3c1',description:'Un halo blanco y dorado acompaña permanentemente su trazada.'},

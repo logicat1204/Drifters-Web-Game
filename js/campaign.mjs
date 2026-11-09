@@ -25,7 +25,7 @@ const rows=[
   ['akagi','kenta','Kenta Nakamura','s14','#d87835',2,'Grip','kenta'],
   ['akagi','keisuke-initial','Keisuke Takahashi','rx7','#e7b948',3,'Complete','keisuke','time'],
   ['iroha','kyoichi','Kyoichi Sudo','evo3','#252a30',3,'Complete','kyoichi'],
-  ['iroha','kai-campaign','Kai Kogashiwa','mr2','#3268a6',3,'Complete','Kai','drift'],
+  ['iroha','kai-campaign','Kai Kogashiwa','mr2','#3268a6',3,'Skiller','Kai','drift'],
   ['usui','iketani-usui','Koichiro Iketani','silvia','#a0bb92',2,'Skiller','iketani'],
   ['usui','mako-campaign','Mako Sato & Sayuki','sileighty','#3776bc',3,'Skiller','mako_sayuki'],
   ['tsukuba','godfoot','Kozo Hoshino · God Foot','r34','#3f79a8',4,'Grip','Kozo Hoshino'],

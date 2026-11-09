@@ -183,3 +183,20 @@ body #touch-controls{display:block;position:absolute;inset:0;pointer-events:none
 #control-preview[data-layout=portrait]{width:min(100%,200px);aspect-ratio:9/16;max-height:43dvh}
 #control-layout-panel .start-button{margin-top:12px}
 @media (max-width:640px){.time-weather{font-size:8px}.time-weather select{min-width:74px;font-size:11px}}
+
+/* Broadcast replay controls stay clear of the driving image on touch screens. */
+.replay-overlay{position:fixed;inset:0;z-index:12;pointer-events:none;color:#f3f6fa;background:linear-gradient(#0009,transparent 22%,transparent 65%,#000b)}
+.replay-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:32px max(24px,env(safe-area-inset-right))}
+.replay-heading>div{display:grid;gap:7px;text-shadow:0 2px 8px #000}.replay-heading small{font:10px var(--mono);letter-spacing:3px;color:#a7c4e3}.replay-heading b{font:700 24px var(--sans)}.replay-heading span{font:10px var(--mono);letter-spacing:2px}
+.replay-overlay button,.replay-overlay select,.replay-overlay input{pointer-events:auto;touch-action:manipulation}
+.replay-heading button{background:#101720cc;min-height:44px;font-size:10px}
+.replay-toolbar{position:absolute;left:50%;bottom:max(20px,env(safe-area-inset-bottom));transform:translateX(-50%);width:min(880px,calc(100% - 32px));padding:17px 20px;background:#080e17ec;border:1px solid #ffffff38;border-radius:5px}
+.replay-timeline{display:flex;align-items:center;gap:14px;font:11px var(--mono);font-variant-numeric:tabular-nums}.replay-timeline input{flex:1;min-width:40px;accent-color:#9bc7f6;min-height:32px}
+.replay-buttons{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px}.replay-buttons button,.replay-buttons label{font:10px var(--mono);min-height:44px;padding:10px 12px;border:1px solid #ffffff34;background:#ffffff0a;color:#f3f6fa}.replay-buttons button:hover{background:#ffffff23}.replay-buttons label{display:flex;align-items:center;gap:10px}.replay-buttons select{background:#172131;color:#fff;border:0;padding:5px}.replay-toolbar p{margin:11px 0 0;font:8px var(--mono);letter-spacing:1px;color:#a7b8ca}
+@media(max-width:600px){.replay-heading{padding:18px 16px;gap:10px}.replay-heading b{font-size:16px}.replay-heading button{max-width:130px;padding:10px;font-size:8px}.replay-heading small{font-size:8px;letter-spacing:1px}.replay-toolbar{padding:10px 12px}.replay-buttons{flex-wrap:wrap}.replay-buttons>*{flex:1 1 43%;justify-content:center;text-align:center}.replay-toolbar p{display:none}.replay-timeline{gap:7px;font-size:9px}}
+@media(max-height:450px){.replay-heading{padding:12px 18px}.replay-heading b{font-size:16px}.replay-toolbar{bottom:8px;padding:7px 12px}.replay-toolbar p{display:none}.replay-buttons{margin-top:2px}}
+
+/* Local navigation keeps the upcoming bends readable in the cockpit too. */
+.cockpit-view .navigation{width:140px}.cockpit-view #minimap{width:124px;height:132px}
+@media(max-width:600px){.navigation{width:130px}#minimap{width:122px;height:142px}.cockpit-view .navigation{width:118px}.cockpit-view #minimap{width:102px;height:116px}}
+@media(max-height:450px){.navigation{width:114px}#minimap{width:106px;height:106px}.cockpit-view .navigation{width:106px}.cockpit-view #minimap{width:90px;height:96px}}

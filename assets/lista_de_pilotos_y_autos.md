@@ -28,7 +28,7 @@ Lista detallada de personajes, vehículos (modelo, color, estilo de carrocería)
 | Personaje | Vehículo | Color | Estilo de Carrocería | Nivel | Estilo de Conducción |
 | :--- | :--- | :--- | :--- | :---: | :---: |
 | **Kyoichi Sudo** | Mitsubishi Lancer Evolution III GSR (CE9A) | Negro *(Pyrenees Black)* | Sedán | 3 | Complete |
-| **Kai Kogashiwa** | Toyota MR2 G-Limited (SW20) | Azul *(Victoria Blue)* | Targa / Mid-engine Coupe | 3 | Complete |
+| **Kai Kogashiwa** | Toyota MR2 G-Limited (SW20) | Azul *(Victoria Blue)* | Targa / Mid-engine Coupe | 3 | Skiller |
 
 ---
 

@@ -4,6 +4,16 @@ import {createHash} from 'node:crypto';
 export const AUDIO_EXTENSIONS=new Set(['.mp3','.ogg','.wav','.m4a','.aac','.flac','.opus','.webm']);
 const IMAGES=new Set(['.png','.jpg','.jpeg','.webp','.gif']);
 const natural=(a,b)=>a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'});
+export function pageSounds(pages,files){
+ const stem=file=>path.parse(file).name.normalize('NFKC').toLowerCase();
+ const number=name=>/^(\d+)(?:[-_ .]|$)/.exec(name)?.[1];
+ return pages.map((page,index)=>{
+  const name=stem(decodeURIComponent(page.split('/').at(-1))),pageNumber=number(name)??String(index+1);
+  const file=files.find(file=>stem(file.name)===name)||
+   files.find(file=>{const n=number(stem(file.name));return n!==undefined&&Number(n)===Number(pageNumber);});
+  return file?{name:path.parse(file.name).name,url:file.url}:null;
+ });
+}
 export function parseShopSong(filename){
  if(!AUDIO_EXTENSIONS.has(path.extname(filename).toLowerCase()))return null;
  const match=/^(.+)_([^_]+)_(\d+)$/.exec(path.parse(filename).name);if(!match)return null;
@@ -27,15 +37,18 @@ export class MediaLibrary {
  isShopFile(filename){return path.resolve(filename).toLowerCase().startsWith(this.shopRoot.toLowerCase()+path.sep);}
  async shopSongs(){const found=new Map();for(const file of await this.files(this.shopRoot,AUDIO_EXTENSIONS,true)){const song=parseShopSong(file.name);if(song&&!found.has(song.id))found.set(song.id,{...song,absolute:file.absolute,url:'/api/music/'+song.id});}return [...found.values()];}
  async stageMedia(stage,legacy={}){
-  const folder=path.join(this.campaignRoot,stage.chapter,stage.id),[music,start,end,introAudio,endAudio]=await Promise.all([
-   this.files(path.join(folder,'music'),AUDIO_EXTENSIONS),this.files(path.join(folder,'story_start'),IMAGES),this.files(path.join(folder,'story_end'),IMAGES),this.files(path.join(folder,'narrative_music_start'),AUDIO_EXTENSIONS),this.files(path.join(folder,'narrative_music_end'),AUDIO_EXTENSIONS)
+  const folder=path.join(this.campaignRoot,stage.chapter,stage.id),[music,start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all([
+   this.files(path.join(folder,'music'),AUDIO_EXTENSIONS),this.files(path.join(folder,'story_start'),IMAGES),this.files(path.join(folder,'story_end'),IMAGES),this.files(path.join(folder,'narrative_music_start'),AUDIO_EXTENSIONS),this.files(path.join(folder,'narrative_music_end'),AUDIO_EXTENSIONS),
+   this.files(path.join(folder,'story_sounds_start'),AUDIO_EXTENSIONS),this.files(path.join(folder,'story_sounds_end'),AUDIO_EXTENSIONS)
   ]);
   const audio=f=>({id:'campaign:'+stage.id+':'+f.url,name:path.parse(f.name).name,url:f.url,detail:'BANDA SONORA DEL NIVEL'}),comics=start.length?start.map(f=>f.url):(legacy.comics||[]);
-  return {...legacy,comics,storyStart:comics,storyEnd:end.map(f=>f.url),music:music.map(audio),narrativeStart:introAudio[0]?audio(introAudio[0]):null,narrativeEnd:endAudio[0]?audio(endAudio[0]):null};
+  const storyEnd=end.map(f=>f.url);
+  return {...legacy,comics,storyStart:comics,storyEnd,storySoundsStart:pageSounds(comics,startSounds),storySoundsEnd:pageSounds(storyEnd,endSounds),music:music.map(audio),narrativeStart:introAudio[0]?audio(introAudio[0]):null,narrativeEnd:endAudio[0]?audio(endAudio[0]):null};
  }
  async chapterMedia(chapter){
-  const folder=path.join(this.campaignRoot,chapter.id,'_chapter'),[start,end,introAudio,endAudio]=await Promise.all(['story_start','story_end','narrative_music_start','narrative_music_end'].map((dir,i)=>this.files(path.join(folder,dir),i<2?IMAGES:AUDIO_EXTENSIONS)));
+  const folder=path.join(this.campaignRoot,chapter.id,'_chapter'),[start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all(['story_start','story_end','narrative_music_start','narrative_music_end','story_sounds_start','story_sounds_end'].map((dir,i)=>this.files(path.join(folder,dir),i<2?IMAGES:AUDIO_EXTENSIONS)));
   const audio=f=>f?{id:'chapter:'+chapter.id+':'+f.url,name:path.parse(f.name).name,url:f.url}:null;
-  return {storyStart:start.map(f=>f.url),storyEnd:end.map(f=>f.url),narrativeStart:audio(introAudio[0]),narrativeEnd:audio(endAudio[0])};
+  const storyStart=start.map(f=>f.url),storyEnd=end.map(f=>f.url);
+  return {storyStart,storyEnd,storySoundsStart:pageSounds(storyStart,startSounds),storySoundsEnd:pageSounds(storyEnd,endSounds),narrativeStart:audio(introAudio[0]),narrativeEnd:audio(endAudio[0])};
  }
 }

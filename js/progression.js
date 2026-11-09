@@ -72,8 +72,26 @@ export class ProgressionClient {
     $('comic-overlay').classList.remove('hidden');$('comic-reader').classList.remove('zoomed');$('comic-zoom').textContent='AMPLIAR';$('comic-title').textContent=stage.name;$('comic-cancel').textContent=phase==='end'?'VER RESULTADOS ×':'VOLVER ×';$('comic-eyebrow').textContent=`${this.catalog.chapters.find(c=>c.id===stage.chapter).name.toUpperCase()} / ${phase==='end'?'VICTORIA':'PRÓLOGO'} · NIVEL ${stage.level}`;
     if(stage.chapterStory){$('comic-eyebrow').textContent='CRÓNICAS DE LA MONTAÑA / '+(phase==='end'?'EPÍLOGO DE CAMPAÑA':'PRÓLOGO DE CAMPAÑA');$('comic-cancel').textContent='VOLVER ×';}const song=phase==='end'?stage.media.narrativeEnd:stage.media.narrativeStart;$('comic-music').textContent=song?'♫ '+song.name:'LECTURA SIN MÚSICA';this.callbacks.storyAudio?.(song);this.renderComic();$('comic-next').focus();return true;
   }
-  renderComic(){const image=$('comic-image');image.classList.remove('comic-arriving');image.onload=()=>{image.classList.remove('comic-arriving');requestAnimationFrame(()=>image.classList.add('comic-arriving'));};image.onerror=()=>{$('comic-page').textContent+=' · Página no disponible. Puedes continuar.';};image.src=this.storyPages[this.page];image.alt=`Página ${this.page+1} de ${this.storyPhase==='end'?'la victoria':'la introducción'} de ${this.introStage.name}`;$('comic-page').textContent=`${this.storyPhase==='end'?'DESENLACE':'PRÓLOGO'} / ${this.page+1} DE ${this.storyPages.length}`;$('comic-prev').disabled=this.page===0;$('comic-next').firstElementChild.textContent=this.page===this.storyPages.length-1?(this.introStage.chapterStory?'CONTINUAR':this.storyPhase==='end'?'VER RESULTADOS':'INICIAR DUELO'):'CONTINUAR';$('comic-reader').scrollTop=0;}
-  closeComic(){this.comicOpen=false;this.callbacks.storyStop?.();$('comic-image').onload=null;$('comic-overlay').classList.add('hidden');$('app').inert=false;this.comicFocus?.focus({preventScroll:true});}
+  renderComic(){
+    const image=$('comic-image'),token=this.storyPageToken=(this.storyPageToken||0)+1;
+    const sound=this.introStage.media[this.storyPhase==='end'?'storySoundsEnd':'storySoundsStart']?.[this.page];
+    this.callbacks.storyPage?.(null);
+    image.classList.remove('comic-arriving');
+    image.onload=()=>{
+      if(!this.comicOpen||token!==this.storyPageToken)return;
+      image.classList.remove('comic-arriving');
+      requestAnimationFrame(()=>{if(this.comicOpen&&token===this.storyPageToken)image.classList.add('comic-arriving');});
+      this.callbacks.storyPage?.(sound||null);
+    };
+    image.onerror=()=>{if(token===this.storyPageToken)$('comic-page').textContent+=' · Página no disponible. Puedes continuar.';};
+    image.src=this.storyPages[this.page];
+    image.alt=`Página ${this.page+1} de ${this.storyPhase==='end'?'la victoria':'la introducción'} de ${this.introStage.name}`;
+    $('comic-page').textContent=`${this.storyPhase==='end'?'DESENLACE':'PRÓLOGO'} / ${this.page+1} DE ${this.storyPages.length}`;
+    $('comic-prev').disabled=this.page===0;
+    $('comic-next').firstElementChild.textContent=this.page===this.storyPages.length-1?(this.introStage.chapterStory?'CONTINUAR':this.storyPhase==='end'?'VER RESULTADOS':'INICIAR DUELO'):'CONTINUAR';
+    $('comic-reader').scrollTop=0;
+  }
+  closeComic(){this.comicOpen=false;this.storyPageToken++;this.callbacks.storyPage?.(null);this.callbacks.storyStop?.();$('comic-image').onload=null;$('comic-image').onerror=null;$('comic-overlay').classList.add('hidden');$('app').inert=false;this.comicFocus?.focus({preventScroll:true});}
   nextComic(){if(!this.comicOpen)return;if(this.page+1<this.storyPages.length){this.page++;this.renderComic();return;}const complete=this.storyComplete;this.closeComic();complete();}
   ending(id){const stage=this.catalog?.stages.find(s=>s.id===id);if(!stage)return;this.chapter=stage.chapter;const chapterEnd=()=>this.maybeChapterStory('end');if(!this.openStory(stage,'end',chapterEnd))chapterEnd();}
   nextStage(id){const index=this.catalog?.stages.findIndex(stage=>stage.id===id);return index>=0?this.catalog.stages[index+1]:null;}

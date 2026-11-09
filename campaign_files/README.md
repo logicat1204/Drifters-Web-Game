@@ -10,8 +10,10 @@ Ejemplo para Kenji:
 campaign_files/akina/kenji/
 ├── music/                  # Música durante la carrera
 ├── story_start/            # Páginas del prólogo
+├── story_sounds_start/     # Un sonido por página del prólogo
 ├── narrative_music_start/  # Música del prólogo
 ├── story_end/              # Páginas después de ganar
+├── story_sounds_end/       # Un sonido por página del desenlace
 └── narrative_music_end/    # Música del desenlace
 ```
 
@@ -24,6 +26,16 @@ El lector permite avanzar, retroceder y ampliar las imágenes. Las flechas del t
 `story_end/` se muestra únicamente después de una victoria completada y verificada por el servidor, también al repetir un duelo ganado. Una derrota no muestra el desenlace. Sin imágenes finales se pasa directamente a los resultados. Sin imágenes iniciales se usan los cómics anteriores de `assets/campaign-media.json`, si existen; de lo contrario, la carrera comienza directamente.
 
 Las introducciones existentes ya se copiaron a `story_start/001.*`. Para sustituir una introducción, reemplaza esa página o elimina la copia antes de añadir las nuevas. No dejes la página anterior junto con una nueva si no quieres que ambas aparezcan.
+
+## Sonidos por página
+
+Coloca los sonidos en `story_sounds_start/` o `story_sounds_end/`. Usa el mismo nombre que la imagen, cambiando la extensión. Por ejemplo, `story_start/001.webp` usa `story_sounds_start/001.mp3`. También puedes usar un número y una descripción, como `002_motor.wav`, para la imagen `002.webp`. Las páginas con nombre descriptivo pueden usar el mismo nombre o su posición numérica en el cómic.
+
+Cada página admite un archivo de audio. Si hay varios candidatos, se prioriza el nombre exacto y después el primer archivo por orden natural con su número. Las páginas sin archivo permanecen en silencio, sin desplazar los sonidos de las páginas siguientes.
+
+El sonido empieza al cargar la imagen, se reproduce una vez y se corta al cambiar de página o cerrar el lector. Volver a una página reproduce su sonido de nuevo. La música narrativa sigue sonando de fondo. El volumen de estos sonidos usa el ajuste de motor y efectos y respeta el silencio general.
+
+Las carpetas `_chapter/story_sounds_start/` y `_chapter/story_sounds_end/` funcionan igual para el prólogo y epílogo de una campaña completa. Tras añadir archivos, vuelve a abrir Campaña para actualizar el catálogo.
 
 ## Música
 
@@ -38,4 +50,4 @@ El selector bajo **Ver introducción** permite conservar la música predetermina
 
 El servidor vuelve a leer las carpetas al abrir Campaña. Después de añadir recursos, sal y vuelve a entrar a Campaña para actualizar la lista. En Render hay que incluir los archivos en el despliegue o almacenarlos en un disco persistente; los archivos locales de tu ordenador no se suben automáticamente.
 
-`npm run assets:story-files` prepara las cinco carpetas de cada rival y copia las introducciones anteriores sin sobrescribir archivos existentes. Está pensado para preparar el proyecto; no hace falta ejecutarlo cada vez que añades una página o canción.
+`npm run assets:story-files` prepara las siete carpetas de cada rival y las seis de cada capítulo, y copia las introducciones anteriores sin sobrescribir archivos existentes. Está pensado para preparar el proyecto. No hace falta ejecutarlo cada vez que añades una página o canción.

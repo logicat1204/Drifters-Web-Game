@@ -19,6 +19,13 @@ test('campaign resources scan natural multi-page order, independent soundtracks,
   for(const name of ['10.png','2.jpg','001.webp'])await put('story_start',name);await put('story_end','01.png');await put('narrative_music_start','01 intro.wav');await put('narrative_music_end','01 outro.wav');await put('music','01 race.mp3');
   let data=await media.stageMedia({id:'kenji',chapter:'akina'},{portrait:'portrait.jpg',comics:['legacy.jpg']});assert.deepEqual(data.storyStart.map(u=>u.split('/').at(-1)),['001.webp','2.jpg','10.png']);assert.equal(data.comics.length,3);assert.equal(data.storyEnd.length,1);assert.match(data.narrativeStart.url,/narrative_music_start/);assert.match(data.narrativeEnd.url,/narrative_music_end/);assert.equal(data.music[0].name,'01 race');assert.equal(data.portrait,'portrait.jpg');
   await put('story_start','3.png');data=await media.stageMedia({id:'kenji',chapter:'akina'});assert.equal(data.storyStart.length,4);
+  await put('story_sounds_start','2_motor.wav');await put('story_sounds_start','10.mp3');await put('story_sounds_end','01.wav');
+  data=await media.stageMedia({id:'kenji',chapter:'akina'});
+  assert.deepEqual(data.storySoundsStart.map(sound=>sound?.name??null),[null,'2_motor',null,'10']);
+  assert.equal(data.storySoundsEnd[0].name,'01');
+  const chapter=path.join(root,'campaign_files','akina','_chapter');
+  for(const [dir,name]of [['story_start','001.webp'],['story_sounds_start','001.mp3']]){await mkdir(path.join(chapter,dir),{recursive:true});await writeFile(path.join(chapter,dir,name),'fixture');}
+  assert.match((await media.chapterMedia({id:'akina'})).storySoundsStart[0].url,/story_sounds_start/);
   await mkdir(path.join(root,'songs','shop'),{recursive:true});await writeFile(path.join(root,'songs','Free.wav'),'free');await writeFile(path.join(root,'songs','shop','GasGasGas_Manuel_300.mp3'),'paid');assert.equal((await media.freeSongs()).length,1);assert.equal((await media.shopSongs())[0].price,300);
  }finally{await rm(root,{recursive:true,force:true});}
 });

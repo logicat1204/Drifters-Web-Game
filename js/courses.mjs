@@ -12,7 +12,7 @@ export const COURSE_LAYOUTS = {
 export const RIVALS = {
   takumi:{id:'takumi',name:'TAKUMI FUJIWARA',short:'TAKUMI',jp:'藤原 拓海',car:'ae86',code:'TRUENO / AE86',color:'#e5e5dc',team:'AKINA SPEED STARS',pace:163,level:3,style:'Skiller',quote:'Conozco cada curva de esta montaña.'},
   keisuke:{id:'keisuke',name:'KEISUKE TAKAHASHI',short:'KEISUKE',jp:'高橋 啓介',car:'rx7',code:'RX-7 / FD3S',color:'#e7b948',team:'AKAGI REDSUNS',pace:126.5,level:3,style:'Complete',quote:'Intenta seguir el ritmo del rotativo.'},
-  kai:{id:'kai',name:'KAI KOGASHIWA',short:'KOGASHIWA',jp:'小柏 カイ',car:'mr2',code:'MR2 G-LIMITED / SW20',color:'#e8e8df',team:'IROHAZAKA',pace:137,level:3,style:'Complete',quote:'El vértice está más cerca de lo que crees.'},
+  kai:{id:'kai',name:'KAI KOGASHIWA',short:'KOGASHIWA',jp:'小柏 カイ',car:'mr2',code:'MR2 G-LIMITED / SW20',color:'#e8e8df',team:'IROHAZAKA',pace:137,level:3,style:'Skiller',quote:'El vértice está más cerca de lo que crees.'},
   mako:{id:'mako',name:'MAKO & SAYUKI',short:'MAKO',jp:'佐藤 真子 / 沙雪',car:'sileighty',code:'SILEIGHTY / RPS13',color:'#3776bc',team:'IMPACT BLUE',pace:89,level:3,style:'Skiller',quote:'Sayuki, vamos a por la C-121.'},
   godhand:{id:'godhand',name:'TOSHIYA JOSHIMA',short:'GOD HAND',jp:'城島 俊也',car:'s2000',code:'S2000 / AP1',color:'#3975a2',team:'PURPLE SHADOW',pace:137.5,level:4,style:'Complete',quote:'La velocidad empieza con un movimiento suave.'},
   shinji:{id:'shinji',name:'SHINJI INUI',short:'SHINJI',jp:'乾 信司',car:'ae86coupe',code:'TRUENO 2DOOR / AE86',color:'#e2e2d6',team:'SIDEWINDER',pace:152,level:4,style:'Skiller',boss:'shinji-campaign',quote:'Esta carretera es el camino de vuelta a casa.'},
