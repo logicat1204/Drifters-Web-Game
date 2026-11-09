@@ -15,7 +15,7 @@ Para jugar directamente accede tambien a https://drifters-web-game.onrender.com/
 3. Crea un usuario o inicia sesión. La primera vez confirma tu nombre visible y elige foto o personaliza un avatar.
 4. Elige coche en **GARAJE**, circuito y modo de carrera. En **AJUSTES** puedes cambiar cámara, transmisión, asfalto, hora y resolución.
 
-El servidor usa la biblioteca WebSocket `ws` y SQLite incluido en Node.js. Ejecuta `npm ci --omit=dev` la primera vez si falta `node_modules/`; JUGAR.bat instala `ws` automáticamente. Después puedes jugar contra este servidor local sin conexión a Internet: el servidor sigue siendo necesario para las cuentas, música y guardado de récords. Necesita un navegador con WebGL y aceleración gráfica. Para detener el servidor pulsa Ctrl+C en su ventana. Si el puerto está ocupado, usa `$env:PORT=4174; npm start` desde PowerShell y abre el puerto indicado.
+El servidor usa la biblioteca WebSocket `ws` y admite SQLite local o MongoDB Atlas. Ejecuta `npm ci --omit=dev` la primera vez si falta `node_modules/`. JUGAR.bat instala las dependencias automáticamente. Con SQLite puedes jugar sin conexión a Internet. El servidor sigue siendo necesario para las cuentas, música y guardado de récords. Necesita un navegador con WebGL y aceleración gráfica. Para detener el servidor pulsa Ctrl+C en su ventana. Si el puerto está ocupado, usa `$env:PORT=4174; npm start` desde PowerShell y abre el puerto indicado.
 
 ## Tu licencia de piloto
 
@@ -23,9 +23,9 @@ El usuario puede tener entre 3 y 24 letras y números, por ejemplo `TakumiFX24` 
 
 En tu licencia, accesible mediante el retrato de la cabecera, puedes elegir **foto** o **avatar**. Hay dos bases con rostro y silueta propios y catálogos independientes de hombre y mujer: cada una tiene cuatro cabellos, tres tipos de ojos y labios, tres prendas y tres accesorios, además de seis tonos de piel y colores. Las piezas solo se equipan en su base; las cuentas anteriores se adaptan automáticamente conservando colores y el tipo de ropa. La combinación del avatar se conserva aunque uses una foto. Elige un solo coche inicial gratis al completar tu licencia. Puedes escoger el AE86 ágil, el RX-7 equilibrado o el Skyline GT-R de potencia. La Tienda ofrece el catálogo completo y el Garaje muestra los coches que posees.
 
-La pestaña **RÉCORDS** de la licencia muestra tus puntos de conducción, estadísticas, marcas personales y al mejor piloto de cada curso. La clasificación permite elegir curso, coche, individual/online, asfalto, hora y transmisión. Los resultados están ligados al usuario en SQLite. Las carreras individuales se verifican reproduciendo los controles en el servidor; las online usan su simulación autoritativa. Las marcas locales anteriores no se atribuyen a una cuenta nueva.
+La pestaña **RÉCORDS** de la licencia muestra tus puntos de conducción, estadísticas, marcas personales y al mejor piloto de cada curso. La clasificación permite elegir curso, coche, individual/online, asfalto, hora y transmisión. Los resultados están ligados al usuario. Las carreras individuales se verifican reproduciendo los controles en el servidor y las online usan su simulación autoritativa. Las marcas locales anteriores no se atribuyen a una cuenta nueva.
 
-La base se crea en `data/touge.sqlite`, o en la ruta indicada por `DATA_DIR` / `DB_PATH`, y está excluida de Git. Los puntos aún no son moneda para compras. El catálogo y el inventario por usuario dejan preparada la futura tienda de cosméticos.
+SQLite se crea por defecto en `data/touge.sqlite`, o en la ruta indicada por `DATA_DIR` / `DB_PATH`, y está excluida de Git. Para cambiar a Atlas, sigue la [guía de migración de la base de datos](docs/MONGODB-ATLAS.md).
 
 Detalles de almacenamiento, sesiones, copias y Render: [docs/ACCOUNTS-DEPLOY.md](docs/ACCOUNTS-DEPLOY.md). Plantilla, capas PNG/SVG y guía para nuevos cosméticos: [docs/AVATAR-ASSETS.md](docs/AVATAR-ASSETS.md).
 
@@ -112,7 +112,7 @@ Esta versión usa una nueva tabla local de mejores tiempos por el cambio de fís
 - Los nuevos interiores incluyen instrumentación angular y volante MR2 en el SW20, velocidad digital y tacómetro de barras naranja en el S2000, relojes analógicos y volante Silvia en el S13, y consola curva con tres relojes y volante Toyota en el Supra. Comparten componentes de dibujo y conservan el retrovisor 3D y los controles reactivos.
 - Faros, niebla, humo, guardarraíles, vegetación, edificios en Atami, colores otoñales en Irohazaka y referencias al puente de Usui y huertos de Tsukuba.
 - HUD con tiempo, posición, ventaja en metros, navegación, tacómetro y combo de derrape.
-- Resultados, puntuaciones y mejores tiempos guardados en SQLite por usuario, circuito, coche, transmisión, hora, asfalto y modalidad; récord del curso con el nombre y retrato del mejor piloto.
+- Resultados, puntuaciones y mejores tiempos por usuario, circuito, coche, transmisión, hora, asfalto y modalidad. El récord del curso incluye el nombre y retrato del mejor piloto.
 
 ## Garaje: siete coches, tres perfiles
 

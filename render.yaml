@@ -14,6 +14,10 @@ services:
         value: production
       - key: DATA_DIR
         value: /var/data
+      - key: MONGODB_URI
+        sync: false
+      # Set MONGODB_DB and DB_BACKEND in the service's Environment tab.
+      # An empty MongoDB database is initialized automatically at startup.
       # RENDER_EXTERNAL_URL is provided automatically. Set PUBLIC_URL in the
       # dashboard only when using a custom domain or a preferred invitation URL.
     disk:

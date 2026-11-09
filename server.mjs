@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {networkInterfaces} from 'node:os';
 import {attachOnline} from './server/online.mjs';
-import {Store} from './server/store.mjs';
+import {databaseUnavailable,isMongoError,loadDatabaseEnv,openStore} from './server/database.mjs';
 import {Accounts} from './server/accounts.mjs';
 import {publicOrigin} from './server/origin.mjs';
 import {MediaLibrary} from './server/media.mjs';
@@ -13,12 +13,13 @@ import {CosmeticPacks} from './server/cosmetic-packs.mjs';
 import {installCosmetics} from './js/avatar.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+loadDatabaseEnv();
 const realRoot=await realpath(root);
 const songsRoot = path.join(root, 'songs');
 export const cosmeticPacks=new CosmeticPacks(root);
 installCosmetics(await cosmeticPacks.reload());
 for(const warning of cosmeticPacks.warnings)console.warn('Paquete cosmético omitido:',warning.pack,warning.error);
-export const store=new Store();
+export const store=await openStore();
 export const media=new MediaLibrary(root);
 export const accounts=new Accounts(store,{media,packs:cosmeticPacks});
 let onlineService;
@@ -32,8 +33,8 @@ export const server = http.createServer(async (req, res) => {
     const ownedSong=/^\/api\/music\/(song-[a-f0-9]{24})$/.exec(pathname);
     let musicTarget=null;
     if(ownedSong){
-      try{const {user}=accounts.require(req,true);if(!user.music.includes(ownedSong[1]))throw Object.assign(Error('Compra esta canción en la tienda.'),{status:403});musicTarget=(await media.shopSongs()).find(song=>song.id===ownedSong[1])?.absolute;if(!musicTarget)throw Object.assign(Error('Canción no disponible.'),{status:404});}
-      catch(error){res.writeHead(error.status||400,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({error:error.message}));return;}
+      try{const {user}=await accounts.require(req,true);if(!user.music.includes(ownedSong[1]))throw Object.assign(Error('Compra esta canción en la tienda.'),{status:403});musicTarget=(await media.shopSongs()).find(song=>song.id===ownedSong[1])?.absolute;if(!musicTarget)throw Object.assign(Error('Canción no disponible.'),{status:404});}
+      catch(error){const unavailable=isMongoError(error);res.writeHead(unavailable?503:error.status||400,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({error:unavailable?databaseUnavailable:error.message}));return;}
     }
     if(pathname==='/api/online'){
       const port=server.address()?.port||4173,addresses=Object.values(networkInterfaces()).flat().filter(v=>v.family==='IPv4'&&!v.internal).map(v=>v.address);
@@ -72,8 +73,9 @@ export const server = http.createServer(async (req, res) => {
   } catch { res.writeHead(404).end('Not found'); }
 });
 export const online=onlineService=attachOnline(server,{accounts,store});
+if(store.remote)server.once('close',()=>void store.close());
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT) || 4173;
   server.listen(port, process.env.HOST||'0.0.0.0', () => console.log(`\n  TOUGE / AFTER HOURS\n  Juega en http://127.0.0.1:${port}\n  Online: WebSocket /online · hasta 4 jugadores\n  Musica: ${songsRoot}\n  Ctrl+C para detener.\n`));
-  server.on('error', e => { console.error(e.code === 'EADDRINUSE' ? `El puerto ${port} esta ocupado. Usa otro: $env:PORT=4174; npm start` : e.message); process.exitCode = 1; });
+  server.on('error', e => { console.error(e.code === 'EADDRINUSE' ? `El puerto ${port} esta ocupado. Usa otro: $env:PORT=4174; npm start` : e.message); if(store.remote)void store.close();process.exitCode = 1; });
 }

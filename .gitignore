@@ -6,4 +6,5 @@ data/
 *.db
 *.db-*
 .env
+.env.atlas-tmp
 test-results/

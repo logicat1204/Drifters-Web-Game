@@ -10,11 +10,55 @@ import {DEFAULT_AVATAR,defaultAvatar,validateAvatar,migrateAvatar,cosmeticId,ava
 import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward} from '../js/campaign.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
-const hashToken=value=>createHash('sha256').update(value).digest('hex');
+export const hashToken=value=>createHash('sha256').update(value).digest('hex');
+export const derivePassword=(value,salt)=>scrypt(value,salt,64,{N:16384,r:8,p:1});
 export function username(value){if(typeof value!=='string'||!/^[a-zA-Z0-9]{3,24}$/.test(value))throw Error('El usuario debe tener de 3 a 24 letras y números, sin espacios.');return value;}
-function password(value){if(typeof value!=='string'||value.length<8||Buffer.byteLength(value)>256)throw Error('La contraseña debe tener al menos 8 caracteres y como máximo 256 bytes.');return value;}
+export function password(value){if(typeof value!=='string'||value.length<8||Buffer.byteLength(value)>256)throw Error('La contraseña debe tener al menos 8 caracteres y como máximo 256 bytes.');return value;}
+export function profileUpdate(current,data){
+  if(!current)throw Error('Usuario inexistente.');
+  const displayName=data.displayName===undefined?current.displayName:typeof data.displayName==='string'?data.displayName.normalize('NFKC').trim():'';
+  if(!displayName||displayName.length>24||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Error('El nombre visible debe tener de 1 a 24 caracteres.');
+  const car=data.defaultCar??current.defaultCar;
+  if(!ALL_CARS.some(c=>c.id===car))throw Error('Coche inválido.');
+  const needsStarter=!current.onboarded&&current.cars.length===0;
+  const grantStarter=needsStarter&&data.complete===true&&STARTER_CARS.some(c=>c.id===car);
+  const editingBeforeChoice=needsStarter&&data.complete!==true&&data.defaultCar===undefined;
+  if(!current.cars.includes(car)&&!grantStarter&&!editingBeforeChoice)throw Error(needsStarter?'Elige un coche inicial para completar tu licencia.':'Compra ese coche antes de equiparlo.');
+  const selectedFocus=data.focusType??current.focusType;
+  if(!FOCUS_TYPES[selectedFocus]||selectedFocus!=='balance'&&!current.focusUnlocked.includes(selectedFocus))throw Error('Esa especialidad todavía está bloqueada.');
+  const stage=data.arcadeStage??current.arcadeStage;
+  if(!Number.isInteger(stage)||stage<0||stage>=TRACKS.length)throw Error('Etapa inválida.');
+  const avatar=data.avatar===undefined?current.avatar:validateAvatar(data.avatar),owned=new Set(current.cosmetics);
+  for(const slot of ['hair','eyes','mouth','outfit','accessory','makeup'])if(!owned.has(cosmeticId(avatar.base,slot,avatar[slot])))throw Error('Ese cosmético no pertenece a tu inventario.');
+  const mode=data.portraitMode??current.portraitMode;
+  if(!['avatar','photo'].includes(mode))throw Error('Elige foto o avatar.');
+  if(mode==='photo'&&!current.hasPhoto)throw Error('Sube una foto antes de continuar.');
+  return {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded:current.onboarded||data.complete===true};
+}
+export function checkChapterStory(cleared,chapter,phase){
+  if(!CAMPAIGN_CHAPTERS.some(c=>c.id===chapter)||!['start','end'].includes(phase))throw Error('Escena inválida.');
+  const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter);
+  if(phase==='start'?!stageAvailable(stages[0],cleared):!stages.every(s=>cleared.includes(s.id)))throw Object.assign(Error('Completa los desafíos anteriores para ver esta escena.'),{status:403});
+}
+export function checkRecordFilters({track,source,mode,car}){
+  if(mode&&!['time','battle','arcade','campaign'].includes(mode)||!TRACKS.some(t=>t.id===track)||!['solo','online'].includes(source)||car&&!ALL_CARS.some(c=>c.id===car))throw Error('Filtro de récords inválido.');
+}
+export function campaignPayout(stage,cleared,run){
+  if(stage.track!==run.track||!stageAvailable(stage,cleared.map(s=>s.level_id)))throw Error('Nivel de campaña bloqueado.');
+  const old=cleared.find(s=>s.level_id===stage.id);
+  const entitlement=campaignReward(stage,Math.max(run.points,old?.best_points||0));
+  const coins=Math.max(0,entitlement-(old?.reward_coins||0))+(old?campaignReplayReward(stage,run.points):0);
+  return {entitlement,coins};
+}
+export function runDocument(id,userId,r,source,finishTime,now){
+  return {id,user_id:userId,track:r.track.id,car:r.car.id,source,mode:r.mode,manual:Number(r.manual),wet:Number(r.wet),night:Number(r.night),
+    handling:HANDLING_VERSION,elapsed:finishTime,points:Math.floor(r.skill.points),drift:Math.floor(r.driftPoints),completed:Number(r.s>=r.track.length),
+    won:Number(source==='online'?r.netPlace===1:r.won),created_at:now,campaign_level:campaignStage(r.campaignStage)?.id??null,focus_type:r.focus.type,
+    focus_enabled:Number(r.focus.enabled!==false),vehicle_build:JSON.stringify(validateBuild(r.car.build)),build_key:buildKey(r.car.build)};
+}
+export const sqlitePath=()=>process.env.DB_PATH||path.join(process.env.DATA_DIR||path.join(root,'data'),'touge.sqlite');
 export class Store {
-  constructor(filename=process.env.DB_PATH||(process.env.NODE_TEST_CONTEXT?':memory:':path.join(process.env.DATA_DIR||path.join(root,'data'),'touge.sqlite')),{now=()=>Date.now()}={}){
+  constructor(filename=process.env.NODE_TEST_CONTEXT&&!process.env.DB_PATH?':memory:':sqlitePath(),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
     if(version>6){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
@@ -49,14 +93,12 @@ export class Store {
   available(name){return !this.db.prepare('SELECT 1 FROM users WHERE username=? COLLATE NOCASE').get(username(name));}
   syncCosmetics(){const insert=this.db.prepare('INSERT OR IGNORE INTO cosmetics(id,slot,rig) VALUES(?,?,?)');for(const item of COSMETICS)insert.run(item.id,item.slot,item.rig);}
   markChapterStory(id,chapter,phase){
-    if(!CAMPAIGN_CHAPTERS.some(c=>c.id===chapter)||!['start','end'].includes(phase))throw Error('Escena inválida.');
-    const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter),cleared=this.progression(id).campaign.map(s=>s.id);
-    if(phase==='start'?!stageAvailable(stages[0],cleared):!stages.every(s=>cleared.includes(s.id)))throw Object.assign(Error('Completa los desafíos anteriores para ver esta escena.'),{status:403});
+    checkChapterStory(this.progression(id).campaign.map(s=>s.id),chapter,phase);
     this.db.prepare('INSERT OR IGNORE INTO chapter_story_seen VALUES(?,?,?,?)').run(id,chapter,phase,this.now());return this.user(id);
   }
   async register(name,pass){
     name=username(name);password(pass);if(!this.available(name))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});
-    const salt=randomBytes(16).toString('hex'),hash=await scrypt(pass,salt,64,{N:16384,r:8,p:1}),id=randomUUID();
+    const salt=randomBytes(16).toString('hex'),hash=await derivePassword(pass,salt),id=randomUUID();
     this.db.exec('BEGIN IMMEDIATE');try{
       this.db.prepare('INSERT INTO users VALUES(?,?,?,?,?)').run(id,name,hash.toString('hex'),salt,this.now());
       this.db.prepare('INSERT INTO profiles(user_id,display_name,avatar) VALUES(?,?,?)').run(id,name,JSON.stringify(DEFAULT_AVATAR));
@@ -68,7 +110,7 @@ export class Store {
     // Unknown and known users both perform a password derivation.
     const row=typeof name==='string'&&name.length<=24?this.db.prepare('SELECT * FROM users WHERE username=? COLLATE NOCASE').get(name):null;
     const text=typeof pass==='string'&&Buffer.byteLength(pass)<=256?pass:'';
-    const candidate=await scrypt(text,row?.salt||this.dummySalt,64,{N:16384,r:8,p:1});
+    const candidate=await derivePassword(text,row?.salt||this.dummySalt);
     if(!row||!timingSafeEqual(candidate,Buffer.from(row.password_hash,'hex')))throw Object.assign(Error('Usuario o contraseña incorrectos.'),{status:401});return this.user(row.id);
   }
   user(id){const p=this.db.prepare('SELECT u.id,u.username,u.created_at,p.display_name,p.avatar,p.photo_version,p.portrait_mode,p.photo IS NOT NULL AS has_photo,p.default_car,p.arcade_stage,p.onboarded,p.focus_type FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?').get(id);if(!p)return null;return {id:p.id,username:p.username,displayName:p.display_name,focusType:p.focus_type,...this.progression(id),avatar:JSON.parse(p.avatar),portraitMode:p.portrait_mode,portraitUrl:`/api/users/${p.id}/portrait?v=${p.photo_version}`,photoVersion:p.photo_version,hasPhoto:!!p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,createdAt:p.created_at};}
@@ -78,24 +120,7 @@ export class Store {
   updateProfile(id,data){
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const current=this.user(id);if(!current)throw Error('Usuario inexistente.');
-      const displayName=data.displayName===undefined?current.displayName:typeof data.displayName==='string'?data.displayName.normalize('NFKC').trim():'';
-      if(!displayName||displayName.length>24||/[\p{Cc}\p{Cf}<>]/u.test(displayName))throw Error('El nombre visible debe tener de 1 a 24 caracteres.');
-      const car=data.defaultCar??current.defaultCar;
-      if(!ALL_CARS.some(c=>c.id===car))throw Error('Coche inválido.');
-      const needsStarter=!current.onboarded&&current.cars.length===0;
-      const grantStarter=needsStarter&&data.complete===true&&STARTER_CARS.some(c=>c.id===car);
-      const editingBeforeChoice=needsStarter&&data.complete!==true&&data.defaultCar===undefined;
-      if(!current.cars.includes(car)&&!grantStarter&&!editingBeforeChoice)throw Error(needsStarter?'Elige un coche inicial para completar tu licencia.':'Compra ese coche antes de equiparlo.');
-      const selectedFocus=data.focusType??current.focusType;if(!FOCUS_TYPES[selectedFocus]||selectedFocus!=='balance'&&!current.focusUnlocked.includes(selectedFocus))throw Error('Esa especialidad todavía está bloqueada.');
-      const stage=data.arcadeStage??current.arcadeStage;if(!Number.isInteger(stage)||stage<0||stage>=TRACKS.length)throw Error('Etapa inválida.');
-      const avatar=data.avatar===undefined?current.avatar:validateAvatar(data.avatar);
-      const owned=new Set(this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(x=>x.item_id));
-      for(const slot of ['hair','eyes','mouth','outfit','accessory','makeup'])if(!owned.has(cosmeticId(avatar.base,slot,avatar[slot])))throw Error('Ese cosmético no pertenece a tu inventario.');
-      const mode=data.portraitMode??current.portraitMode;if(!['avatar','photo'].includes(mode))throw Error('Elige foto o avatar.');
-      const hasPhoto=this.db.prepare('SELECT photo IS NOT NULL AS present FROM profiles WHERE user_id=?').get(id).present;
-      if(mode==='photo'&&!hasPhoto)throw Error('Sube una foto antes de continuar.');
-      const onboarded=current.onboarded||data.complete===true;
+      const {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded}=profileUpdate(this.user(id),data);
       if(grantStarter)this.db.prepare('INSERT INTO owned_cars VALUES(?,?,?)').run(id,car,this.now());
       this.db.prepare('UPDATE profiles SET display_name=?,avatar=?,portrait_mode=?,default_car=?,arcade_stage=?,onboarded=?,focus_type=?,photo_version=photo_version+1 WHERE user_id=?').run(displayName,JSON.stringify(avatar),mode,car,stage,Number(onboarded),selectedFocus,id);
       this.db.exec('COMMIT');
@@ -176,14 +201,14 @@ export class Store {
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   addRun(id,userId,r,source='solo',finishTime=r.elapsed){
-    const valid=r.s>=r.track.length,stage=r.campaignStage?campaignStage(r.campaignStage):null;
+    const run=runDocument(id,userId,r,source,finishTime,this.now()),stage=campaignStage(run.campaign_level);
     this.db.exec('BEGIN IMMEDIATE');try{
-      const inserted=this.db.prepare('INSERT OR IGNORE INTO runs(id,user_id,track,car,source,mode,manual,wet,night,handling,elapsed,points,drift,completed,won,created_at,campaign_level,focus_type,focus_enabled,vehicle_build,build_key) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,userId,r.track.id,r.car.id,source,r.mode,Number(r.manual),Number(r.wet),Number(r.night),HANDLING_VERSION,finishTime,Math.floor(r.skill.points),Math.floor(r.driftPoints),Number(valid),Number(source==='online'?r.netPlace===1:r.won),this.now(),stage?.id||null,r.focus.type,Number(r.focus.enabled!==false),JSON.stringify(validateBuild(r.car.build)),buildKey(r.car.build));
-      if(inserted.changes&&stage&&source==='solo'&&r.mode==='campaign'&&valid&&r.won){
-        const progress=this.progression(userId),cleared=progress.campaign.map(s=>s.id);
-        if(stage.track!==r.track.id||!stageAvailable(stage,cleared))throw Error('Nivel de campaña bloqueado.');
-        const old=progress.campaign.find(s=>s.id===stage.id),points=Math.floor(r.skill.points),entitlement=campaignReward(stage,Math.max(points,old?.bestPoints||0)),coins=Math.max(0,entitlement-(old?.rewardCoins||0))+(old?campaignReplayReward(stage,points):0);
-        this.db.prepare('INSERT INTO campaign_progress VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,level_id) DO UPDATE SET best_time=MIN(best_time,excluded.best_time),best_points=MAX(best_points,excluded.best_points),reward_coins=MAX(reward_coins,excluded.reward_coins)').run(userId,stage.id,finishTime,points,entitlement,this.now());
+      const fields=Object.keys(run);
+      const inserted=this.db.prepare(`INSERT OR IGNORE INTO runs(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).run(...Object.values(run));
+      if(inserted.changes&&stage&&source==='solo'&&r.mode==='campaign'&&run.completed&&run.won){
+        const cleared=this.db.prepare('SELECT * FROM campaign_progress WHERE user_id=?').all(userId);
+        const {entitlement,coins}=campaignPayout(stage,cleared,run);
+        this.db.prepare('INSERT INTO campaign_progress VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,level_id) DO UPDATE SET best_time=MIN(best_time,excluded.best_time),best_points=MAX(best_points,excluded.best_points),reward_coins=MAX(reward_coins,excluded.reward_coins)').run(userId,stage.id,finishTime,run.points,entitlement,this.now());
         if(coins){this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(coins,userId);this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('reward:'+id,userId,coins,'campaign:'+stage.id,id,this.now());}
       }
       this.db.exec('COMMIT');return this.runResult(id,userId);
@@ -192,7 +217,7 @@ export class Store {
   runResult(id,userId){const run=this.db.prepare('SELECT * FROM runs WHERE id=? AND user_id=?').get(id,userId);if(!run)return null;const best=this.db.prepare('SELECT MIN(elapsed) AS time FROM runs WHERE user_id=? AND track=? AND car=? AND source=? AND manual=? AND wet=? AND night=? AND handling=? AND build_key=? AND completed=1').get(userId,run.track,run.car,run.source,run.manual,run.wet,run.night,run.handling,run.build_key);return {id,build:JSON.parse(run.vehicle_build),buildKey:run.build_key,time:run.elapsed,points:run.points,drift:run.drift,completed:!!run.completed,won:!!run.won,personalBest:best.time,stats:this.stats(userId),reward:{coins:this.db.prepare('SELECT COALESCE(SUM(delta),0) AS n FROM economy_ledger WHERE user_id=? AND run_id=?').get(userId,id).n,stage:run.campaign_level},user:this.user(userId)};}
   stats(id){return this.db.prepare('SELECT COUNT(*) AS races,COALESCE(SUM(won),0) AS wins,COALESCE(SUM(points),0) AS points,COALESCE(MAX(points),0) AS bestPoints,COALESCE(MAX(drift),0) AS bestDrift FROM runs WHERE user_id=?').get(id);}
   records({userId=null,track='akina',source='solo',wet=false,night=true,manual=false,car=null,mode=null}={}){
-    if(mode&&!['time','battle','arcade','campaign'].includes(mode)||!TRACKS.some(t=>t.id===track)||!['solo','online'].includes(source)||car&&!ALL_CARS.some(c=>c.id===car))throw Error('Filtro de récords inválido.');
+    checkRecordFilters({track,source,mode,car});
     const filters=[HANDLING_VERSION,track,source,Number(wet),Number(night),Number(manual)],extra=(userId?' AND r.user_id=?':'')+(car?' AND r.car=?':'')+(mode?' AND r.mode=?':'');if(userId)filters.push(userId);if(car)filters.push(car);if(mode)filters.push(mode);
     return this.db.prepare(`WITH ranked AS (SELECT r.*,u.username,p.display_name,p.photo_version,ROW_NUMBER() OVER(PARTITION BY r.user_id ORDER BY r.elapsed,r.created_at) AS n FROM runs r JOIN users u ON u.id=r.user_id JOIN profiles p ON p.user_id=u.id WHERE r.handling=? AND r.track=? AND r.source=? AND r.wet=? AND r.night=? AND r.manual=? AND r.completed=1${extra}) SELECT user_id AS userId,username,display_name AS displayName,car,elapsed AS time,points,created_at AS createdAt,photo_version AS portraitVersion,build_key AS buildKey,vehicle_build AS vehicleBuild FROM ranked WHERE n=1 ORDER BY elapsed,created_at LIMIT 50`).all(...filters).map(row=>({...row,build:JSON.parse(row.vehicleBuild),portraitUrl:`/api/users/${row.userId}/portrait?v=${row.portraitVersion}`}));
   }

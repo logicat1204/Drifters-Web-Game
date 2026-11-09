@@ -12,15 +12,18 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-if not exist "node_modules\ws\package.json" (
-  echo Preparando el modo online...
-  call npm ci --omit=dev --ignore-scripts
-  if errorlevel 1 (
-    echo No se pudo instalar ws. Revisa tu conexion y vuelve a abrir JUGAR.bat.
-    pause
-    exit /b 1
-  )
+if not exist "node_modules\ws\package.json" goto install
+if not exist "node_modules\mongodb\package.json" goto install
+goto play
+:install
+echo Preparando el servidor...
+call npm ci --omit=dev --ignore-scripts
+if errorlevel 1 (
+  echo No se pudieron instalar las dependencias. Revisa tu conexion y vuelve a abrir JUGAR.bat.
+  pause
+  exit /b 1
 )
+:play
 start "" "http://127.0.0.1:4173"
 node server.mjs
 pause

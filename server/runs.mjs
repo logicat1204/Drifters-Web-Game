@@ -3,22 +3,27 @@ import {setImmediate} from 'node:timers/promises';
 import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,makeTrack,updateRace,repositionRace} from '../js/sim.mjs';
 import {activateFocus} from '../js/focus.mjs';
 import {campaignStage,stageAvailable,CAMPAIGN_CHAPTERS} from '../js/campaign.mjs';
+import {stockBuild} from '../js/tuning.mjs';
 export class Runs {
   constructor(store,{now=()=>Date.now()}={}){this.store=store;this.now=now;this.pending=new Map();this.busy=0;}
   start(userId,data){
+    const user=this.store.user(userId);
+    return this.store.remote?user.then(pilot=>this.prepareStart(userId,data,pilot)):this.prepareStart(userId,data,user);
+  }
+  prepareStart(userId,data,user){
     for(const [id,run] of this.pending)if(this.now()-run.created>2*60*60*1000)this.pending.delete(id);
     for(const [id,run] of this.pending)if(run.userId===userId&&!run.busy)this.pending.delete(id);
-    const stage=data.mode==='campaign'?campaignStage(data.campaignStage):null,user=this.store.user(userId);
+    const stage=data.mode==='campaign'?campaignStage(data.campaignStage):null;
     if(data.mode==='campaign'&&(!stage||!stageAvailable(stage,user.campaign.map(s=>s.id))))throw Error('Nivel de campaña bloqueado.');
     const car=CARS.find(c=>c.id===data.car),track=TRACKS.find(t=>t.id===(stage?.track||data.track));
     if(!car||!user.cars.includes(car.id)||!track||!['time','battle','arcade','campaign'].includes(data.mode))throw Error('Configuración de carrera inválida o coche no comprado.');
     const chapter=stage?CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter):null;
     const rematch=!!stage&&user.campaign.some(result=>result.id===stage.id);
-    const options={build:this.store.vehicleBuild(userId,car.id),mode:data.mode,manual:data.manual===true,wet:stage?rematch||!!chapter.wet:data.wet===true,night:stage?stage.index<14:data.night!==false,...this.store.loadout(userId),...(stage?{campaignStage:stage.id,rematch,rival:{...stage,code:CARS.find(c=>c.id===stage.car).code},fog:!!chapter.fog}:{})},id=randomUUID();
+    const options={build:user.garage[car.id]?.build||stockBuild(),mode:data.mode,manual:data.manual===true,wet:stage?rematch||!!chapter.wet:data.wet===true,night:stage?stage.index<14:data.night!==false,focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType),...(stage?{campaignStage:stage.id,rematch,rival:{...stage,code:CARS.find(c=>c.id===stage.car).code},fog:!!chapter.fog}:{})},id=randomUUID();
     this.pending.set(id,{userId,car,track,options,created:this.now(),busy:false});return {id,track:track.id,options};
   }
   async submit(userId,id,frames){
-    const existing=this.store.runResult(id,userId);if(existing)return existing;
+    const existing=await this.store.runResult(id,userId);if(existing)return existing;
     const attempt=this.pending.get(id);if(!attempt||attempt.userId!==userId)throw Object.assign(Error('La carrera no existe, caducó o pertenece a otro piloto.'),{status:404});
     if(attempt.busy||this.busy>=2)throw Object.assign(Error('El servidor está verificando carreras. Intenta guardar de nuevo en unos segundos.'),{status:429});
     if(!Array.isArray(frames)||frames.length===0||frames.length>108400)throw Error('Registro de controles inválido.');
@@ -33,7 +38,7 @@ export class Runs {
       }
       if(!r.finished)throw Error('El descenso no terminó.');
       if(this.now()-attempt.created+2000<r.elapsed*1000)throw Error('El tiempo de carrera no corresponde al reloj del servidor.');
-      const saved=this.store.addRun(id,userId,r);this.pending.delete(id);return saved;
+      const saved=await this.store.addRun(id,userId,r);this.pending.delete(id);return saved;
     }finally{attempt.busy=false;this.busy--;}
   }
 }

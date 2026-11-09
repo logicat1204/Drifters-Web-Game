@@ -3,6 +3,7 @@ import {timingSafeEqual} from 'node:crypto';
 import {AVATAR_VERSION,avatarOptions,defaultAvatar,COSMETICS,installCosmetics,validateAvatar} from '../js/avatar.mjs';
 import {avatarSvg} from './store.mjs';
 import {Runs} from './runs.mjs';
+import {databaseUnavailable,isMongoError} from './database.mjs';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {MediaLibrary} from './media.mjs';
@@ -31,9 +32,9 @@ function validPhoto(bytes,type){
 }
 export class Accounts {
   constructor(store,{media=new MediaLibrary(fileURLToPath(new URL('../',import.meta.url))),packs=null}={}){this.store=store;this.media=media;this.packs=packs;this.runs=new Runs(store);this.limits=new Map();}
-  async refreshCosmetics(){if(!this.packs)return;installCosmetics(await this.packs.reload());this.store.syncCosmetics();}
+  async refreshCosmetics(){if(!this.packs)return;installCosmetics(await this.packs.reload());await this.store.syncCosmetics();}
   session(req){return this.store.session(sessionToken(req));}
-  require(req,complete=false){const session=this.session(req);if(!session)throw fail('Inicia sesión para continuar.',401);if(complete&&!session.user.onboarded)throw fail('Completa tu nombre y tu retrato de piloto.',403);return session;}
+  async require(req,complete=false){const session=await this.session(req);if(!session)throw fail('Inicia sesión para continuar.',401);if(complete&&!session.user.onboarded)throw fail('Completa tu nombre y tu retrato de piloto.',403);return session;}
   throttle(req,key,max,window){const ip=req.socket.remoteAddress||'local',id=key+':'+ip;let r=this.limits.get(id);const now=Date.now();if(!r||now>r.until){r={n:0,until:now+window};this.limits.set(id,r);}if(++r.n>max)throw fail('Demasiados intentos. Espera unos minutos y vuelve a intentarlo.',429);if(this.limits.size>5000)for(const [k,v] of this.limits)if(now>v.until)this.limits.delete(k);}
   cookie(req,res,token){res.setHeader('Set-Cookie',`touge_session=${token||''}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${token?2592000:0}${secureSession(req)?'; Secure':''}`);}
   async handle(req,res,url,online){
@@ -45,42 +46,42 @@ export class Accounts {
         const a={...defaultAvatar(url.searchParams.get('base')||'male'),...Object.fromEntries(url.searchParams),version:AVATAR_VERSION},svg=avatarSvg(validateAvatar(a));res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'private, max-age=60','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(svg);return true;
       }
       const portrait=/^\/api\/users\/([a-f\d-]{36})\/portrait$/.exec(p);
-      if(portrait&&['GET','HEAD'].includes(req.method)){const image=this.store.portrait(portrait[1]);if(!image)throw fail('Piloto inexistente.',404);res.writeHead(200,{'Content-Type':image.mime,'Content-Length':image.bytes.length,'Cache-Control':'private, max-age=60','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(req.method==='HEAD'?undefined:image.bytes);return true;}
-      if(p==='/api/username'&&req.method==='GET'){this.throttle(req,'available',90,60000);json(res,200,{available:this.store.available(url.searchParams.get('name'))});return true;}
-      if(p==='/api/session'&&req.method==='GET'){const s=this.session(req);json(res,200,{user:s?.user||null,csrf:s?.csrf||null});return true;}
-      if(p==='/api/songs'&&req.method==='GET'){const user=this.session(req)?.user,shop=await this.media.shopSongs();json(res,200,{songs:[...await this.media.freeSongs(),...shop.filter(song=>user?.music.includes(song.id)).map(({absolute,...song})=>({...song,detail:'TU COLECCIÓN · '+song.author}))]});return true;}
+      if(portrait&&['GET','HEAD'].includes(req.method)){const image=await this.store.portrait(portrait[1]);if(!image)throw fail('Piloto inexistente.',404);res.writeHead(200,{'Content-Type':image.mime,'Content-Length':image.bytes.length,'Cache-Control':'private, max-age=60','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(req.method==='HEAD'?undefined:image.bytes);return true;}
+      if(p==='/api/username'&&req.method==='GET'){this.throttle(req,'available',90,60000);json(res,200,{available:await this.store.available(url.searchParams.get('name'))});return true;}
+      if(p==='/api/session'&&req.method==='GET'){const s=await this.session(req);json(res,200,{user:s?.user||null,csrf:s?.csrf||null});return true;}
+      if(p==='/api/songs'&&req.method==='GET'){const user=(await this.session(req))?.user,shop=await this.media.shopSongs();json(res,200,{songs:[...await this.media.freeSongs(),...shop.filter(song=>user?.music.includes(song.id)).map(({absolute,...song})=>({...song,detail:'TU COLECCIÓN · '+song.author}))]});return true;}
       if(['/api/register','/api/login'].includes(p)&&req.method==='POST'){
         if(!sameOrigin(req))throw fail('Origen no permitido.',403);this.throttle(req,p,p==='/api/register'?12:35,p==='/api/register'?3600000:60000);
-        const data=await jsonBody(req),user=p==='/api/register'?await this.store.register(data.username,data.password):await this.store.login(data.username,data.password),session=this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
+        const data=await jsonBody(req),user=p==='/api/register'?await this.store.register(data.username,data.password):await this.store.login(data.username,data.password),session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
       const routes=['/api/logout','/api/profile','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
-      const s=this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
+      const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
-      if(p==='/api/logout'&&req.method==='POST'){this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
-      if(p==='/api/profile'&&req.method==='PATCH'){json(res,200,{user:this.store.updateProfile(s.user.id,await jsonBody(req))});return true;}
-      if(p==='/api/profile/photo'&&req.method==='GET'){const photo=this.store.photo(s.user.id);if(!photo)throw fail('Aún no hay una foto.',404);res.writeHead(200,{'Content-Type':photo.mime,'Cache-Control':'private, no-cache','X-Content-Type-Options':'nosniff'});res.end(photo.bytes);return true;}
+      if(p==='/api/logout'&&req.method==='POST'){await this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
+      if(p==='/api/profile'&&req.method==='PATCH'){json(res,200,{user:await this.store.updateProfile(s.user.id,await jsonBody(req))});return true;}
+      if(p==='/api/profile/photo'&&req.method==='GET'){const photo=await this.store.photo(s.user.id);if(!photo)throw fail('Aún no hay una foto.',404);res.writeHead(200,{'Content-Type':photo.mime,'Cache-Control':'private, no-cache','X-Content-Type-Options':'nosniff'});res.end(photo.bytes);return true;}
       if(p==='/api/profile/photo'&&req.method==='POST'){
         this.throttle(req,'photo',20,60000);const data=await jsonBody(req,750000);if(typeof data.image!=='string')throw fail('Elige una imagen.');const match=/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(data.image);if(!match)throw fail('Usa una foto PNG, JPEG o WebP.');const bytes=Buffer.from(match[2],'base64');if(bytes.length>512000||bytes.length<12)throw fail('La foto debe ocupar como máximo 500 KB.');
         validPhoto(bytes,match[1]);
-        json(res,200,{user:this.store.setPhoto(s.user.id,bytes,'image/'+match[1])});return true;
+        json(res,200,{user:await this.store.setPhoto(s.user.id,bytes,'image/'+match[1])});return true;
       }
       if(p==='/api/campaign'&&req.method==='GET'){json(res,200,{chapters:await Promise.all(CAMPAIGN_CHAPTERS.map(async c=>({...c,map:campaignMap[c.id],media:await this.media.chapterMedia(c)}))),stages:await Promise.all(CAMPAIGN_STAGES.map(async stage=>({...stage,carInfo:ALL_CARS.find(c=>c.id===stage.car),media:await this.media.stageMedia(stage,campaignMedia.stages[stage.id])}))),focusTypes:FOCUS_TYPES,user:s.user});return true;}
-      if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
+      if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:await this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
       if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:ALL_CARS,cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
-      if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):this.store.buy(s.user.id,data.kind,data.id));return true;}
+      if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?await this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):await this.store.buy(s.user.id,data.kind,data.id));return true;}
       if(p==='/api/garage'&&req.method==='GET'){json(res,200,{upgrades:UPGRADES,parts:VEHICLE_PARTS,paints:PAINTS,user:s.user});return true;}
       if(['/api/garage/upgrade','/api/garage/buy','/api/garage/customize'].includes(p)&&req.method==='POST'){
         this.throttle(req,'garage',90,60000);const data=await jsonBody(req);
-        const result=p.endsWith('/upgrade')?this.store.upgradeVehicle(s.user.id,data.car,data.system,data.tier):p.endsWith('/buy')?this.store.buyVehiclePart(s.user.id,data.car,data.part):this.store.customizeVehicle(s.user.id,data.car,data.appearance);
+        const result=p.endsWith('/upgrade')?await this.store.upgradeVehicle(s.user.id,data.car,data.system,data.tier):p.endsWith('/buy')?await this.store.buyVehiclePart(s.user.id,data.car,data.part):await this.store.customizeVehicle(s.user.id,data.car,data.appearance);
         json(res,200,result);return true;
       }
-      if(p==='/api/records/me'&&req.method==='GET'){json(res,200,this.store.personal(s.user.id));return true;}
-      if(p==='/api/rankings'&&req.method==='GET'){const q=url.searchParams,filters={track:q.get('track')||'akina',source:'solo',mode:'time',wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',car:q.get('car')||null},records=this.store.records(filters),personal=this.store.records({...filters,userId:s.user.id})[0]||null;json(res,200,{records:records.map((r,i)=>({...r,rank:i+1})),personal:personal?{...personal,rank:records.findIndex(r=>r.userId===s.user.id)+1||null}:null,filters});return true;}
-      if(p==='/api/records'&&req.method==='GET'){const q=url.searchParams;json(res,200,{records:this.store.records({track:q.get('track')||'akina',source:q.get('source')||'solo',car:q.get('car')||null,wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',userId:q.get('mine')==='1'?s.user.id:null})});return true;}
+      if(p==='/api/records/me'&&req.method==='GET'){json(res,200,await this.store.personal(s.user.id));return true;}
+      if(p==='/api/rankings'&&req.method==='GET'){const q=url.searchParams,filters={track:q.get('track')||'akina',source:'solo',mode:'time',wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',car:q.get('car')||null},records=await this.store.records(filters),personal=(await this.store.records({...filters,userId:s.user.id}))[0]||null;json(res,200,{records:records.map((r,i)=>({...r,rank:i+1})),personal:personal?{...personal,rank:records.findIndex(r=>r.userId===s.user.id)+1||null}:null,filters});return true;}
+      if(p==='/api/records'&&req.method==='GET'){const q=url.searchParams;json(res,200,{records:await this.store.records({track:q.get('track')||'akina',source:q.get('source')||'solo',car:q.get('car')||null,wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',userId:q.get('mine')==='1'?s.user.id:null})});return true;}
       if(p==='/api/rooms'&&req.method==='GET'){json(res,200,{rooms:online.rooms.publicRooms()});return true;}
-      if(p==='/api/runs/start'&&req.method==='POST'){this.throttle(req,'start',40,60000);json(res,200,this.runs.start(s.user.id,await jsonBody(req)));return true;}
+      if(p==='/api/runs/start'&&req.method==='POST'){this.throttle(req,'start',40,60000);json(res,200,await this.runs.start(s.user.id,await jsonBody(req)));return true;}
       if(p==='/api/runs/finish'&&req.method==='POST'){this.throttle(req,'finish',12,60000);const data=await jsonBody(req,4*1024*1024);json(res,200,await this.runs.submit(s.user.id,data.id,data.frames));return true;}
       throw fail('Método no permitido.',405);
-    }catch(error){json(res,error.status||400,{error:error.message});return true;}
+    }catch(error){const unavailable=isMongoError(error);json(res,unavailable?503:error.status||400,{error:unavailable?databaseUnavailable:error.message});return true;}
   }
 }
