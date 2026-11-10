@@ -193,3 +193,11 @@ Estructura: `js/sim.mjs` contiene la simulación; `js/courses.mjs`, cursos y riv
 La campaña tiene 24 duelos en nueve capítulos, con los retratos y cómics de assets/campanias. Balance se desbloquea al vencer a Takumi en Akina, Time Master tras Keisuke en Akagi y Drift Master tras Kai en Irohazaka. La licencia permite elegir la especialidad. Las victorias verificadas dan monedas para comprar 18 autos nuevos y 30 cosméticos separados por base. Se conservan los siete autos anteriores.
 
 Consulta [la guía de campaña, tienda y superconcentración](docs/CAMPANIA-TIENDA-FOCUS.md) y [la solicitud registrada el 30 de octubre de 2026](logs_solicitudes/2026-10-30-campania-superconcentracion-tienda.md). La actualización migra la base a v3 conservando cuentas y datos.
+
+**Mapas y manejo — 9 de noviembre de 2026:** nueve recorridos reconstruidos desde las referencias, Ashinoko de 8,433 km por vuelta, perfiles Grip/Skiller/Balance y física v9 compartida con online. SQLite migra a v7 conservando progreso y compras; los tiempos se separan por versión. Consulta [implementación, distancias y validación](docs/MAPAS-Y-MANEJO-V9.md) y la [vista general de los cursos](screenshots/course-remake-overview.png).
+
+**Optimización del entorno — 9 de noviembre de 2026:** taludes locales, capas con descarte independiente, vegetación limitada por distancia y fondos ligeros del segundo pack. Las pistas y el manejo se conservan. Consulta [estrategia, mediciones y compilación](docs/OPTIMIZACION-ENTORNO.md).
+
+**Corrección de suelo y assets:** superficie continua, guardrails con base cerrada, decoración apoyada, agua a cota única y tres complementos originales exportados a GLB. [Implementación y generadores](docs/SUELO-Y-ASSETS-COMPLEMENTARIOS.md).
+
+**Temporadas de campaña:** temporada seca, temporada lluviosa y NG+ con final definitivo, progreso y recompensas independientes y escenas propias. Conserva la licencia y permite repetir duelos. [Reglas y carpetas de recursos](docs/TEMPORADAS-Y-NGPLUS.md).

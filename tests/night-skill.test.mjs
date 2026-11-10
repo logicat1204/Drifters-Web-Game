@@ -5,7 +5,7 @@ import {createSkillState,cornerQuality,updateCornerSkill} from '../js/skill.mjs'
 import {rearCameraPose} from '../js/renderer.js';
 
 test('corner intensity rewards speed near grip, never straights, crawling or overspeed',()=>{
-  const base={curve:.015,speed:30,grip:lateralGrip(CARS[0]),lateral:0};
+  const base={curve:.015,speed:Math.sqrt(lateralGrip(CARS[0])/.015)*.9,grip:lateralGrip(CARS[0]),lateral:0};
   const q=cornerQuality(base);assert.ok(q>.75);assert.ok(q>cornerQuality({...base,speed:21}));
   for(const overrides of [{curve:0},{speed:0},{speed:50},{collision:.2},{lateral:4.7},{slipAngle:.8},{travelYaw:.6}])assert.equal(cornerQuality({...base,...overrides}),0);
 });
@@ -23,7 +23,7 @@ test('visual rewards and headlight switches give no handling or speed boost',()=
   for(const key of ['s','speed','yaw','lateral'])assert.equal(a[key],b[key]);assert.equal(a.headlights,true);assert.equal(b.headlights,false);assert.equal(toggleHeadlights(b),true);
 });
 function overtake({night=true,lights=false,collision=0}={}){
-  const track=makeTrack(TRACKS[0]),r=createRace(CARS[0],track,{night});
+  const track=makeTrack({...TRACKS[0],layout:[[1,0]]}),r=createRace(CARS[0],track,{night});
   Object.assign(r,{countdown:0,s:100,speed:40,lateral:-2.5,headlights:lights,rivalS:130,collision});
   r.opponent=createRace({...CARS[0],accel:0,max:22},track,{mode:'time'});Object.assign(r.opponent,{countdown:0,s:130,speed:22,lateral:1.25,timeLeft:10000});
   for(let i=0;i<3.5*120;i++)updateRace(r,{throttle:true},1/120);return r;

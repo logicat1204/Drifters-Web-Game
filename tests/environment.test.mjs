@@ -32,6 +32,9 @@ test('all ten decorated maps retain safe road corridors and sector culling, incl
   const env=renderer.environment;assert.ok(env.profile.name);assert.ok(env.props.length>800);assert.equal(uploads,2,'one world buffer and one backdrop buffer');
   assert.equal(renderer.scene.chunks.reduce((n,c)=>n+c.count,6),renderer.scene.count);
   for(const prop of env.props)assert.ok(index.distance(prop.x,prop.z,prop.radius+32)>track.width/2+prop.radius+1.79,config.id+' '+prop.kind);
+  for(const prop of env.props)if(!['dock','railway-bridge'].includes(prop.kind)){
+   const y=env.ground.groundAt(prop.x,prop.z);assert.notEqual(y,null,config.id+' unsupported '+prop.kind);assert.ok(Math.abs(prop.y-y-(prop.kind==='bench'?.5:0))<1e-5,config.id+' floating '+prop.kind);
+  }
   // Independently sample accepted surfaces; height is intentionally ignored so
   // lower hairpins stay safe from upper-bank scenery as well.
   for(const {kind,vertices}of env.surfaces){const center=[0,0,0];for(const p of vertices){center[0]+=p[0]/4;center[2]+=p[2]/4;}for(const p of [...vertices,center])assert.ok(index.distance(p[0],p[2],64)>=track.width/2+.14,config.id+' '+kind);}

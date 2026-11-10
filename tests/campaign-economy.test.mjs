@@ -13,7 +13,7 @@ const media=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',impo
 function stageRace(stage,car=CARS[2]){const chapter=CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter);return createRace(car,makeTrack(ALL_TRACKS.find(t=>t.id===stage.track)),{mode:'campaign',campaignStage:stage.id,rival:stage,wet:!!chapter.wet,fog:!!chapter.fog,focusEnabled:false});}
 function win(store,user,stage,index=0,points=9000){const race=stageRace(stage);Object.assign(race,{s:race.track.length,elapsed:160,finished:true,won:true});race.skill.points=points;return store.addRun('win-'+stage.id+'-'+index,user.id,race);}
 async function fixture(defaultCar='ae86'){const store=new Store(':memory:'),account=await store.register('CampaignDriver','night-password-24');const user=store.updateProfile(account.id,{complete:true,defaultCar});return {store,user};}
-test('only a cleared campaign stage becomes a rain rematch, regardless of client weather',async()=>{
+test('replaying the dry season preserves its original weather despite client rematch flags',async()=>{
   const {store,user}=await fixture();
   try {
     const runs=new Runs(store);
@@ -26,8 +26,8 @@ test('only a cleared campaign stage becomes a rain rematch, regardless of client
     assert.equal(next.wet,false);
     assert.equal(next.rematch,false);
     const retry=start('kenji',false,false);
-    assert.equal(retry.wet,true);
-    assert.equal(retry.rematch,true);
+    assert.equal(retry.wet,false);
+    assert.equal(retry.rematch,false);
   } finally {store.close();}
 });
 test('the guide has 24 ordered opponents, nine campaigns and real portrait/comic files',()=>{
@@ -96,7 +96,7 @@ test('each campaign stage can be won with a starter machine and a physically dri
   for(const stage of CAMPAIGN_STAGES){let won=false;
     for(const type of ['time','drift']){for(const line of [-2.5,2.5,0]){for(const car of CARS.slice(0,3)){
       const r=stageRace(stage,car);r.countdown=0;r.timeLeft=10000;r.focus.enabled=stage.index>=3;r.focus.type=stage.index>=7?type:stage.index>=5?'time':'balance';
-      for(let i=0;i<108000&&!r.finished;i++){const final=stage.id==='kanata-final';if(r.focus.charge>=60&&(!final||r.track.length-r.s<320))activateFocus(r);updateRace(r,final?kanataLateInput(r,{line,gripUse:.90}):driverInput(r,{line,gripUse:.90}),1/120);}
+      for(let i=0;i<108000&&!r.finished;i++){const final=stage.id==='kanata-final';if(r.focus.charge>=60&&(!final||r.track.length-r.s<220))activateFocus(r);updateRace(r,final?kanataLateInput(r,{line,gripUse:.90}):driverInput(r,{line,gripUse:.90}),1/120);}
       if(r.won){won=true;break;}
     }if(won)break;}if(won)break;}
     assert.ok(won,stage.id+' must be beatable without purchases');

@@ -24,7 +24,7 @@ export function pilotView(pilot){
     hasPhoto:p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,garage,coins:pilot.balance,
     cars:pilot.cars.map(row=>row.car_id),cosmetics:pilot.inventory.map(row=>row.item_id),music:pilot.music.map(row=>row.song_id),
     chapterStories:pilot.stories.map(row=>row.chapter_id+':'+row.phase),focusUnlocked:focusUnlocks(pilot.campaign.map(row=>row.level_id)),
-    campaign:pilot.campaign.map(row=>({id:row.level_id,bestTime:row.best_time,bestPoints:row.best_points,rewardCoins:row.reward_coins}))
+    campaign:pilot.campaign.map(row=>({id:row.level_id,bestTime:row.handling===HANDLING_VERSION?row.best_time:null,bestPoints:row.best_points,rewardCoins:row.reward_coins}))
   };
 }
 
@@ -191,7 +191,7 @@ export class MongoStore {
           await this.runs.insertOne({_id,...run},{session});
           const {entitlement,coins}=campaignPayout(stage,pilot.campaign,run);
           const old=pilot.campaign.find(row=>row.level_id===stage.id);
-          const progress={level_id:stage.id,best_time:Math.min(run.elapsed,old?.best_time??Infinity),best_points:Math.max(run.points,old?.best_points??run.points),
+          const progress={level_id:stage.id,handling:run.handling,best_time:Math.min(run.elapsed,old?.handling===run.handling?old.best_time:Infinity),best_points:Math.max(run.points,old?.best_points??run.points),
             reward_coins:Math.max(entitlement,old?.reward_coins??0),cleared_at:old?.cleared_at??run.created_at};
           const campaign=[...pilot.campaign.filter(row=>row.level_id!==stage.id),progress];
           await this.pilots.updateOne({_id:userId},{$set:{campaign},$inc:{balance:coins}},{session});

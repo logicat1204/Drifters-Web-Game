@@ -9,9 +9,9 @@ export const AI_LEVELS=Object.freeze([
   {grip:.87,speed:1,response:4.4,slip:.25}
 ]);
 export const AI_STYLES={
-  Grip:{corner:.84,preview:260,brakePlan:10.5,brakeMargin:.45,line:.12},
-  Complete:{corner:.94,preview:225,brakePlan:13.5,brakeMargin:.28,line:.35},
-  Skiller:{corner:.99,preview:200,brakePlan:15,brakeMargin:.20,line:.50}
+  Grip:{corner:.88,preview:260,brakePlan:10.5,brakeMargin:.45,line:.12},
+  Complete:{corner:.92,preview:225,brakePlan:13.5,brakeMargin:.28,line:.35},
+  Skiller:{corner:.99,preview:200,brakePlan:15,brakeMargin:.20,line:.35}
 };
 export function rivalLevel(rival){return Math.max(1,Math.min(5,Math.round(rival.level||3)));}
 export function rivalStyle(rival){return AI_STYLES[rival.style]?rival.style:'Complete';}
@@ -26,11 +26,12 @@ export const TRAFFIC_LEVELS=Object.freeze([
 ]);
 export const CRIMSON_TRAFFIC=Object.freeze({gap:5.1,commit:1.7,reaction:.32,prediction:.16,margin:.18,reserve:.96,laneRate:3.0});
 export function trafficBehavior(r,o){return r.boss?.id==='kanata-final'&&r.boss.enraged?CRIMSON_TRAFFIC:TRAFFIC_LEVELS[o.aiDriver?.level||rivalLevel(r.rival)];}
-export function createAIDriver(rival){return {style:rivalStyle(rival),level:rivalLevel(rival),slide:0,slip:0,counter:null,targetSpeed:0,passing:{phase:'cruise',side:0,lane:0,switchCooldown:0,yielding:false,commitRemaining:0,contesting:false,blockedTime:0,feints:0}};}
+export function createAIDriver(rival){return {style:rivalStyle(rival),level:rivalLevel(rival),slide:0,slip:0,brake:false,throttle:false,counter:null,targetSpeed:0,passing:{phase:'cruise',side:0,lane:0,switchCooldown:0,yielding:false,commitRemaining:0,contesting:false,blockedTime:0,feints:0}};}
 export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
   const state=o.aiDriver.passing,behavior=trafficBehavior(r,o),distance=r.s-o.s,closing=o.speed-r.speed;
   const limit=Math.min(PASSING.laneLimit,o.track.width/2-1.25),velocity=r.lateralV||0;
-  const predicted=clamp(r.lateral+clamp(velocity*behavior.prediction,-1.1,1.1),-4.6,4.6);
+  const roadLimit=o.track.width/2-.7;
+  const predicted=clamp(r.lateral+clamp(velocity*behavior.prediction,-1.1,1.1),-roadLimit,roadLimit);
   const corridor=CONTACT.width+.12+(behavior.margin-.12)*clamp(o.speed/20,0,1);
   const candidate=side=>{
     const edge=side>0?Math.max(r.lateral,predicted):Math.min(r.lateral,predicted);
@@ -96,33 +97,49 @@ export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
 }
 export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,clamp}){
   o.aiDriver??=createAIDriver(r.rival);
-  const level=AI_LEVELS[rivalLevel(r.rival)],styleName=rivalStyle(r.rival),style=AI_STYLES[styleName],driver=o.aiDriver;
+  const baseline=AI_LEVELS[rivalLevel(r.rival)],level=r.rival.ngplus?{...baseline,grip:baseline.grip*1.025,response:baseline.response+.2}:baseline,styleName=rivalStyle(r.rival),style=AI_STYLES[styleName],driver=o.aiDriver;
   const boost=driver?.counter,grip=lateralGrip(o.car,o.wet)*(boost?.grip||1),p=sample(o.track,o.s),v=o.speed;
   // Rematch rivals use more of the available wet grip and brake closer to the bend.
-  const cornerGrip=level.grip*style.corner*(r.rematch?1.12:1);
-  const brakePlan=style.brakePlan*(r.rematch?1.14:1);
+  const technique=styleName==='Skiller'?1.24:styleName==='Complete'?1.06:1;
+  const cornerGrip=level.grip*style.corner*technique*(r.rematch?(styleName==='Skiller'?1.06:1.12):1);
+  const brakePlan=style.brakePlan*(r.rematch?1.14:1)*(boost?.braking||1);
   let target=o.car.max*level.speed*(boost?.topSpeed||1)*draftSpeedMultiplier(o);
-  for(let ahead=0;ahead<=style.preview;ahead+=8){const bend=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*cornerGrip/Math.max(.0001,bend));target=Math.min(target,Math.sqrt(safe*safe+2*brakePlan*ahead));}
+  for(let ahead=0;ahead<=style.preview;ahead+=Math.min(4,o.track.step)){const bend=Math.abs(sample(o.track,o.s+ahead).curve),safe=Math.sqrt(grip*cornerGrip/Math.max(.0001,bend));target=Math.min(target,Math.sqrt(safe*safe+2*brakePlan*ahead));}
   if(driver){
-    const slide=styleName==='Skiller'&&Math.abs(p.curve)>.0014&&v>15?Math.min(1,Math.abs(p.curve)/.004):0;
+    // Prepare the slide and reverse its sign before the next S-bend, matching
+    // the wheel preview instead of countersteering against the previous bend.
+    const driftCurve=sample(o.track,o.s+v*.12).curve;
+    const slide=styleName==='Skiller'&&Math.abs(driftCurve)>.0014&&v>15?Math.min(1,Math.abs(driftCurve)/.004):0;
     driver.slide+=(slide-driver.slide)*(1-Math.exp(-dt*(slide?5:7)));
     const oldSlip=driver.slip;
-    driver.slip+=(Math.sign(p.curve)*level.slip*driver.slide-driver.slip)*(1-Math.exp(-dt*12));
+    driver.slip+=(Math.sign(driftCurve)*level.slip*.6*driver.slide-driver.slip)*(1-Math.exp(-dt*12));
     driver.slipRate=(driver.slip-oldSlip)/Math.max(.0001,dt);
   }
   const normalLine=clamp(.1+sample(o.track,o.s+26).curve*style.line*40,-.65,.85),plan=planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp});
   target=plan.target;
+  // Correct an outward drift before it reaches the rail. This spends speed and
+  // steering grip, rather than snapping the rival back onto its racing line.
+  const outward=Math.sign(o.lateral)*o.lateralV;
+  if(!plan.maneuver&&outward>1){const overshoot=Math.abs(o.lateral+o.lateralV*.45)-2.7;target*=1-clamp(overshoot*.16,0,.28);}
   if(plan.maneuver&&Math.abs(plan.line-o.lateral)>.3&&Math.abs(p.curve)>.001)target=Math.min(target,Math.sqrt(grip*cornerGrip*plan.reserve/Math.abs(p.curve)));
   driver.targetSpeed=target;
   const change=(plan.line-(o.targetLine??o.lateral))*(1-Math.exp(-dt*(plan.maneuver?2.6:1.4)));
   o.targetLine=(o.targetLine??o.lateral)+(plan.maneuver?clamp(change,-plan.laneRate*dt,plan.laneRate*dt):change);
-  const brake=v>target+(target<1?.02:style.brakeMargin),throttle=!brake&&target>.25&&v<target+.12;
-  const anticipated=o.lateral+(plan.maneuver?o.lateralV*.45:0);
-  const positionGain=plan.maneuver?Math.min(.14,.062*Math.max(1,25/Math.max(10,v))):.062;
-  const desiredTravel=clamp(-(anticipated-o.targetLine)*positionGain,-.18,.18),roadRate=p.curve*v*Math.cos(o.travelYaw)/clamp(1-p.curve*o.lateral,.65,1.35);
-  const travelRate=roadRate+(desiredTravel-o.travelYaw)*level.response;
-  const alignment=(brake&&Math.abs(o.steer)>.32?6.2:9.5)*(1-o.driftAssist*.28);
+  // Coast near the requested pace. Hysteresis prevents alternating full brake
+  // and full throttle every physics tick while holding a steady corner speed.
+  driver.brake=target<1?v>target+.02:driver.brake?v>target-.45:v>target+style.brakeMargin;
+  driver.throttle=!driver.brake&&target>.25&&(driver.throttle?v<target+.02:v<target-(plan.maneuver?.2:.9));
+  const brake=driver.brake,throttle=driver.throttle;
+  const anticipated=o.lateral+o.lateralV*(plan.maneuver?.45:.32);
+  const positionGain=plan.maneuver?Math.min(.14,.062*Math.max(1,25/Math.max(10,v))):.075;
+  const desiredTravel=clamp(-(anticipated-o.targetLine)*positionGain,-.18,.18);
+  // Steering and body yaw both have inertia in the current handling model.
+  // Aim through that response delay, rather than waiting to enter a bend or
+  // its reversal before asking the front wheels to turn.
+  const preview=sample(o.track,o.s+v*(plan.maneuver?.08:.18)),previewRate=preview.curve*v*Math.cos(o.travelYaw)/clamp(1-preview.curve*o.lateral,.65,1.35);
+  const travelRate=previewRate+(desiredTravel-o.travelYaw)*level.response;
+  const alignment=(brake&&Math.abs(o.steer)>.32&&v>16?6.2:9.5)*(1-o.driftAssist*.28);
   const desiredBody=o.travelYaw+travelRate/alignment+(driver?.slip||0);
-  const bodyRate=roadRate+(desiredBody-o.yaw)*9+(driver?.slipRate||0)*.55,wheelbase=o.car.id==='r32'?2.62:o.car.id==='rx7'?2.43:2.4;
+  const bodyRate=previewRate+(desiredBody-o.yaw)*9+(driver?.slipRate||0)*.55,wheelbase=o.car.id==='r32'?2.62:o.car.id==='rx7'?2.43:2.4;
   return {steer:-clamp(Math.atan(bodyRate*wheelbase/Math.max(2,v))/steeringAngle(v),-1,1),throttle,brake,handbrake:false};
 }

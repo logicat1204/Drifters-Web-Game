@@ -1,3 +1,7 @@
+import {COMPLEMENT_MODELS} from './roadside-complements.mjs';
+import {createTerrainField} from './terrain-field.mjs';
+import {PART2_MODELS} from './scenery-part2.mjs';
+import {packScene,boundsDistance,chunkOpacity} from './scene-batches.mjs';
 import {applyBuild,appearanceKey} from './tuning.mjs';
 import { ALL_CARS as CARS, sample, worldAt, mix, clamp } from './sim.mjs';
 import { createRoadIndex } from './scenery.mjs';
@@ -155,17 +159,18 @@ export class Renderer {
       precision mediump float;
       #endif
       varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;
-      uniform sampler2D uAtlas;uniform float uAtlasReady,uTunnel,uBackdrop;
+      uniform sampler2D uAtlas;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain;
       uniform vec4 uStreetLights[3];
       uniform vec3 uFog,uEye,uCar,uRivalCar;uniform vec2 uForward,uRivalForward;
-      uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];
+      uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];uniform vec3 uNetSlopes;
+      uniform float uCarSlope,uRivalSlope;
       uniform float uDay,uWet,uWeatherTime,uAlpha,uFogStart,uFogEnd,uFogFromCar,uHeadlights,uRivalLights,uLampState,uBrake;
       uniform float uVehicle,uCarbon;uniform vec3 uVehiclePaint,uWheelColor;
-      float beam(vec3 car,vec2 forward){
+      float beam(vec3 car,vec2 forward,float slope){
         vec2 delta=vWorld.xz-car.xz;float ahead=dot(delta,forward);
         float across=abs(delta.x*forward.y-delta.y*forward.x);
-        float cone=smoothstep(1.,4.,ahead)*(1.-smoothstep(38.,110.,ahead))*(1.-smoothstep(1.3+ahead*.035,2.+ahead*.19,across));
-        float height=1.-smoothstep(1.5,6.,abs(vWorld.y-car.y));
+        float cone=smoothstep(1.,4.,ahead)*(1.-smoothstep(48.,140.,ahead))*(1.-smoothstep(1.3+ahead*.035,2.+ahead*.19,across));
+        float height=1.-smoothstep(1.5,6.,abs(vWorld.y-car.y-ahead*slope));
         return cone*height;
       }
       float hashRain(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}
@@ -191,8 +196,9 @@ export class Renderer {
         if(f>=1.){if(vSurface.z<-19.5&&vSurface.z>-20.5)discard;gl_FragColor=vec4(uFog,uAlpha);return;}
         vec3 n=normalize(vNormal);float sun=max(0.,dot(n,normalize(vec3(-.35,.85,.4))));
         float daylight=uDay*(1.-uTunnel*.85),light=mix(.075+sun*.065,.48+sun*.52,daylight)*(1.-uWet*daylight*.14);
-        float headlights=0.;if(daylight<.999){headlights=max(beam(uCar,uForward)*uHeadlights,beam(uRivalCar,uRivalForward)*uRivalLights)*(1.-daylight)*1.85;
-        for(int i=0;i<3;i++)headlights=max(headlights,beam(uNetCars[i].xyz,uNetForward[i])*uNetCars[i].w*(1.-daylight)*1.85);
+        if(uTerrain>.5){float head=beam(uCar,uForward,uCarSlope)*uHeadlights*(1.-daylight)*1.85;vec3 c=vColor.rgb*texel.rgb*(light+head);gl_FragColor=vec4(mix(c,uFog,f),uAlpha);return;}
+        float headlights=0.;if(daylight<.999){headlights=max(beam(uCar,uForward,uCarSlope)*uHeadlights,beam(uRivalCar,uRivalForward,uRivalSlope)*uRivalLights)*(1.-daylight)*1.85;
+        for(int i=0;i<3;i++)headlights=max(headlights,beam(uNetCars[i].xyz,uNetForward[i],uNetSlopes[i])*uNetCars[i].w*(1.-daylight)*1.85);
         for(int i=0;i<3;i++){float falloff=max(0.,1.-length(vWorld.xz-uStreetLights[i].xz)/14.);light+=falloff*falloff*uStreetLights[i].w*(1.-daylight)*(1.-smoothstep(3.,10.,abs(vWorld.y-uStreetLights[i].y)));}}
         float noise=fract(sin(dot(floor(vWorld.xz*13.),vec2(12.9898,78.233)))*43758.5453);
         float grain=abs(n.y)>.7?.96+noise*.08:1.;
@@ -252,7 +258,7 @@ export class Renderer {
     this.program=gl.createProgram();gl.attachShader(this.program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(this.program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(this.program);
     if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));gl.useProgram(this.program);
     this.attrs={};for(const name of ['aPos','aNormal','aColor','aSurface'])this.attrs[name]=gl.getAttribLocation(this.program,name);
-    this.uniforms={};for(const name of ['uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    this.uniforms={};for(const name of ['uCarSlope','uRivalSlope','uNetSlopes','uTerrain','uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uAtlas','uAtlasReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor','uWet','uWeatherTime'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     this.initAtlas();
@@ -400,51 +406,76 @@ export class Renderer {
     this.track=track;const gl=this.gl;
     if(this.scene)gl.deleteBuffer(this.scene.buffer);if(this.backdrop)gl.deleteBuffer(this.backdrop.buffer);
     const g=new Geometry(),roadIndex=createRoadIndex(track);this.sceneryBounds=[];let seed=track.seed*11231;
-    const chunks=[];let chunkStart=6;
-    const endChunk=()=>{const end=g.data.length/14;if(end===chunkStart)return;const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(let i=chunkStart*14;i<g.data.length;i+=14)for(let a=0;a<3;a++){min[a]=Math.min(min[a],g.data[i+a]);max[a]=Math.max(max[a],g.data[i+a]);}chunks.push({first:chunkStart,count:end-chunkStart,min,max});chunkStart=end;};
+    const spans=[];let spanStart=6,spanKind='road',sector=0,baseY=0;
+    const layer=kind=>{const end=g.data.length/14;if(end>spanStart)spans.push({first:spanStart,count:end-spanStart,kind:spanKind,sector,baseY});spanStart=end;spanKind=kind;};
+    const endChunk=()=>{layer(spanKind);sector++;};
     const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
     const point=(p,l,y=0)=>V(p.x+Math.cos(p.heading)*l,p.y+y,p.z-Math.sin(p.heading)*l);
     const strip=(a,b,l1,l2,y,color)=>g.quad(point(a,l1,y),point(b,l1,y),point(b,l2,y),point(a,l2,y),color);
-    const environment=this.environment=createEnvironment(track,g,roadIndex,this.sceneryBounds);
-    const minY=Math.min(...track.points.map(p=>p.y))-75;
+    const ground=createTerrainField(track,roadIndex);
+    const environment=this.environment=createEnvironment(track,g,roadIndex,this.sceneryBounds,{layer,ground});
+    const water=['atami','tsubaki','odawara','manazuru','ashinoko'].includes(track.id);
+    const minY=Math.min(...track.points.map(p=>p.y))-(water?12:35);
     const minX=Math.min(...track.points.map(p=>p.x))-1500,maxX=Math.max(...track.points.map(p=>p.x))+1500,minZ=Math.min(...track.points.map(p=>p.z))-1500,maxZ=Math.max(...track.points.map(p=>p.z))+1500;
-    g.quad(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),track.theme==='city'?'#263b3e':'#22372d');
-    for(let i=0;i<track.points.length-1;i++) {
-      const a=track.points[i],b=track.points[i+1];
+    if(water)g.surface(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),TEXTURES.water,[[0,0],[0,40],[40,40],[40,0]]);else g.quad(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),'#22372d');
+    ground.build(g,(id,y)=>{layer('terrain');sector=-id-1;baseY=y;},TEXTURES.grass);
+    layer('road');sector=0;baseY=0;
+    for(let i=0;i<(track.renderSegments??track.points.length-1);i++) {
+      const a=track.points[i],b=track.points[i+1];layer('road');baseY=a.y;
+      for(const side of [-1,1]){strip(a,b,side*5.3,side*6.05,-.015,'#747972');g.quad(point(a,side*6.05,-.015),point(b,side*6.05,-.015),point(b,side*6.05,-.48),point(a,side*6.05,-.48),'#5f655f');}
+      if(i%Math.max(1,Math.round(48/track.step))===0){const m=COMPLEMENT_MODELS.drainage_grille,c=Math.cos(a.heading),s=Math.sin(a.heading);for(const side of [-1,1]){const p=point(a,side*5.76,-.01);for(let k=0;k<m.data.length;k+=14){const d=m.data;g.data.push(p[0]+d[k]*c+d[k+2]*s,p[1]+d[k+1],p[2]-d[k]*s+d[k+2]*c,d[k+3]*c+d[k+5]*s,d[k+4],-d[k+3]*s+d[k+5]*c,...d.slice(k+6,k+14));}}}
       // Narrow vertical embankments cannot stretch over another hairpin.
-      for(const side of [-1,1])g.quad(point(a,side*5.58,-.12),point(b,side*5.58,-.12),point(b,side*5.58,-38),point(a,side*5.58,-38),track.theme==='autumn'?'#5a5142':'#35453c');
+      for(const side of [-1,1])g.quad(point(a,side*5.58,-.12),point(b,side*5.58,-.12),point(b,side*5.58,-4),point(a,side*5.58,-4),track.theme==='autumn'?'#5a5142':'#35453c');
       g.surface(point(a,-5.3),point(b,-5.3),point(b,5.3),point(a,5.3),TEXTURES.asphalt,[[0,a.s/5],[0,b.s/5],[2.65,b.s/5],[2.65,a.s/5]],[1.15,1.15,1.15,0]);
       strip(a,b,-5.55,-5.3,.015,'#737771');strip(a,b,5.3,5.55,.015,'#737771');
       strip(a,b,-4.9,-4.78,.025,'#d0d2bb');strip(a,b,4.78,4.9,.025,'#d0d2bb');
-      if(i%3!==0){strip(a,b,-.11,-.03,.03,'#cb9c4d');strip(a,b,.03,.11,.03,'#cb9c4d');}
+      if(Math.floor(a.s/8)%3!==0){strip(a,b,-.11,-.03,.03,'#cb9c4d');strip(a,b,.03,.11,.03,'#cb9c4d');}
       for(const side of [-1,1]) {
         strip(a,b,side*5.65,side*5.68,.75,'#9aaba8');strip(a,b,side*5.65,side*5.68,.97,'#aeb7b0');
         g.quad(point(a,side*5.68,.75),point(b,side*5.68,.75),point(b,side*5.68,.97),point(a,side*5.68,.97),'#a6b0a8');
-        if(i%4===0){const p=point(a,side*5.68,.45);g.box(...p,.09,.9,.10,'#808c87');const q=point(a,side*5.62,.99);g.box(...q,.09,.10,.18,side<0?[.95,.18,.08,.12]:[.9,.88,.6,.12]);}
+        if(i%Math.max(1,Math.round(32/track.step))===0){const p=point(a,side*5.68,.45);g.box(...p,.09,.9,.10,'#808c87');const q=point(a,side*5.62,.99);g.box(...q,.09,.10,.18,side<0?[.95,.18,.08,.12]:[.9,.88,.6,.12]);}
       }
       environment.step(i,a,b);
-      if(i===4){for(const side of [-1,1]){const p=point(a,side*6.5,2.8);g.box(...p,.2,5.6,.2,'#747e83');}g.surface(point(a,-6.5,5.1),point(a,6.5,5.1),point(a,6.5,6.5),point(a,-6.5,6.5),TEXTURES.billboard_generic);}
-      if(i===Math.floor(track.length/track.step))for(let k=0;k<12;k++)strip(a,b,-5.2+k*.87,-5.2+(k+1)*.87,.04,k%2?'#d1d2bd':'#171f22');
-      if(i%24===23)endChunk();
+      layer('road');
+      if(i===Math.round(32/track.step)){for(const side of [-1,1]){const p=point(a,side*6.5,2.8);g.box(...p,.2,5.6,.2,'#747e83');}g.surface(point(a,-6.5,5.1),point(a,6.5,5.1),point(a,6.5,6.5),point(a,-6.5,6.5),TEXTURES.billboard_generic);}
+      if(i===(track.renderSegments?track.renderSegments-1:Math.floor(track.length/track.step)))for(let k=0;k<12;k++)strip(a,b,-5.2+k*.87,-5.2+(k+1)*.87,.04,k%2?'#d1d2bd':'#171f22');
+      if((i+1)%Math.max(1,Math.round(96/track.step))===0)endChunk();
     }
-    endChunk();this.scene=g.upload(gl);this.scene.chunks=chunks;
+    endChunk();const chunks=packScene(g.data,spans);this.scene=g.upload(gl);this.scene.chunks=chunks;
     const bg=new Geometry();
     for(let i=0;i<8;i++){const a=i/8*Math.PI*2,b=(i+1)/8*Math.PI*2,p=(angle,y,r)=>V(Math.sin(angle)*r,y,Math.cos(angle)*r);bg.surface(p(a,-900,1400),p(b,-900,1400),p(b,1100,1400),p(a,1100,1400),TEXTURES.sky_day,[[i/4,0],[(i+1)/4,0],[(i+1)/4,1],[i/4,1]],undefined,TEXTURES.sky_night);}
-    for(let layer=0;layer<2;layer++)for(let i=0;i<12;i++){const a=i/12*Math.PI*2,b=(i+1)/12*Math.PI*2,r=1000-layer*150,y=-100-layer*30,p=(angle,height)=>V(Math.sin(angle)*r,height,Math.cos(angle)*r);bg.surface(p(a,y),p(b,y),p(b,y+260-layer*20),p(a,y+260-layer*20),TEXTURES[layer?'mountains_mid':'mountains_far'],[[i%3/3,0],[(i%3+1)/3,0],[(i%3+1)/3,1],[i%3/3,1]],[.8,.88,.89,0]);}this.backdrop=bg.upload(gl);
+    for(let layer=0;layer<2;layer++)for(let i=0;i<12;i++){const a=i/12*Math.PI*2,b=(i+1)/12*Math.PI*2,r=1000-layer*150,y=-100-layer*30,p=(angle,height)=>V(Math.sin(angle)*r,height,Math.cos(angle)*r);bg.surface(p(a,y),p(b,y),p(b,y+260-layer*20),p(a,y+260-layer*20),TEXTURES[layer?'mountains_mid':'mountains_far'],[[i%3/3,0],[(i%3+1)/3,0],[(i%3+1)/3,1],[i%3/3,1]],[.8,.88,.89,0]);}
+    const horizon=(name,x,y,z,sx,sy,sz)=>{const model=PART2_MODELS[name];for(let i=0;i<model.data.length;i+=14){const d=model.data;bg.data.push(x+d[i]*sx,y+d[i+1]*sy,z+d[i+2]*sz,...d.slice(i+3,i+14));}};
+    horizon('bg_hills_ring_low',0,65,0,2.4,2.5,2.4);
+    horizon('bg_ridge_low',-650,80,800,3,3,2);
+    if(['tsubaki','odawara','ashinoko','manazuru','atami'].includes(track.id))horizon('bg_mountain_fuji',650,-180,-1050,2,1.4,2);
+    this.backdrop=bg.upload(gl);
     this.resetCamera=true;
   }
   draw(mesh,model=IDENTITY,alpha=1,first=0,count=mesh?.count) {if(!mesh)return;const gl=this.gl,u=this.uniforms;if(this.boundBuffer!==mesh.buffer){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);const a=this.attrs;gl.enableVertexAttribArray(a.aPos);gl.vertexAttribPointer(a.aPos,3,gl.FLOAT,false,56,0);gl.enableVertexAttribArray(a.aNormal);gl.vertexAttribPointer(a.aNormal,3,gl.FLOAT,false,56,12);gl.enableVertexAttribArray(a.aColor);gl.vertexAttribPointer(a.aColor,4,gl.FLOAT,false,56,24);gl.enableVertexAttribArray(a.aSurface);gl.vertexAttribPointer(a.aSurface,4,gl.FLOAT,false,56,40);this.boundBuffer=mesh.buffer;}gl.uniformMatrix4fv(u.uModel,false,model);gl.uniform1f(u.uAlpha,alpha);gl.drawArrays(gl.TRIANGLES,first,count);if(this.stats){this.stats.drawCalls++;this.stats.vertices+=count;}}
   drawScene(view,projection,origin,far){
     if(this.culling===false||!this.scene.chunks){this.draw(this.scene);return;}
     const planes=viewPlanes(view,projection,this.planes);this.draw(this.scene,IDENTITY,1,0,6);
-    for(const chunk of this.scene.chunks)if(chunkVisible(chunk,planes,origin,far)){this.draw(this.scene,IDENTITY,1,chunk.first,chunk.count);this.stats.chunks++;}
+    let range=null;
+    const flush=()=>{if(range){this.gl.uniform1f(this.uniforms.uTerrain,range.kind==='terrain'?1:0);if(range.kind==='terrain'){this.gl.enable(this.gl.CULL_FACE);this.gl.cullFace(this.gl.BACK);}this.draw(this.scene,IDENTITY,range.alpha,range.first,range.count);if(range.kind==='terrain')this.gl.disable(this.gl.CULL_FACE);}range=null;this.gl.uniform1f(this.uniforms.uTerrain,0);};
+    for(const chunk of this.scene.chunks){
+      const limit=Math.min(far,chunk.distance??Infinity),distance=boundsDistance(chunk,origin);
+      if(!chunkVisible(chunk,planes,origin,limit))continue;
+      const alpha=chunkOpacity(chunk,origin,distance);
+      if(alpha<=0)continue;
+      if(range&&range.first+range.count===chunk.first&&range.alpha===alpha&&range.kind===chunk.kind)range.count+=chunk.count;
+      else{flush();range={first:chunk.first,count:chunk.count,alpha,kind:chunk.kind};}this.stats.chunks++;
+    }flush();
     this.stats.totalChunks+=this.scene.chunks.length;
   }
   drawWorld(race,racing,p,angle,eye,target,aspect,fov,day,sky,hidePlayer=false,up){
     const gl=this.gl,u=this.uniforms,rival=racing&&race.mode!=='time'?worldAt(this.track,race.rivalS,race.rivalLateral):null;
     const others=racing?(race.netOpponents||[]).slice(0,3).map(o=>({...o,world:worldAt(this.track,o.s,o.lateral)})):[],netCars=new Float32Array(12),netForward=new Float32Array(6);
-    others.forEach((o,i)=>{const q=o.world,a=q.heading+o.yaw;netCars.set([q.x,q.y,q.z,o.headlights?1:0],i*4);netForward.set([Math.sin(a),Math.cos(a)],i*2);});
-    gl.uniform4fv(u['uNetCars[0]'],netCars);gl.uniform2fv(u['uNetForward[0]'],netForward);
+    const slopeAt=s=>{const lo=Math.max(0,s-6),hi=Math.min(this.track.length,s+6);return (sample(this.track,hi).y-sample(this.track,lo).y)/Math.max(1,hi-lo);};
+    const slopes=this.headlightSlopes??=new Float32Array(3);slopes.fill(0);
+    gl.uniform1f(u.uCarSlope,slopeAt(race?.s||0));gl.uniform1f(u.uRivalSlope,rival?slopeAt(race.rivalS):0);
+    others.forEach((o,i)=>{slopes[i]=slopeAt(o.s);const q=o.world,a=q.heading+o.yaw;netCars.set([q.x,q.y,q.z,o.headlights?1:0],i*4);netForward.set([Math.sin(a),Math.cos(a)],i*2);});
+    gl.uniform3fv(u.uNetSlopes,slopes);gl.uniform4fv(u['uNetCars[0]'],netCars);gl.uniform2fv(u['uNetForward[0]'],netForward);
     const view=lookAt(eye,target,up),projection=perspective(fov*Math.PI/180,aspect,.15,2200);
     gl.uniformMatrix4fv(u.uView,false,view);gl.uniformMatrix4fv(u.uProjection,false,projection);
     gl.uniform3fv(u.uFog,sky);gl.uniform3fv(u.uEye,eye);gl.uniform3fv(u.uCar,[p.x,p.y,p.z]);gl.uniform2fv(u.uForward,[Math.sin(angle),Math.cos(angle)]);

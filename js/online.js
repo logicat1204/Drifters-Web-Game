@@ -1,4 +1,4 @@
-import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix,sample} from './sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,updateRace,clamp,mix,sample,roadEdge} from './sim.mjs';
 import {vehiclePose,resolveVehicleContact} from './traffic.mjs';
 import {remotePoses} from './presentation.mjs';
 const $=id=>document.getElementById(id);
@@ -99,7 +99,7 @@ export class OnlineClient {
       const state=p.state,o={...vehiclePose(state),track:r.track,timeLeft:state.timeLeft,contactCooldown:state.contactCooldown};
       const advance=clamp(r.elapsed-state.elapsed,0,.15),curve=sample(r.track,o.s).curve;
       o.progress=o.speed*Math.max(.12,Math.cos(o.travelYaw))/clamp(1-curve*o.lateral,.65,1.35);
-      o.s+=o.progress*advance;o.lateral=clamp(o.lateral+(state.lateralV||0)*advance,-4.65,4.65);return o;
+      o.s+=o.progress*advance;o.lateral=clamp(o.lateral+(state.lateralV||0)*advance,-roadEdge(r.track),roadEdge(r.track));return o;
     });
     const before=vehiclePose(r);
     const gear=r.requestedGear??input.gear;

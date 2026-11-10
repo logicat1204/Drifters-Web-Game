@@ -7,7 +7,7 @@ import {databaseUnavailable,isMongoError} from './database.mjs';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {MediaLibrary} from './media.mjs';
-import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES} from '../js/campaign.mjs';
+import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,CAMPAIGN_SEASONS,campaignStages,seasonStageId} from '../js/campaign.mjs';
 import {ALL_CARS} from '../js/sim.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 const campaignMedia=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',import.meta.url),'utf8'));
@@ -65,7 +65,13 @@ export class Accounts {
         validPhoto(bytes,match[1]);
         json(res,200,{user:await this.store.setPhoto(s.user.id,bytes,'image/'+match[1])});return true;
       }
-      if(p==='/api/campaign'&&req.method==='GET'){json(res,200,{chapters:await Promise.all(CAMPAIGN_CHAPTERS.map(async c=>({...c,map:campaignMap[c.id],media:await this.media.chapterMedia(c)}))),stages:await Promise.all(CAMPAIGN_STAGES.map(async stage=>({...stage,carInfo:ALL_CARS.find(c=>c.id===stage.car),media:await this.media.stageMedia(stage,campaignMedia.stages[stage.id])}))),focusTypes:FOCUS_TYPES,user:s.user});return true;}
+      if(p==='/api/campaign'&&req.method==='GET'){
+        const seasons=await Promise.all(CAMPAIGN_SEASONS.map(async season=>({...season,
+          chapters:await Promise.all(CAMPAIGN_CHAPTERS.map(async c=>({...c,...(season.id!=='dry'?{season:season.id}:{}),storyKey:seasonStageId(c.id,season.id),map:campaignMap[c.id],media:{...await this.media.chapterMedia({...c,...(season.id!=='dry'?{season:season.id}:{})}),portrait:campaignMedia.stages[CAMPAIGN_STAGES.find(s=>s.chapter===c.id).id].portrait}}))),
+          stages:await Promise.all(campaignStages(season.id).map(async stage=>({...stage,carInfo:ALL_CARS.find(c=>c.id===stage.car),media:await this.media.stageMedia(stage,campaignMedia.stages[stage.baseId||stage.id])})))
+        })));
+        json(res,200,{...seasons[0],seasons,focusTypes:FOCUS_TYPES,user:s.user});return true;
+      }
       if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:await this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
       if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:ALL_CARS,cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
       if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?await this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):await this.store.buy(s.user.id,data.kind,data.id));return true;}

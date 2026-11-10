@@ -1,6 +1,6 @@
 // Render-only poses. The 120 Hz simulation, contacts, replays and server state
 // never consume these interpolated values.
-import {sample as courseSample} from './sim.mjs';
+import {sample as courseSample,roadEdge} from './sim.mjs';
 export const PHYSICS_STEP=1/120;
 const fields=['s','lateral','yaw','speed','steer','rivalS','rivalLateral','rivalYaw','rivalSpeed','rivalSteer'];
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
@@ -25,7 +25,7 @@ export class RacePresentation {
     if(!active||r.finished){this.reset(r);return r;}
     const v=Object.assign(this.view,r),a=clamp(alpha,0,1),prev=this.previous;this.lastView=v;this.alpha=a;
     for(const k of fields){const current=Number.isFinite(r[k])?r[k]:0;v[k]=k==='yaw'||k==='rivalYaw'?angleMix(prev[k],current,a):mix(prev[k],current,a);}
-    v.s+=this.offset.s;v.lateral=clamp(v.lateral+this.offset.lateral,-4.65,4.65);v.yaw+=this.offset.yaw;
+    v.s+=this.offset.s;v.lateral=clamp(v.lateral+this.offset.lateral,-roadEdge(r.track),roadEdge(r.track));v.yaw+=this.offset.yaw;
     const decay=Math.exp(-Math.max(0,dt)*14);this.offset.s*=decay;this.offset.lateral*=decay;this.offset.yaw*=decay;
     return v;
   }
@@ -49,7 +49,7 @@ export function remotePoses(frames,at,track=null){
     if(a===b&&ahead>0&&!current.finished&&!(current.resetHold>0)&&!(current.countdown>0)){
       const curve=track?courseSample(track,current.s).curve:0;
       view.s+=Math.max(0,current.speed||0)*Math.max(.12,Math.cos(current.travelYaw??current.yaw??0))/clamp(1-curve*current.lateral,.65,1.35)*ahead;
-      view.lateral=clamp(view.lateral+(current.lateralV||0)*ahead,-4.65,4.65);
+      view.lateral=clamp(view.lateral+(current.lateralV||0)*ahead,-roadEdge(track||{width:10.6}),roadEdge(track||{width:10.6}));
     }
     return view;
   });

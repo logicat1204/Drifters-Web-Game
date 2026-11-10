@@ -1,7 +1,7 @@
 import {drawNavigation} from './minimap.mjs';
 import {StoryPageAudio} from './story-audio.mjs';
 import {DrivingControls} from './driving-controls.js';
-import {DrivingAudio} from './driving-audio.js';
+import {DrivingAudio,musicDucking} from './driving-audio.js';
 import {PlayMenu} from './play-menu.js';
 import {Ranking} from './ranking.js';
 import {applyBuild} from './tuning.mjs';
@@ -23,7 +23,7 @@ import {RacePresentation,PHYSICS_STEP,presentationPose} from './presentation.mjs
 
 const $ = id => document.getElementById(id);
 let stored={};try{stored=JSON.parse(localStorage.getItem('touge-settings')||'{}');}catch{}
-const settings={car:0,track:0,arcadeStage:0,camera:'0',transmission:'auto',daytime:'night',weather:'dry',quality:'1.4',autoQuality:true,performanceDisplay:'compact',musicVolume:50,engineVolume:35,tireVolume:35,weatherVolume:35,shake:true,cabinMotion:65,cabinFov:65,cabinHands:true,stableHorizon:true,song:'synth',...stored};
+const settings={car:0,track:0,arcadeStage:0,camera:'0',transmission:'auto',daytime:'night',weather:'dry',quality:'1.4',autoQuality:true,performanceDisplay:'compact',musicVolume:50,engineVolume:55,tireVolume:60,weatherVolume:35,shake:true,cabinMotion:65,cabinFov:65,cabinHands:true,stableHorizon:true,song:'synth',...stored};
 if(!['off','compact','detailed'].includes(settings.performanceDisplay))settings.performanceDisplay='compact';
 settings.autoQuality=settings.autoQuality!==false;
 settings.cabinMotion=clamp(Number(settings.cabinMotion)||0,0,100);settings.cabinFov=clamp(Number(settings.cabinFov)||65,55,80);settings.cabinHands=settings.cabinHands!==false;settings.stableHorizon=settings.stableHorizon!==false;
@@ -71,22 +71,30 @@ function shiftGear(value, relative){
 }
 
 class SoundSystem {
-  constructor(){this.pageAudio=new StoryPageAudio();this.audio=new Audio();this.audio.preload='metadata';this.audio.loop=true;this.playing=false;this.muted=false;this.song=null;this.step=0;this.next=0;this.isDriving=false;this.preview=false;this.audio.addEventListener('error',()=>{if(this.song?.url){toast('No se pudo reproducir este archivo. Prueba MP3, OGG o WAV.');this.stop();renderSongs();}});}
+  constructor(){this.pageAudio=new StoryPageAudio();this.audio=new Audio();this.audio.preload='metadata';this.audio.loop=true;this.playing=false;this.muted=false;this.song=null;this.step=0;this.next=0;this.isDriving=false;this.musicDuck=1;this.preview=false;this.audio.addEventListener('error',()=>{if(this.song?.url){toast('No se pudo reproducir este archivo. Prueba MP3, OGG o WAV.');this.stop();renderSongs();}});}
   ensure(){
     if(this.ctx){if(this.ctx.state==='suspended')this.ctx.resume();return;}
     const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
     try{
-      const ctx=this.ctx=new AC();const compressor=ctx.createDynamicsCompressor();compressor.connect(ctx.destination);this.output=compressor;
-      this.musicGain=ctx.createGain();this.musicGain.connect(compressor);
+      const ctx=this.ctx=new AC();const compressor=ctx.createDynamicsCompressor();compressor.threshold.value=-6;compressor.knee.value=8;compressor.ratio.value=5;compressor.attack.value=.008;compressor.release.value=.18;compressor.connect(ctx.destination);this.output=compressor;
+      this.musicGain=ctx.createGain();this.musicGain.gain.value=0;this.musicGain.connect(compressor);
+      this.fileGain=ctx.createGain();this.fileGain.gain.value=0;this.fileGain.connect(compressor);
+      this.fileSource=ctx.createMediaElementSource(this.audio);this.fileSource.connect(this.fileGain);
       this.fxGain=ctx.createGain();this.fxGain.connect(compressor);
       this.driving=new DrivingAudio(ctx,compressor);
       this.noiseBuffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);const musicNoise=this.noiseBuffer.getChannelData(0);for(let i=0;i<musicNoise.length;i++)musicNoise[i]=Math.random()*2-1;
       setInterval(()=>this.schedule(),70);this.volume();
     }catch{toast('El audio no está disponible en este navegador.');}
   }
-  volume(){this.pageAudio.setVolume(this.muted?0:settings.engineVolume/100);const v=this.muted?0:settings.musicVolume/100;this.audio.volume=clamp(v,0,1);if(this.musicGain)this.musicGain.gain.value=v*.24;}
+  volume(){
+    this.pageAudio.setVolume(this.muted?0:settings.engineVolume/100);
+    const volume=this.muted?0:clamp(settings.musicVolume/100,0,1),level=volume*this.musicDuck,time=this.ctx?.currentTime||0;
+    this.audio.volume=this.fileGain?1:level*.58;
+    this.fileGain?.gain.setTargetAtTime(level*.58,time,.12);
+    this.musicGain?.gain.setTargetAtTime(level*.24,time,.12);
+  }
   note(freq,t,duration,vol=.15,type='sawtooth',slide=0){if(!this.ctx)return;const ctx=this.ctx,o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+duration);g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(vol,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(this.musicGain);o.start(t);o.stop(t+duration+.01);o.onended=()=>{o.disconnect();g.disconnect();};}
-  reward(blind=false){if(!this.ctx)return;const ctx=this.ctx,t=ctx.currentTime;this.fxGain.gain.setValueAtTime(settings.engineVolume/100*.13,t);for(const [i,f] of (blind?[554,830,1108]:[660,880,1320]).entries()){const o=ctx.createOscillator(),g=ctx.createGain(),at=t+i*.065;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.45,at+.012);g.gain.exponentialRampToValueAtTime(.001,at+.24);o.connect(g);g.connect(this.fxGain);o.start(at);o.stop(at+.25);o.onended=()=>{o.disconnect();g.disconnect();};}}
+  reward(blind=false){if(!this.ctx)return;const ctx=this.ctx,t=ctx.currentTime;this.fxGain.gain.setValueAtTime(settings.engineVolume/100*.30,t);for(const [i,f] of (blind?[554,830,1108]:[660,880,1320]).entries()){const o=ctx.createOscillator(),g=ctx.createGain(),at=t+i*.065;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.45,at+.012);g.gain.exponentialRampToValueAtTime(.001,at+.24);o.connect(g);g.connect(this.fxGain);o.start(at);o.stop(at+.25);o.onended=()=>{o.disconnect();g.disconnect();};}}
   schedule(){
     if(!this.ctx||!this.playing||this.song?.id!=='synth'||this.ctx.state!=='running')return;
     const ctx=this.ctx;if(this.next<ctx.currentTime)this.next=ctx.currentTime+.025;
@@ -105,8 +113,13 @@ class SoundSystem {
   stop(){this.pageAudio.stop();this.playing=false;this.audio.pause();this.preview=false;}
   pause(){this.driving?.silence();this.wasPlaying=this.playing;this.playing=false;this.audio.pause();}
   resume(){if(!this.wasPlaying)return;this.ensure();this.playing=true;if(this.song?.url)this.audio.play().catch(()=>{});this.next=this.ctx?.currentTime||0;}
-  gearClick(){if(!this.ctx||!this.output)return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(170,t);o.frequency.exponentialRampToValueAtTime(65,t+.055);g.gain.setValueAtTime(settings.engineVolume/100*.055,t);g.gain.exponentialRampToValueAtTime(.0001,t+.07);o.connect(g);g.connect(this.output);o.start(t);o.stop(t+.075);o.onended=()=>{o.disconnect();g.disconnect();};}
-  update(r,active,input={}){if(active&&this.lastDrivingGear!==undefined&&r.gear!==this.lastDrivingGear)this.gearClick();this.lastDrivingGear=active?r.gear:undefined;this.driving?.update(r,active,settings,input);}
+  gearClick(){if(!this.ctx||!this.output)return;const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(170,t);o.frequency.exponentialRampToValueAtTime(65,t+.055);g.gain.setValueAtTime(settings.engineVolume/100*.09,t);g.gain.exponentialRampToValueAtTime(.0001,t+.07);o.connect(g);g.connect(this.output);o.start(t);o.stop(t+.075);o.onended=()=>{o.disconnect();g.disconnect();};}
+  update(r,active,input={}){
+    if(active&&this.lastDrivingGear!==undefined&&r.gear!==this.lastDrivingGear)this.gearClick();
+    this.lastDrivingGear=active?r.gear:undefined;this.driving?.update(r,active,settings,input);
+    const duck=musicDucking(this.driving?.mix,active);
+    if(Math.abs(duck-this.musicDuck)>.015){this.musicDuck=duck;this.volume();}
+  }
 }
 const sound=new SoundSystem();
 const builtin=[{id:'synth',name:'Midnight Transmission',detail:'ORIGINAL SYNTH EUROBEAT · 154 BPM'},{id:'none',name:'Solo el sonido del motor',detail:'SIN MÚSICA'}];
@@ -325,7 +338,7 @@ $('retry-record').onclick=()=>race&&saveRun(race);
 
 let previous=performance.now(),accumulator=0,hudTimer=0;
 function prepareCampaign(stage){if(net?.room){toast('Sal de la sala online antes de iniciar la campaña.');return false;}currentCampaign=stage.id;closeModal();sound.stop();sound.update(race,false);race=null;keys.clear();driving.clear();showScreen('campaign');return true;}
-function finishCampaign(){showScreen('results');sound.stop();sound.update(race,false);const stage=campaignStage(race.campaignStage),next=progression.nextStage(stage.id);$('result-eyebrow').textContent='CAMPAÑA / '+stage.chapter.toUpperCase();$('results-title').textContent=race.won?'DUELO SUPERADO.':'VUELVE AL VÉRTICE.';$('result-message').textContent=race.won?'Has vencido a '+stage.name+'. Verificando victoria y recompensas…':stage.name+' cruzó primero. Frena antes y vuelve a desafiarlo.';$('result-time').textContent=fmtTime(race.elapsed);$('result-drift').textContent=Math.floor(race.driftPoints).toLocaleString();$('result-apex').textContent=Math.floor(race.skill.points).toLocaleString();$('result-best').textContent='VERIFICANDO…';$('result-reward').textContent='';$('next-arcade').classList.toggle('hidden',!race.won);$('next-arcade').disabled=true;$('next-arcade-label').textContent=next?'SIGUIENTE / '+next.short:'CAMPAÑA COMPLETADA';openModal('results');saveRun(race);}
+function finishCampaign(){showScreen('results');sound.stop();sound.update(race,false);const stage=campaignStage(race.campaignStage),next=progression.nextStage(stage.id);$('result-eyebrow').textContent=(stage.season==='ngplus'?'NG+ / ':stage.season==='rain'?'TEMPORADA LLUVIOSA / ':'TEMPORADA SECA / ')+stage.chapter.toUpperCase();$('results-title').textContent=race.won?'DUELO SUPERADO.':'VUELVE AL VÉRTICE.';$('result-message').textContent=race.won?'Has vencido a '+stage.name+'. Verificando victoria y recompensas…':stage.name+' cruzó primero. Frena antes y vuelve a desafiarlo.';$('result-time').textContent=fmtTime(race.elapsed);$('result-drift').textContent=Math.floor(race.driftPoints).toLocaleString();$('result-apex').textContent=Math.floor(race.skill.points).toLocaleString();$('result-best').textContent='VERIFICANDO…';$('result-reward').textContent='';$('next-arcade').classList.toggle('hidden',!race.won);$('next-arcade').disabled=true;$('next-arcade-label').textContent=next?'SIGUIENTE / '+next.short:stage.season==='ngplus'?'JUEGO COMPLETADO':'TEMPORADA COMPLETADA';openModal('results');saveRun(race);}
 function restoreSoloScene(){track=makeTrack(TRACKS[settings.track]);renderer.setTrack(track);renderer.setCar(ownedCar());updateSceneLabels();}
 function onlineHud(){
   const players=[...(race.netPlayers||[])].sort((a,b)=>(a.dnf?1:0)-(b.dnf?1:0)||(a.place??99)-(b.place??99)||b.state.s-a.state.s),position=players.findIndex(p=>p.id===net.id)+1;

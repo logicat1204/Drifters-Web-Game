@@ -2,7 +2,7 @@
 // ignored deliberately: foliage must not hide a lower hairpin either.
 export function createRoadIndex(track) {
   const cell=48,buckets=new Map();
-  for(let i=0;i<track.points.length-1;i++){
+  for(let i=0;i<(track.renderSegments??track.points.length-1);i++){
     const a=track.points[i],b=track.points[i+1];
     for(let x=Math.floor(Math.min(a.x,b.x)/cell);x<=Math.floor(Math.max(a.x,b.x)/cell);x++)for(let z=Math.floor(Math.min(a.z,b.z)/cell);z<=Math.floor(Math.max(a.z,b.z)/cell);z++){
       const key=x+','+z;if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(i);

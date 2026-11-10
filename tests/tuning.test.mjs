@@ -52,7 +52,7 @@ test('visual parts are owned per car; color is validated and repainting or re-eq
 test('migration from v3 preserves money, sessions and records and is safe to reopen',async()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'touge-garage-')),filename=path.join(dir,'save.sqlite');let store;try{
   const fixtureData=await fixture(filename);store=fixtureData.store;const user=fixtureData.user;fund(store,user,1234);const session=store.createSession(user.id),r=createRace(CARS[0],makeTrack(TRACKS[0]),{mode:'time'});Object.assign(r,{s:r.track.length,elapsed:150,won:true});store.addRun('before-upgrades',user.id,r);
-  store.db.exec('DROP TABLE owned_vehicle_parts; DROP TABLE vehicle_builds; DROP INDEX runs_build; ALTER TABLE runs DROP COLUMN vehicle_build; ALTER TABLE runs DROP COLUMN build_key; PRAGMA user_version=3;');store.close();store=new Store(filename);assert.equal(store.user(user.id).coins,1234);assert.equal(store.session(session.token).user.id,user.id);assert.equal(store.records()[0].time,150);assert.equal(store.records()[0].buildKey,'M0-C0-F0');store.upgradeVehicle(user.id,'ae86','engine',1);store.close();store=new Store(filename);assert.equal(store.vehicleBuild(user.id,'ae86').engine,1);assert.equal(store.user(user.id).coins,1014);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,6);
+  store.db.exec('DROP TABLE owned_vehicle_parts; DROP TABLE vehicle_builds; DROP INDEX runs_build; ALTER TABLE runs DROP COLUMN vehicle_build; ALTER TABLE runs DROP COLUMN build_key; PRAGMA user_version=3;');store.close();store=new Store(filename);assert.equal(store.user(user.id).coins,1234);assert.equal(store.session(session.token).user.id,user.id);assert.equal(store.records()[0].time,150);assert.equal(store.records()[0].buildKey,'M0-C0-F0');store.upgradeVehicle(user.id,'ae86','engine',1);store.close();store=new Store(filename);assert.equal(store.vehicleBuild(user.id,'ae86').engine,1);assert.equal(store.user(user.id).coins,1014);assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,7);
  }finally{store?.close();rmSync(dir,{recursive:true,force:true});}
 });
 test('solo preparations are fixed by the server, cannot be forged, and survive later garage changes',async()=>{
@@ -78,7 +78,7 @@ test('max preparation opens a winning margin against elite rivals with a less ag
   const rival=CAMPAIGN_STAGES.find(s=>s.id===id);let won=false;
   for(const car of CARS.slice(0,3)){
    const r=createRace(car,makeTrack(ALL_TRACKS.find(t=>t.id===rival.track)),{mode:'campaign',rival,build:{engine:3,chassis:3,brakes:3},focusEnabled:rival.index>=3,focusType:'time'});r.countdown=0;r.timeLeft=10000;
-   for(let i=0;i<108000&&!r.finished;i++){const final=id==='kanata-final';if(r.focus.charge>=60&&(!final||r.track.length-r.s<320))activateFocus(r);updateRace(r,final?kanataLateInput(r,{line:-3.5,followLine:-3.5,followGap:8,gripUse:.8}):driverInput(r,{line:-2.5,gripUse:.8}),1/120);}
+   for(let i=0;i<108000&&!r.finished;i++){const final=id==='kanata-final';if(r.focus.charge>=60&&(!final||r.track.length-r.s<220))activateFocus(r);updateRace(r,final?kanataLateInput(r,{line:2.5,followLine:0,followGap:10,gripUse:.88}):driverInput(r,{line:-2.5,gripUse:.8}),1/120);}
    if(r.won){won=true;break;}
   }
   assert.ok(won,id);

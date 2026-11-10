@@ -1,0 +1,15 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Touge Assets Parte 3 — visor</title>
+<style>body{margin:0;background:#111;color:#ddd;font:13px sans-serif}#i{position:fixed;top:8px;left:8px;background:#000a;padding:6px 10px;border-radius:6px}button{margin:0 2px}</style>
+<div id="i">Parte 3 · cielo: <button data-k="day">día</button><button data-k="sunset">atardecer</button><button data-k="night">noche</button><button data-k="rain">lluvia</button> · arrastra para orbitar</div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const names=["barrier_fence_banner", "building_apartment_narrow", "building_apartment_narrow_night", "building_tower", "building_tower_night", "car_parked_blue", "car_parked_red", "car_parked_silver", "car_parked_white", "checkpoint_arch", "city_crosswalk", "city_intersection_4way", "city_t_junction", "cone_row", "crowd_group_photographers", "crowd_group_small_a", "crowd_group_small_b", "crowd_row_10m_a", "crowd_row_10m_b", "crowd_row_rain", "event_tent", "fire_hydrant", "flag_pole_checkered", "footbridge", "konbini", "mailbox_japan", "person_cheer", "person_flag", "person_marshal", "person_photo", "person_sit", "person_stand_a", "person_stand_b", "person_umbrella", "planter", "race_finish_gate", "race_start_gate", "ramen_shop", "road_city_corner_90", "scoreboard_tower", "sidewalk_segment", "stands_small_empty", "stands_small_with_crowd", "street_sign_blue", "tire_stack", "traffic_cone", "wire_span_20m"];
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+const s=new THREE.Scene();s.add(new THREE.HemisphereLight(0xffffff,0x556644,1.2));const d=new THREE.DirectionalLight(0xfff0d0,2);d.position.set(30,60,40);s.add(d);
+const c=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,3000);c.position.set(90,40,140);const o=new OrbitControls(c,r.domElement);o.target.set(90,3,20);
+function sky(k){const t=new THREE.CubeTextureLoader().setPath('textures/sky/').load(['px','nx','py','ny','pz','nz'].map(f=>`sky_${k}_${f}.jpg`));t.colorSpace=THREE.SRGBColorSpace;s.background=t}
+sky('day');document.querySelectorAll('button').forEach(b=>b.onclick=()=>sky(b.dataset.k));
+const L=new GLTFLoader();names.forEach((n,i)=>L.load('models/'+n+'.glb',g=>{g.scene.position.set((i%8)*28,0,Math.floor(i/8)*-28);s.add(g.scene)}));
+(function a(){requestAnimationFrame(a);r.render(s,c)})();
+</script></html>

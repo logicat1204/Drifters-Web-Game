@@ -12,7 +12,7 @@ export function readSqlite(filename){
   const rows=table=>sql.prepare('SELECT * FROM '+table).all();
   try{
     sql.exec('BEGIN');
-    if(sql.prepare('PRAGMA user_version').get().user_version!==6)throw Error('La copia SQLite debe tener el esquema v6. Ábrela primero con la versión actual del servidor.');
+    if(![6,7].includes(sql.prepare('PRAGMA user_version').get().user_version))throw Error('La copia SQLite debe tener el esquema v6 o v7. Ábrela primero con la versión actual del servidor.');
     if(sql.prepare('PRAGMA quick_check').get().quick_check!=='ok'||sql.prepare('PRAGMA foreign_key_check').get())throw Error('SQLite tiene errores de integridad. Usa una copia consistente.');
     const users=rows('users'),profiles=new Map(rows('profiles').map(({user_id,...row})=>[user_id,row]));
     const balances=new Map(rows('wallets').map(row=>[row.user_id,row.balance]));

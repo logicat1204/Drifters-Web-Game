@@ -24,7 +24,7 @@ npm run db:migrate -- --check
 npm run db:migrate -- --dry-run
 ```
 
-El segundo comando solo lee la SQLite y muestra conteos. Toma la ruta de `DB_PATH`, `DATA_DIR` o `data/touge.sqlite`. Para usar una copia explícita, añade `--source "ruta/a/touge.sqlite"` a los comandos `--dry-run` y `--apply`. La copia debe tener el esquema v6.
+El segundo comando solo lee la SQLite y muestra conteos. Toma la ruta de `DB_PATH`, `DATA_DIR` o `data/touge.sqlite`. Para usar una copia explícita, añade `--source "ruta/a/touge.sqlite"` a los comandos `--dry-run` y `--apply`. La copia debe tener el esquema v6 o v7.
 
 Si `--check` falla, el mensaje distingue la resolución DNS, la autenticación, los permisos y la conexión TLS. Para una falla DNS con `mongodb+srv://`, desactiva **SRV Connection String** en el diálogo de Atlas y copia la URI estándar completa que genera. Para un problema de conexión desde tu PC, revisa **Network Access** y agrega tu IP pública actual. [Diagnóstico de conexiones a Atlas](https://www.mongodb.com/docs/atlas/troubleshoot-connection/).
 

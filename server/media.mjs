@@ -1,8 +1,10 @@
-import {readdir,realpath} from 'node:fs/promises';
+import {seasonDialogue,seasonChapterDialogue} from '../js/season-stories.mjs';
+import {readdir,realpath,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 export const AUDIO_EXTENSIONS=new Set(['.mp3','.ogg','.wav','.m4a','.aac','.flac','.opus','.webm']);
 const IMAGES=new Set(['.png','.jpg','.jpeg','.webp','.gif']);
+async function dialogue(folder,fallback){try{const value=JSON.parse(await readFile(path.join(folder,'dialogue.json'),'utf8'));return Object.fromEntries(['start','end'].map(key=>[key,Array.isArray(value[key])&&value[key].length>0&&value[key].length<=20&&value[key].every(s=>typeof s==='string'&&s.length<=2000)?value[key]:fallback[key]]));}catch{return fallback;}}
 const natural=(a,b)=>a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'});
 export function pageSounds(pages,files){
  const stem=file=>path.parse(file).name.normalize('NFKC').toLowerCase();
@@ -37,18 +39,21 @@ export class MediaLibrary {
  isShopFile(filename){return path.resolve(filename).toLowerCase().startsWith(this.shopRoot.toLowerCase()+path.sep);}
  async shopSongs(){const found=new Map();for(const file of await this.files(this.shopRoot,AUDIO_EXTENSIONS,true)){const song=parseShopSong(file.name);if(song&&!found.has(song.id))found.set(song.id,{...song,absolute:file.absolute,url:'/api/music/'+song.id});}return [...found.values()];}
  async stageMedia(stage,legacy={}){
-  const folder=path.join(this.campaignRoot,stage.chapter,stage.id),[music,start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all([
+  const inherited=stage.season?await this.stageMedia({...stage,id:stage.baseId,season:undefined},legacy):null;
+  const folder=path.join(this.campaignRoot,stage.chapter,stage.baseId||stage.id,...(stage.season?[stage.season]:[])),[music,start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all([
    this.files(path.join(folder,'music'),AUDIO_EXTENSIONS),this.files(path.join(folder,'story_start'),IMAGES),this.files(path.join(folder,'story_end'),IMAGES),this.files(path.join(folder,'narrative_music_start'),AUDIO_EXTENSIONS),this.files(path.join(folder,'narrative_music_end'),AUDIO_EXTENSIONS),
    this.files(path.join(folder,'story_sounds_start'),AUDIO_EXTENSIONS),this.files(path.join(folder,'story_sounds_end'),AUDIO_EXTENSIONS)
   ]);
-  const audio=f=>({id:'campaign:'+stage.id+':'+f.url,name:path.parse(f.name).name,url:f.url,detail:'BANDA SONORA DEL NIVEL'}),comics=start.length?start.map(f=>f.url):(legacy.comics||[]);
+  const script=stage.season?await dialogue(folder,{start:seasonDialogue(stage),end:seasonDialogue(stage,true)}):null;
+  const audio=f=>({id:'campaign:'+stage.id+':'+f.url,name:path.parse(f.name).name,url:f.url,detail:'BANDA SONORA DEL NIVEL'}),comics=start.length?start.map(f=>f.url):(stage.season?[]:legacy.comics||[]);
   const storyEnd=end.map(f=>f.url);
-  return {...legacy,comics,storyStart:comics,storyEnd,storySoundsStart:pageSounds(comics,startSounds),storySoundsEnd:pageSounds(storyEnd,endSounds),music:music.map(audio),narrativeStart:introAudio[0]?audio(introAudio[0]):null,narrativeEnd:endAudio[0]?audio(endAudio[0]):null};
+  return {...legacy,...(stage.season?{dialogueStart:script.start,dialogueEnd:script.end}:{}),comics,storyStart:comics,storyEnd,storySoundsStart:pageSounds(comics.length?comics:(script?.start||[]).map((_,i)=>String(i+1)),startSounds),storySoundsEnd:pageSounds(storyEnd.length?storyEnd:(script?.end||[]).map((_,i)=>String(i+1)),endSounds),music:music.length?music.map(audio):inherited?.music||[],narrativeStart:introAudio[0]?audio(introAudio[0]):inherited?.narrativeStart||null,narrativeEnd:endAudio[0]?audio(endAudio[0]):inherited?.narrativeEnd||null};
  }
  async chapterMedia(chapter){
-  const folder=path.join(this.campaignRoot,chapter.id,'_chapter'),[start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all(['story_start','story_end','narrative_music_start','narrative_music_end','story_sounds_start','story_sounds_end'].map((dir,i)=>this.files(path.join(folder,dir),i<2?IMAGES:AUDIO_EXTENSIONS)));
+  const folder=path.join(this.campaignRoot,chapter.id,'_chapter',...(chapter.season?[chapter.season]:[])),[start,end,introAudio,endAudio,startSounds,endSounds]=await Promise.all(['story_start','story_end','narrative_music_start','narrative_music_end','story_sounds_start','story_sounds_end'].map((dir,i)=>this.files(path.join(folder,dir),i<2?IMAGES:AUDIO_EXTENSIONS)));
+  const script=chapter.season?await dialogue(folder,{start:seasonChapterDialogue(chapter),end:seasonChapterDialogue(chapter,true)}):null;
   const audio=f=>f?{id:'chapter:'+chapter.id+':'+f.url,name:path.parse(f.name).name,url:f.url}:null;
   const storyStart=start.map(f=>f.url),storyEnd=end.map(f=>f.url);
-  return {storyStart,storyEnd,storySoundsStart:pageSounds(storyStart,startSounds),storySoundsEnd:pageSounds(storyEnd,endSounds),narrativeStart:audio(introAudio[0]),narrativeEnd:audio(endAudio[0])};
+  return {...(chapter.season?{dialogueStart:script.start,dialogueEnd:script.end}:{}),storyStart,storyEnd,storySoundsStart:pageSounds(storyStart.length?storyStart:(script?.start||[]).map((_,i)=>String(i+1)),startSounds),storySoundsEnd:pageSounds(storyEnd,endSounds),narrativeStart:audio(introAudio[0]),narrativeEnd:audio(endAudio[0])};
  }
 }

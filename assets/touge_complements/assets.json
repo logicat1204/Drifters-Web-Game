@@ -1,0 +1,22 @@
+{
+  "generator": "scripts/build-roadside-complements.mjs",
+  "units": "metres",
+  "up": "Y",
+  "models": [
+    {
+      "id": "drainage_grille",
+      "file": "models/drainage_grille.glb",
+      "triangles": 28
+    },
+    {
+      "id": "mile_stone",
+      "file": "models/mile_stone.glb",
+      "triangles": 16
+    },
+    {
+      "id": "fern_cluster",
+      "file": "models/fern_cluster.glb",
+      "triangles": 14
+    }
+  ]
+}

@@ -7,7 +7,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CARS,STARTER_CARS,ALL_CARS,HANDLING_VERSION,ALL_TRACKS as TRACKS} from '../js/sim.mjs';
 import {DEFAULT_AVATAR,defaultAvatar,validateAvatar,migrateAvatar,cosmeticId,avatarLayers,COSMETICS} from '../js/avatar.mjs';
-import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward} from '../js/campaign.mjs';
+import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward,campaignStages} from '../js/campaign.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const hashToken=value=>createHash('sha256').update(value).digest('hex');
@@ -36,8 +36,10 @@ export function profileUpdate(current,data){
   return {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded:current.onboarded||data.complete===true};
 }
 export function checkChapterStory(cleared,chapter,phase){
-  if(!CAMPAIGN_CHAPTERS.some(c=>c.id===chapter)||!['start','end'].includes(phase))throw Error('Escena inválida.');
-  const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter);
+  const parts=chapter?.split(':')||[],season=parts.length===2?parts[0]:'dry',base=parts.length===2?parts[1]:chapter;
+  if(!CAMPAIGN_CHAPTERS.some(c=>c.id===base)||!['start','end'].includes(phase))throw Error('Escena inválida.');
+  const stages=campaignStages(season).filter(s=>s.chapter===base);
+  if(!stages.length)throw Error('Escena inválida.');
   if(phase==='start'?!stageAvailable(stages[0],cleared):!stages.every(s=>cleared.includes(s.id)))throw Object.assign(Error('Completa los desafíos anteriores para ver esta escena.'),{status:403});
 }
 export function checkRecordFilters({track,source,mode,car}){
@@ -61,7 +63,7 @@ export class Store {
   constructor(filename=process.env.NODE_TEST_CONTEXT&&!process.env.DB_PATH?':memory:':sqlitePath(),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>6){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>7){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -86,6 +88,11 @@ export class Store {
       if(version<4)this.db.exec(readFileSync(new URL('./migrations/004-vehicle-garage.sql',import.meta.url),'utf8'));
       if(version<5)this.db.exec(readFileSync(new URL('./migrations/005-music.sql',import.meta.url),'utf8'));
       if(version<6)this.db.exec(readFileSync(new URL('./migrations/006-chapter-stories.sql',import.meta.url),'utf8'));
+      if(version<7){
+        const columns=this.db.prepare('PRAGMA table_info(campaign_progress)').all();
+        if(!columns.some(column=>column.name==='handling'))this.db.exec("ALTER TABLE campaign_progress ADD COLUMN handling TEXT NOT NULL DEFAULT 'v8'");
+        this.db.exec('PRAGMA user_version=7');
+      }
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
@@ -131,7 +138,7 @@ export class Store {
   photo(id){const p=this.db.prepare('SELECT photo,photo_mime FROM profiles WHERE user_id=?').get(id);return p?.photo?{bytes:Buffer.from(p.photo),mime:p.photo_mime}:null;}
   portrait(id){const p=this.db.prepare('SELECT portrait_mode,photo,photo_mime,avatar FROM profiles WHERE user_id=?').get(id);if(!p)return null;if(p.portrait_mode==='photo'&&p.photo)return {bytes:Buffer.from(p.photo),mime:p.photo_mime};return {bytes:Buffer.from(avatarSvg(JSON.parse(p.avatar))),mime:'image/svg+xml'};}
   progression(id){
-    const cleared=this.db.prepare('SELECT level_id AS id,best_time AS bestTime,best_points AS bestPoints,reward_coins AS rewardCoins FROM campaign_progress WHERE user_id=?').all(id);
+    const cleared=this.db.prepare('SELECT level_id AS id,CASE WHEN handling=? THEN best_time END AS bestTime,best_points AS bestPoints,reward_coins AS rewardCoins FROM campaign_progress WHERE user_id=?').all(HANDLING_VERSION,id);
     return {chapterStories:this.db.prepare('SELECT chapter_id,phase FROM chapter_story_seen WHERE user_id=?').all(id).map(s=>s.chapter_id+':'+s.phase),music:this.db.prepare('SELECT song_id FROM owned_music WHERE user_id=?').all(id).map(s=>s.song_id),garage:this.garage(id),coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
   }
   garage(id){
@@ -208,7 +215,7 @@ export class Store {
       if(inserted.changes&&stage&&source==='solo'&&r.mode==='campaign'&&run.completed&&run.won){
         const cleared=this.db.prepare('SELECT * FROM campaign_progress WHERE user_id=?').all(userId);
         const {entitlement,coins}=campaignPayout(stage,cleared,run);
-        this.db.prepare('INSERT INTO campaign_progress VALUES(?,?,?,?,?,?) ON CONFLICT(user_id,level_id) DO UPDATE SET best_time=MIN(best_time,excluded.best_time),best_points=MAX(best_points,excluded.best_points),reward_coins=MAX(reward_coins,excluded.reward_coins)').run(userId,stage.id,finishTime,run.points,entitlement,this.now());
+        this.db.prepare('INSERT INTO campaign_progress(user_id,level_id,best_time,best_points,reward_coins,cleared_at,handling) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,level_id) DO UPDATE SET best_time=CASE WHEN campaign_progress.handling=excluded.handling THEN MIN(best_time,excluded.best_time) ELSE excluded.best_time END,best_points=MAX(best_points,excluded.best_points),reward_coins=MAX(reward_coins,excluded.reward_coins),handling=excluded.handling').run(userId,stage.id,finishTime,run.points,entitlement,this.now(),HANDLING_VERSION);
         if(coins){this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(coins,userId);this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('reward:'+id,userId,coins,'campaign:'+stage.id,id,this.now());}
       }
       this.db.exec('COMMIT');return this.runResult(id,userId);

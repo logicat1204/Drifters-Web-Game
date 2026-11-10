@@ -4,7 +4,7 @@ import {CARS,TRACKS,makeTrack,createRace,updateRace,sample,cornerSpeed} from '..
 import {driverInput,referenceDrive} from './helpers/reference-driver.mjs';
 
 function curveRace({curve=.035,speed=22,wet=false,car=CARS[0]}={}){
-  const track=makeTrack(TRACKS[0]);track.length=900;track.points=Array.from({length:150},(_,i)=>{const s=i*8,h=curve*s;return {s,x:(1-Math.cos(h))/curve,z:Math.sin(h)/curve,y:0,heading:h,curve};});
+  const track=makeTrack(TRACKS[0]);track.length=900;track.step=8;track.points=Array.from({length:150},(_,i)=>{const s=i*8,h=curve*s;return {s,x:(1-Math.cos(h))/curve,z:Math.sin(h)/curve,y:0,heading:h,curve};});
   const r=createRace(car,track,{mode:'time',wet});r.countdown=0;r.lateral=0;r.speed=speed;return r;
 }
 test('the car keeps its world heading instead of automatically following a bend',()=>{

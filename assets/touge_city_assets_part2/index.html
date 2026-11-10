@@ -1,0 +1,15 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Touge Assets Parte 2 — visor</title>
+<style>body{margin:0;background:#111;color:#ddd;font:13px sans-serif}#i{position:fixed;top:8px;left:8px;background:#0008;padding:6px}</style>
+<div id="i">Parte 2 · arrastra para orbitar, rueda para zoom · <span id="n"></span></div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const names=["bamboo_cluster", "bg_city_ring", "bg_clouds", "bg_forest_strip", "bg_forest_strip_dense", "bg_hills_ring", "bg_hills_ring_low", "bg_mountain_cone_a", "bg_mountain_cone_b", "bg_mountain_fuji", "bg_ridge_long", "bg_ridge_low", "bg_sea_plane", "boulder_a", "boulder_b", "boulder_c", "bridge_segment", "bus_stop_sign", "bush_flowers", "curb_segment", "curve_mirror", "house_japanese_a", "house_japanese_b", "jersey_barrier", "km_post", "mossy_wall_segment", "power_pylon", "reflector_post", "road_curve_45_wide", "road_curve_90", "road_decal_30", "road_decal_arrow", "road_decal_cracks", "road_decal_diamond", "road_decal_leaves", "road_decal_manhole", "road_decal_stopline", "road_decal_tyre_marks", "road_hairpin_180", "road_shoulder_gutter", "road_touge_wet_segment", "roadside_shrine", "rockfall_fence", "sign_falling_rocks", "sign_slippery", "slope_lattice_panel", "stone_lantern", "storage_shed", "tree_maple", "tree_pine", "tunnel_portal", "wooden_fence"];const bg=names.filter(n=>n.startsWith('bg_')),props=names.filter(n=>!n.startsWith('bg_'));
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+const s=new THREE.Scene();s.background=new THREE.Color(0x9fc0de);s.add(new THREE.HemisphereLight(0xffffff,0x556644,1.2));const d=new THREE.DirectionalLight(0xfff0d0,2);d.position.set(30,60,40);s.add(d);
+const c=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,5000);c.position.set(60,40,110);const o=new OrbitControls(c,r.domElement);o.target.set(60,3,20);
+const L=new GLTFLoader();props.forEach((n,i)=>L.load('models/'+n+'.glb',g=>{g.scene.position.set((i%8)*30,0,Math.floor(i/8)*-30);s.add(g.scene)}));
+// fondos: pulsa 1-3 para ver bg_ individuales a gran escala
+let cur;addEventListener('keydown',e=>{const k=+e.key;if(k>=1&&k<=bg.length){if(cur)s.remove(cur);L.load('models/'+bg[k-1]+'.glb',g=>{cur=g.scene;cur.position.set(0,0,0);s.add(cur);c.position.set(0,150,500);o.target.set(0,40,0);document.getElementById('n').textContent=bg[k-1]})}});
+(function a(){requestAnimationFrame(a);r.render(s,c)})();
+</script></html>
