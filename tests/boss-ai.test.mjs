@@ -69,6 +69,9 @@ test('starting ahead or recovering cannot manufacture Kanata counterattacks or T
 });
 test('Kanata boost changes acceleration through physics without teleportation or unbounded speed',()=>{
  const r=fixture('kanata-final');updateBossState(r,.01,0);r.s=105;updateBossState(r,.01,0);windup(r);r.s=300;r.lateral=-2.5;
+ // Isolate acceleration on a straight: on a technical road the faster car can
+ // already be braking for the next hairpin at the comparison's final tick.
+ r.track=makeTrack({...TRACKS[0],length:10000,elevation:0,layout:[[1,0]]});r.opponent.track=r.track;
  const boosted=structuredClone(r),normal=structuredClone(r);normal.boss.enraged=false;normal.boss.boost=0;normal.opponent.aiDriver.counter=null;
  for(let i=0;i<120;i++){const before=boosted.opponent.s;updateRace(boosted,{},1/120);updateRace(normal,{},1/120);assert.ok(boosted.opponent.s-before<=boosted.opponent.car.max*KANATA_COUNTER.topSpeed*1.05/120+.001);assert.ok(boosted.opponent.speed<=boosted.opponent.car.max*KANATA_COUNTER.topSpeed);}
  assert.ok(boosted.opponent.speed>normal.opponent.speed+1);assert.ok(boosted.opponent.s>normal.opponent.s+1);

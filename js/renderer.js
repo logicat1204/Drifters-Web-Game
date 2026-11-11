@@ -563,12 +563,15 @@ export class Renderer {
     const actualEye=this.eye.map((v,i)=>v+(i<2?Math.sin(this.time*95+i)*shake:0));
     const demo=mode==='title'?{s,speed:32,mode:'time',headlights:true,netOpponents:[{carId:'rx7',s:s+18,lateral:1.4,yaw:0,headlights:true},{carId:'r32',s:s+38,lateral:-1.5,yaw:0,headlights:true}]}:null;
     this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,replay?options.replayCamera.fov:racing?(cabinFov||58+race.speed*.18):49,mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,!replay&&racing&&[1,3].includes(this.cameraMode),driverUp);
-    if(racing&&race.speed>12&&(mode==='race'||replay)){
-      const emit=(q,a,wet)=>{for(const side of [-1,1])if(this.particles.length<48&&Math.random()<1-Math.exp(-dt*(wet?22:50)))this.particles.push({x:q.x+Math.cos(a)*side*.8-Math.sin(a)*1.4,y:q.y+.25,z:q.z-Math.sin(a)*side*.8-Math.cos(a)*1.4,life:1,size:.18+Math.random()*.16,wet});};
-      if(race.wet||race.drift>.3)emit(p,angle,race.wet);
-      if(race.wet){const opponents=race.online?race.netOpponents||[]:race.mode!=='time'?[{s:race.rivalS,lateral:race.rivalLateral,yaw:race.rivalYaw,speed:race.rivalSpeed}]:[];for(const o of opponents)if(Math.abs(o.s-race.s)<60&&o.speed>15){const q=worldAt(this.track,o.s,o.lateral);emit(q,q.heading+o.yaw,true);}}
+    if(racing&&(mode==='race'||replay)){
+      const emit=(q,a,wet,rate=wet?22:50,thin=false)=>{for(const side of [-1,1])if(this.particles.length<48&&Math.random()<1-Math.exp(-dt*rate))this.particles.push({x:q.x+Math.cos(a)*side*.8-Math.sin(a)*1.4,y:q.y+.25,z:q.z-Math.sin(a)*side*.8-Math.cos(a)*1.4,life:thin?.6:1,size:thin?.1+Math.random()*.08:.18+Math.random()*.16,wet,thin});};
+      if(race.speed>12&&(race.wet||race.drift>.3))emit(p,angle,race.wet);
+      const opponents=race.online?race.netOpponents||[]:race.mode!=='time'?[{s:race.rivalS,lateral:race.rivalLateral,yaw:race.rivalYaw,speed:race.rivalSpeed,drift:race.rivalDrift,slipAngle:race.rivalSlip}]:[];
+      for(const o of opponents)if(Math.abs(o.s-race.s)<60&&o.speed>15&&(race.wet||o.drift>.3&&Math.abs(o.slipAngle||0)>.1)){
+        const q=worldAt(this.track,o.s,o.lateral);emit(q,q.heading+o.yaw,race.wet,race.wet?22:14,!race.wet);
+      }
     }
-    gl.depthMask(false);this.particles=this.particles.filter(v=>v.life>0);for(const v of this.particles){v.life-=dt*(v.wet?2.8:.85);v.y+=dt*(v.wet?.13:.35);v.size+=dt*(v.wet?1.4:.65);this.draw(v.wet?this.spray:this.smoke,transform(v.x,v.y,v.z,v.life,v.size),v.life*(v.wet?.10:.13));}gl.depthMask(true);
+    gl.depthMask(false);this.particles=this.particles.filter(v=>v.life>0);for(const v of this.particles){v.life-=dt*(v.wet?2.8:.85);v.y+=dt*(v.wet?.13:.35);v.size+=dt*(v.wet?1.4:v.thin?.32:.65);this.draw(v.wet?this.spray:this.smoke,transform(v.x,v.y,v.z,v.life,v.size),v.life*(v.wet?.10:.13));}gl.depthMask(true);
     if(!replay&&racing&&this.cameraMode===3){const use3D=this.cabin.status!=='error';this.renderMirror(race,p,angle,day,sky,w,h,!use3D);if(use3D)this.cabinActive=this.cabin.draw(this,race,driverPose,{day,fov:cabinFov,hands:options.cabinHands,song:options.song,reducedMotion:this.reducedMotion?.matches},this.mirrorTexture);if(use3D&&!this.cabinActive)this.renderMirror(race,p,angle,day,sky,w,h);document.body.classList.toggle('cabin-3d',this.cabinActive);}
   }
 }

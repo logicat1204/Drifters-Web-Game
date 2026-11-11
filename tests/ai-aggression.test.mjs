@@ -22,7 +22,7 @@ test('once alongside, the rival holds its established line and throttle through 
  const r=fixture({gap:1}),o=r.opponent,p=o.aiDriver.passing;Object.assign(o,{lateral:2.5,targetLine:2.5});Object.assign(p,{phase:'overtake',side:1,lane:2.5});
  rivalDriverInput(r,o,.01);assert.ok(p.contesting);
  r.lateral=2.3;r.lateralV=3;const input=rivalDriverInput(r,o,.01);
- assert.ok(p.contesting);assert.equal(p.lane,2.5);assert.equal(p.side,1);assert.equal(input.brake,false);assert.equal(input.throttle,true);assert.ok(o.aiDriver.targetSpeed>r.speed+15);
+ assert.ok(p.contesting);assert.equal(p.lane,2.5);assert.equal(p.side,1);assert.equal(input.brake,0);assert.ok(input.throttle>0,'continues applying accelerator pressure');assert.ok(o.aiDriver.targetSpeed>r.speed+15);
  o.s=r.s-CONTACT.length-.2;rivalDriverInput(r,o,.01);assert.equal(p.contesting,false,'full loss of overlap ends priority');
 });
 test('higher levels keep closer pressure and crimson makes Kanata the most assertive',()=>{
@@ -31,7 +31,7 @@ test('higher levels keep closer pressure and crimson makes Kanata the most asser
  const r=fixture({gap:8,crimson:true});rivalDriverInput(r,r.opponent,.01);assert.equal(trafficBehavior(r,r.opponent),CRIMSON_TRAFFIC);assert.ok(r.opponent.aiDriver.targetSpeed>targets[4]);assert.ok(r.opponent.aiDriver.passing.commitRemaining>1.5);
 });
 test('a full frontal block still provokes real braking instead of collision immunity',()=>{
- const r=fixture({gap:4.3,frontSpeed:35,aiSpeed:60,crimson:true}),o=r.opponent,input=rivalDriverInput(r,o,.01);assert.equal(o.aiDriver.passing.contesting,false);assert.equal(input.brake,true);assert.ok(o.aiDriver.targetSpeed<=r.speed);
+ const r=fixture({gap:4.3,frontSpeed:35,aiSpeed:60,crimson:true}),o=r.opponent,input=rivalDriverInput(r,o,.01);assert.equal(o.aiDriver.passing.contesting,false);assert.equal(input.brake,1);assert.ok(o.aiDriver.targetSpeed<=r.speed);
 });
 test('a blocked expert stays close and counter-attacks instead of opening a 22 m gap',()=>{
  const r=fixture({gap:12,frontSpeed:45,aiSpeed:46}),o=r.opponent;let side=0,blocked=false,peakGap=0,passed=false;
