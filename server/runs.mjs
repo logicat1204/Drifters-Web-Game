@@ -3,7 +3,7 @@ import {setImmediate} from 'node:timers/promises';
 import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,makeTrack,updateRace,repositionRace} from '../js/sim.mjs';
 import {activateFocus} from '../js/focus.mjs';
 import {campaignStage,stageAvailable,CAMPAIGN_CHAPTERS,campaignConditions} from '../js/campaign.mjs';
-import {stockBuild} from '../js/tuning.mjs';
+import {stockBuild,campaignPreparationIssue} from '../js/tuning.mjs';
 export class Runs {
   constructor(store,{now=()=>Date.now()}={}){this.store=store;this.now=now;this.pending=new Map();this.busy=0;}
   start(userId,data){
@@ -17,6 +17,8 @@ export class Runs {
     if(data.mode==='campaign'&&(!stage||!stageAvailable(stage,user.campaign.map(s=>s.id))))throw Error('Nivel de campaña bloqueado.');
     const car=CARS.find(c=>c.id===data.car),track=TRACKS.find(t=>t.id===(stage?.track||data.track));
     if(!car||!user.cars.includes(car.id)||!track||!['time','battle','arcade','campaign'].includes(data.mode))throw Error('Configuración de carrera inválida o coche no comprado.');
+    const preparationIssue=campaignPreparationIssue(stage,car,user.garage[car.id]?.build||stockBuild());
+    if(preparationIssue)throw Error(preparationIssue);
     const chapter=stage?CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter):null;
     const conditions=stage?campaignConditions(stage):null,rematch=!!conditions?.rematch;
     const options={build:user.garage[car.id]?.build||stockBuild(),mode:data.mode,manual:data.manual===true,wet:stage?conditions.wet:data.wet===true,night:stage?conditions.night:data.night!==false,focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType),...(stage?{campaignStage:stage.id,rematch,rival:{...stage,code:CARS.find(c=>c.id===stage.car).code},fog:!!chapter.fog}:{})},id=randomUUID();

@@ -3,9 +3,9 @@ import {BOSS_TRAITS} from './bosses.mjs';
 // Presentation asset paths live in the generated campaign-media.json manifest.
 export const CAMPAIGN_LEVELS=['Fácil','Medio','Difícil','Profesional','Leyenda'];
 export const DRIVER_STYLES={
-  Grip:{label:'Grip',description:'Potencia y adherencia al volante. Frenada estable y salida de curva fuerte.',profile:'power',grip:1.12,max:76,accel:19.0,brakePower:1.30},
-  Skiller:{label:'Skiller',description:'Menor punta y derrape técnico. Conserva más impulso al preparar y enlazar curvas.',profile:'agile',grip:1.08,max:64,accel:15.4,brakePower:1.08},
-  Complete:{label:'Complete',description:'Adherencia, derrape y aceleración equilibrados para cualquier tramo.',profile:'balanced',grip:1.12,max:70,accel:17.1,brakePower:1.16}
+  Grip:{label:'Grip',description:'Frenada fuerte con el coche recto, vértice más lento y gas decidido al abrir la salida.'},
+  Skiller:{label:'Skiller',description:'Derrape preparado y contravolante. Gana terreno en horquillas y curvas enlazadas, con menor punta en rectas.'},
+  Complete:{label:'Balance',description:'Trazada ortodoxa y fluida. Combina una entrada precisa, velocidad de paso y aceleración progresiva.'}
 };
 export const CAMPAIGN_CHAPTERS=[
   {id:'akina',name:'Akina',folder:'1 akina',track:'akina',tag:'INITIAL D / GUNMA'},

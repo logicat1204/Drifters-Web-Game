@@ -19,7 +19,7 @@ const fund=(store,user,n=20000)=>store.db.prepare('UPDATE wallets SET balance=? 
 test('stock preparation leaves actual physics unchanged; max upgrades are bounded and keep car profiles',()=>{
  const track=makeTrack(TRACKS[0]);for(const car of ALL_CARS){const original=JSON.stringify(car),a=createRace(car,track,{mode:'time'}),b=createRace(car,track,{mode:'time',build:stockBuild()});a.countdown=b.countdown=0;
   for(let i=0;i<200;i++){const input={throttle:true,steer:i>150?.12:0};updateRace(a,input,1/120);updateRace(b,input,1/120);}for(const key of ['s','speed','lateral','yaw'])assert.equal(a[key],b[key]);
-  const max=applyBuild(car,{engine:3,chassis:3,brakes:3});assert.equal(max.max,car.max*1.06);assert.equal(max.accel,car.accel*1.12);assert.equal(max.grip,car.grip*1.12);assert.equal(max.brakePower,1.18);assert.equal(max.profile,car.profile);assert.equal(JSON.stringify(car),original);assert.equal(applyBuild(max,max.build).max,max.max);
+  const max=applyBuild(car,{engine:3,chassis:3,brakes:3});assert.equal(max.max,car.max*1.06);assert.equal(max.accel,car.accel*1.12);assert.equal(max.grip,car.grip*1.12);assert.equal(max.brakePower,(car.brakePower||1)*1.18);assert.equal(max.profile,car.profile);assert.equal(JSON.stringify(car),original);assert.equal(applyBuild(max,max.build).max,max.max);
  }
  assert.ok(applyBuild(CARS[0],{chassis:3}).grip>applyBuild(CARS[2],{chassis:3}).grip);assert.ok(applyBuild(CARS[2],{engine:3}).max>applyBuild(CARS[0],{engine:3}).max);
 });

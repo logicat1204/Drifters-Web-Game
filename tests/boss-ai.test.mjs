@@ -20,16 +20,17 @@ test('Takumi D keeps Skiller while final Sawatari and Kanata use Complete; retir
  assert.equal(CAMPAIGN_STAGES.filter(s=>s.boss).length,5);
  assert.doesNotMatch(readFileSync(new URL('../index.html',import.meta.url),'utf8'),/id="difficulty"/);
 });
-test('styles physically separate early braking, straight speed and controlled corner slip',()=>{
+test('Grip launches hardest, Balance holds a middle pace and Skiller carries the most speed and rotation into a bend',()=>{
  const metrics={};
  for(const style of ['Grip','Complete','Skiller']){
-  const r=createRace(CARS[0],makeTrack({...TRACKS[2],length:4000,elevation:0,layout:[[5,0],[2,110],[5,0]]}),{rival:{id:'comparison',car:'ae86',color:'#fff',level:4,style}});r.countdown=0;r.timeLeft=1000;
-  let max=0,slip=0,n=0,firstBrake=null;
-  for(let i=0;i<108000&&!r.finished;i++){updateRace(r,{},1/120);const o=r.opponent;max=Math.max(max,o.speed);if(o.braking)firstBrake??=o.s;if(Math.abs(sample(r.track,o.s).curve)>.003){slip+=Math.abs(o.slipAngle);n++;}}
-  assert.ok(r.rivalFinished);metrics[style]={max,slip:slip/n,firstBrake};
+  const r=createRace(CARS[0],makeTrack({...TRACKS[2],length:3500,elevation:0,layout:[[4,0],[1,145],[3,0]]}),{rival:{id:'comparison',car:'ae86',color:'#fff',level:4,style}});r.countdown=0;r.timeLeft=1000;
+  let max=0,launch=0,slip=0,corner=0,n=0,firstBrake=null;
+  for(let i=0;i<108000&&!r.finished;i++){updateRace(r,{},1/120);const o=r.opponent;max=Math.max(max,o.speed);if(i===239)launch=o.speed;if(o.braking)firstBrake??=o.s;if(Math.abs(sample(r.track,o.s).curve)>.007){slip+=Math.abs(o.slipAngle);corner+=o.speed;n++;}}
+  assert.ok(r.rivalFinished);metrics[style]={max,launch,corner:corner/n,slip:slip/n,firstBrake};
  }
  const {Grip:g,Complete:c,Skiller:s}=metrics;
- assert.ok(g.max>c.max+3&&c.max>s.max+3);assert.ok(g.firstBrake<c.firstBrake-25&&c.firstBrake<s.firstBrake-20);
+ assert.ok(g.max>c.max+3&&c.max>s.max+3);assert.ok(g.launch>c.launch+1&&c.launch>s.launch+.5);
+ assert.ok(s.corner>c.corner*1.06&&c.corner>g.corner*1.04);assert.ok(g.firstBrake<c.firstBrake&&c.firstBrake<s.firstBrake);
  assert.ok(s.slip>.14&&g.slip<.08&&c.slip<.08);
 });
 test('higher Skiller levels carry larger real slip angles and faster physical laps',()=>{

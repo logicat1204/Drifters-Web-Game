@@ -25,11 +25,11 @@ test('Skiller corner technique needs a clean prepared slide, never a straight, h
  const clean=race(),held=race();for(let i=0;i<120;i++){updateRace(clean,{throttle:true},1/120);updateRace(held,{throttle:true,handbrake:true},1/120);}assert.ok(held.speed<clean.speed-8,'holding the handbrake must cost speed');
 });
 
-test('old-course best times stay out of v9 rankings while campaign clears, rewards and unlocks survive',async()=>{
+test('v9 best times stay out of v10 rankings while campaign clears, rewards and unlocks survive',async()=>{
  const store=new Store(':memory:');try{
   const account=await store.register('ReferenceDriver24','reference-password-24');store.updateProfile(account.id,{complete:true});
   const stage=CAMPAIGN_STAGES[2],track=makeTrack(ALL_TRACKS[0]),won=createRace(CARS[0],track,{mode:'campaign',campaignStage:stage.id,rival:stage});Object.assign(won,{finished:true,won:true,s:track.length,elapsed:80});won.skill.points=500;
-  for(const earlier of CAMPAIGN_STAGES.slice(0,3)){won.campaignStage=earlier.id;won.rival=earlier;store.addRun('legacy-'+earlier.id,account.id,won);}store.db.prepare('UPDATE runs SET handling=?').run('v8');store.db.prepare('UPDATE campaign_progress SET handling=?').run('v8');
+  for(const earlier of CAMPAIGN_STAGES.slice(0,3)){won.campaignStage=earlier.id;won.rival=earlier;store.addRun('legacy-'+earlier.id,account.id,won);}store.db.prepare('UPDATE runs SET handling=?').run('v9');store.db.prepare('UPDATE campaign_progress SET handling=?').run('v9');
   const before=store.user(account.id);assert.ok(before.focusUnlocked.includes('balance'));assert.equal(before.campaign.find(s=>s.id===stage.id).bestTime,null);assert.equal(store.records().length,0);
   won.elapsed=240;store.addRun('reference-road',account.id,won);const after=store.user(account.id);assert.equal(after.campaign.find(s=>s.id===stage.id).bestTime,240);assert.equal(after.coins,before.coins+50,'only the normal level-3 replay reward is granted');assert.equal(store.stats(account.id).races,4);assert.equal(store.records()[0].time,240);assert.equal(store.db.prepare('SELECT handling FROM campaign_progress WHERE level_id=?').get(stage.id).handling,HANDLING_VERSION);
  }finally{store.close();}

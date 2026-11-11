@@ -24,6 +24,12 @@ export function validateBuild(value={}){
 }
 export const buildKey=b=>{const x=validateBuild(b);return `M${x.engine}-C${x.chassis}-F${x.brakes}`;};
 export const buildLabel=b=>{const x=validateBuild(b);return x.engine+x.chassis+x.brakes===0?'DE SERIE':buildKey(x);};
+export function campaignPreparationIssue(stage,car,build={}){
+ if(!stage?.ngplus)return null;
+ if((car?.competitionTier||1)<3)return 'NG+ exige un coche de competición (categoría 3). Consíguelo en la tienda y prepáralo en el garaje.';
+ const b=validateBuild(build);
+ return b.engine===3&&b.chassis===3&&b.brakes===3?null:'NG+ exige motor, chasis/neumáticos y frenos al nivel 3. Completa la preparación en el garaje.';
+}
 export function applyBuild(base,value={}){
  const b=validateBuild(value),original=base.baseStats||{accel:base.accel,max:base.max,grip:base.grip,brakePower:base.brakePower||1,color:base.color,power:base.power};
  const accel=original.accel*UPGRADES.engine.acceleration[b.engine],max=original.max*UPGRADES.engine.speed[b.engine],grip=original.grip*UPGRADES.chassis.grip[b.chassis];
