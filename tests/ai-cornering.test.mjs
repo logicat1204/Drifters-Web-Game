@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {ALL_TRACKS,CARS,makeTrack,createRace,updateRace,rivalCar,rivalDriverInput} from '../js/sim.mjs';
 import {campaignStages,campaignConditions} from '../js/campaign.mjs';
 
-test('every seasonal rival holds a controlled line through the reference-course bends without brake chatter',()=>{
+test('every seasonal rival holds its line and the seasonal pace progresses on all courses',()=>{
  const tracks=new Map(ALL_TRACKS.map(t=>[t.id,makeTrack(t)]));
+ const times=new Map();
  for(const season of ['dry','rain','ngplus'])for(const rival of campaignStages(season)){
   const r=createRace(CARS[0],tracks.get(rival.track),{rival,...campaignConditions(rival),focusEnabled:false});
   Object.assign(r,{countdown:0,timeLeft:10000});let walls=0,switches=0,braking=false,maxError=0,cornerSamples=0;
@@ -20,6 +21,12 @@ test('every seasonal rival holds a controlled line through the reference-course 
   assert.ok(cornerSamples>100,rival.id+' actually crosses technical bends');
   assert.ok(maxError<2,rival.id+' overshoots its line: '+maxError.toFixed(3)+' m');
   assert.ok(switches/r.elapsed<1.5,rival.id+' alternates brake too often: '+switches/r.elapsed+' /s');
+  times.set(rival.id,r.elapsed);
+ }
+ for(const rival of campaignStages()){
+  const dry=times.get(rival.id),rain=times.get('rain:'+rival.id),ng=times.get('ngplus:'+rival.id);
+  assert.ok(rain>=dry&&rain<dry*1.025,rival.id+' keeps nearly the same pace in rain');
+  assert.ok(ng<rain,rival.id+' increases pace for NG+');
  }
 });
 

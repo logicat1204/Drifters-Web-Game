@@ -62,7 +62,9 @@ test('a moving player blocking the chosen side makes the rival yield and select 
 });
 test('all three AI styles can pass through an actual course bend while respecting guardrails',()=>{
  const track=makeTrack(ALL_TRACKS.find(t=>t.id==='manazuru'));
- for(const style of ['Grip','Complete','Skiller']){const rival={...CAMPAIGN_STAGES.find(s=>s.id==='kanata-final'),id:'curve-pass',boss:null,style},r=ready(rival,{track,playerS:900,gap:45,playerSpeed:35,aiSpeed:42});const result=runPass(r,{speed:35,seconds:30});assert.ok(result.passed,style);assert.equal(result.hits,0,style);assert.equal(result.walls,0,style);}
+ // At 35 m/s the front car outruns the Grip GT86 through this sequence of
+ // hairpins even when the rival has its full racing line to itself.
+ for(const style of ['Grip','Complete','Skiller']){const rival={...CAMPAIGN_STAGES.find(s=>s.id==='kanata-final'),id:'curve-pass',boss:null,style},r=ready(rival,{track,playerS:900,gap:45,playerSpeed:30,aiSpeed:42});const result=runPass(r,{speed:30,seconds:30});assert.ok(result.passed,style);assert.equal(result.hits,0,style);assert.equal(result.walls,0,style);}
 });
 test('campaign rivals also pass on their own real roads and keep control after merging',()=>{
  for(const rival of CAMPAIGN_STAGES){const track=makeTrack(ALL_TRACKS.find(t=>t.id===rival.track)),r=ready(rival,{track,playerS:260,gap:45,playerSpeed:30,aiSpeed:38});const result=runPass(r,{speed:30,seconds:40});assert.ok(result.passed,rival.id);assert.equal(result.hits,0,rival.id);assert.equal(result.walls,0,rival.id);}

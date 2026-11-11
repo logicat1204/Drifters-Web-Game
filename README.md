@@ -202,4 +202,4 @@ Consulta [la guía de campaña, tienda y superconcentración](docs/CAMPANIA-TIEN
 
 **Temporadas de campaña:** temporada seca, temporada lluviosa y NG+ con final definitivo, progreso y recompensas independientes y escenas propias. Conserva la licencia y permite repetir duelos. [Reglas y carpetas de recursos](docs/TEMPORADAS-Y-NGPLUS.md).
 
-**Conducción de rivales — 10 de noviembre de 2026:** pedales progresivos en todos los cursos, trazadas y rotación diferentes para Grip/Balance/Skiller, y humo tenue al derrapar. [Diseño, mediciones y pruebas](docs/IA-CURVAS-V9.md).
+**Conducción de rivales — 11 de noviembre de 2026:** trazadas y frenadas por estilo, prestaciones propias para cada modelo y acceso a NG+ con coche de competición al máximo. [Catálogo, ritmo de las temporadas y requisitos](docs/CATALOGO-COMPETICION.md).

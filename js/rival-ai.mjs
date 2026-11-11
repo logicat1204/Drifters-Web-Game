@@ -61,8 +61,13 @@ export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
   state.commitRemaining=Math.max(0,state.commitRemaining-dt);state.switchCooldown=Math.max(0,state.switchCooldown-dt);
   const look=clamp(24+Math.max(0,closing)*3.5+o.speed*.22,38,115);
   if(r.finished||distance>140){state.phase='cruise';state.side=0;state.contesting=false;state.commitRemaining=0;}
-  if(!r.finished&&state.phase==='cruise'&&distance>0&&distance<look&&(closing>.6||target>r.speed+.8)){
-    const pass=choose();if(pass)commit(pass);
+  const paceAdvantage=target-r.speed;
+  if(!r.finished&&state.phase==='cruise'&&state.switchCooldown===0&&distance>0&&distance<look&&(closing>.6||paceAdvantage>.8)){
+    // In bends the parallel lane costs speed and distance. Keep the racing
+    // line until the time needed to move across fits the closing gap.
+    const setupDistance=clamp(14+Math.max(0,closing)*1.5,19,39);
+    const clearRoad=distance<setupDistance||[0,20,40,60].every(offset=>Math.abs(sample(o.track,o.s+offset).curve)<.006);
+    if(clearRoad){const pass=choose();if(pass)commit(pass);}
   }
   if(state.phase==='overtake'){
     // Once it reaches the player's door, the rival owns its established lane.
@@ -73,6 +78,11 @@ export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
     state.blockedTime=blocked&&distance>0?state.blockedTime+dt:0;
     const projectedLead=-distance-Math.max(0,r.speed-o.speed)*1.2;
     if(projectedLead>PASSING.mergeGap){state.phase='return';state.contesting=false;}
+    else if(!state.contesting&&state.commitRemaining===0&&distance>CONTACT.length+12&&closing<.5&&paceAdvantage<1){
+      // Recover the racing line when there is no closing pace and both cars
+      // are still separated. A committed pass at the door keeps its lane.
+      state.phase='cruise';state.side=0;state.switchCooldown=.75;state.blockedTime=0;
+    }
     else if(blocked&&!state.contesting&&state.commitRemaining===0&&distance>CONTACT.length+.2+Math.max(0,closing)*.25){
       const pass=choose();
       if(pass&&(pass.side!==state.side||Math.abs(pass.lane-state.lane)>.35)){if(pass.side!==state.side)state.feints++;commit(pass);}
@@ -101,7 +111,7 @@ export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
     if(distance<gap)target=Math.min(target,front);
     if(distance<CONTACT.length+.35)target=Math.min(target,Math.max(0,front-(CONTACT.length+.35-distance)*2));
   }
-  if(state.phase==='cruise'&&(!r.night||r.headlights)&&distance<-10&&distance>-25&&r.speed>o.speed+1)line=clamp(line+(r.lateral-line)*.18,-1,1);
+  if(state.phase==='cruise'&&(!r.night||r.headlights)&&distance<-10&&distance>-25&&r.speed>o.speed+1)line=clamp(line+(r.lateral-line)*.18,-limit,limit);
   return {line,target,maneuver:state.phase!=='cruise',reserve:behavior.reserve,laneRate:behavior.laneRate,
     emergency:distance>0&&actualCrossing&&!state.contesting&&closing>.2&&free<1+closing*behavior.reaction};
 }

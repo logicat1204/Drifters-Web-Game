@@ -17,3 +17,17 @@ El AE86 Project D utiliza el perfil ágil; el RX-7 RE Amemiya mantiene el equili
 No hay recompra ni reinicio de progreso: los propietarios existentes reciben la nueva ficha al cargar el catálogo, manteniendo pintura, piezas y niveles de mejoras. Los precios siguen entre 900 y 3900 monedas, y mejorar completamente un coche sigue costando 4070. Solo las victorias base de las temporadas seca y lluviosa proporcionan unas 31.368 monedas antes de NG+, sin contar bonificaciones, por lo que el salto de coche puede financiarse jugando la campaña.
 
 Los cambios de física de coches se separan de los récords anteriores mediante la versión de manejo del juego. La propiedad y las victorias de campaña se conservan.
+
+## IA de campaña y acceso a NG+
+
+Cada rival sigue una trazada calculada para el ancho de la carretera y su estilo. El plan anticipa las frenadas a partir de la curvatura de esa trazada, el agarre, la potencia y los frenos del modelo. Grip acepta un vértice más lento para recuperar con aceleración. Balance busca una línea fluida y estable. Skiller prepara el derrape y conserva más velocidad al enlazar curvas. La simulación aplica volante y pedales progresivos y calcula el tiempo a partir del recorrido real del coche.
+
+En temporada lluviosa, los rivales retienen el 96 % de su agarre seco. Los coches del jugador retienen el 75 %. Los duelos de Ashinoko ya parten de lluvia en la temporada inicial. NG+ calibra por circuito el ritmo de sus rivales y aumenta sus prestaciones. Las recompensas siguen el multiplicador ×1,6 del nivel.
+
+El mapa de NG+ muestra el coche equipado y su preparación. Para disputar un duelo se necesita un coche de categoría 3 con motor, chasis y frenos al nivel 3. La tienda identifica los modelos aptos y el servidor verifica la compra y las mejoras guardadas. El primer coche de competición y las mejoras completas se pueden financiar con las victorias de las dos temporadas previas.
+
+El manejo v10 aplica las fichas nuevas a cada modelo. Los récords anteriores quedan guardados con su versión y las clasificaciones de manejo v10 se abren con las marcas nuevas.
+
+La medición con pista libre cubrió los 24 rivales de las tres temporadas. Los 72 duelos terminaron sin golpear los guardrails. Donde cambia el clima, el tiempo del rival aumenta entre 1,1 % y 1,5 % al pasar de seco a lluvia. Los rivales de NG+ llegan entre 0,8 % y 13,2 % antes que su contraparte lluviosa. Los cambios de estado del freno bajaron de 10.782 a 7.896 frente al controlador anterior. `node scripts/audit-rival-corners.mjs` reproduce la medición.
+
+`node --test tests/ngplus-balance.test.mjs` comprueba una victoria física en cada duelo de NG+ con un R34 al máximo, además de victorias sin golpes al guardrail de un AE86 Project D frente a Keisuke y de un GT3 RS frente a Beckenbauer.
