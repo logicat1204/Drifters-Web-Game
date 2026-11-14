@@ -29,7 +29,9 @@ test('three finite seasons unlock in order, preserve ownership and pay independe
  const {store,id}=await fixture();try{
   const runs=new Runs(store),start=(stage,car='ae86',extra={})=>runs.start(id,{mode:'campaign',car,campaignStage:stage,...extra});
   assert.throws(()=>start('rain:kenji'),/bloqueado/);assert.throws(()=>start('ngplus:kenji'),/bloqueado/);
+  assert.ok(seasonUnlocked('rain',stages.slice(0,14).map(s=>s.id)));
   for(const s of stages)victory(store,id,s);const original=store.user(id);assert.equal(original.campaign.length,24);assert.ok(seasonUnlocked('rain',original.campaign.map(s=>s.id)));
+  assert.ok(seasonUnlocked('ngplus',[...original.campaign.map(s=>s.id),...campaignStages('rain').filter(s=>s.index<14).map(s=>s.id)]));
   const retry=start('kenji');assert.equal(retry.options.wet,false);assert.equal(retry.options.rematch,false);
   const rain=start('rain:kenji');assert.equal(rain.options.wet,true);assert.equal(rain.options.rematch,true);assert.throws(()=>start('rain:takumi-initial'),/bloqueado/);
   for(const s of campaignStages('rain')){assert.ok(stageAvailable(s,store.user(id).campaign.map(s=>s.id)));const result=victory(store,id,s);assert.ok(result.reward.coins>campaignReward(stages[s.index],9000));assert.equal(victory(store,id,s).user.coins,result.user.coins);}

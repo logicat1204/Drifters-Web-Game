@@ -1,6 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {ALL_TRACKS,CARS,makeTrack,createRace,updateRace,cornerTechnique,HANDLING_VERSION} from '../js/sim.mjs';
+import {EXPANSION_TRACKS} from '../js/expansion-courses.mjs';
+import {campaignEvents} from '../js/campaign-events.mjs';
 import {trackCrossings} from '../js/track-geometry.mjs';
 import {Store} from '../server/store.mjs';
 import {CAMPAIGN_STAGES} from '../js/campaign.mjs';
@@ -33,4 +35,17 @@ test('v9 best times stay out of v10 rankings while campaign clears, rewards and 
   const before=store.user(account.id);assert.ok(before.focusUnlocked.includes('balance'));assert.equal(before.campaign.find(s=>s.id===stage.id).bestTime,null);assert.equal(store.records().length,0);
   won.elapsed=240;store.addRun('reference-road',account.id,won);const after=store.user(account.id);assert.equal(after.campaign.find(s=>s.id===stage.id).bestTime,240);assert.equal(after.coins,before.coins+50,'only the normal level-3 replay reward is granted');assert.equal(store.stats(account.id).races,4);assert.equal(store.records()[0].time,240);assert.equal(store.db.prepare('SELECT handling FROM campaign_progress WHERE level_id=?').get(stage.id).handling,HANDLING_VERSION);
  }finally{store.close();}
+});
+test('all supplied expansion roads have continuous reference geometry and two rivals before their qualifier',()=>{
+ for(const config of EXPANSION_TRACKS){
+  const track=makeTrack(config);
+  assert.equal(track.reference.image,config.referenceSheet);
+  assert.equal(track.sectionEnds.at(-1),config.length);
+  assert.deepEqual(trackCrossings(track),[],config.id);
+  assert.ok(track.points[track.renderSegments].y<-200,config.id);
+  assert.ok(track.points.every(p=>Number.isFinite(p.curve)&&Math.abs(p.curve)<.12),config.id);
+  const events=campaignEvents().filter(event=>event.chapter===config.id);
+  assert.deepEqual(events.map(event=>event.kind),['duel','duel','trial']);
+  assert.ok(events[2].pace>0);
+ }
 });

@@ -2,9 +2,9 @@ import {cornerQuality} from './skill.mjs';
 
 export const FOCUS=Object.freeze({capacity:100,minimum:30,maxDuration:5,rechargeRate:6,cooldown:3,grip:1.22,topSpeed:1.06,acceleration:1.10});
 export const FOCUS_TYPES={
-  balance:{id:'balance',name:'Balance',color:'#bd8cff',aura:'#9c6dff',grip:1.22,topSpeed:1.06,acceleration:1.10,braking:1.1,alignment:1.15,description:'Equilibrio: +22% de agarre, +10% de aceleración y +6% de punta.',unlock:'Vence a Takumi en Akina'},
-  drift:{id:'drift',name:'Drift Master',color:'#b0f3ff',aura:'#76daff',grip:1.52,topSpeed:1.02,acceleration:1.04,braking:1.1,alignment:1.30,description:'Alas celestes: +52% de agarre y mayor control de la trayectoria. +2% de punta.',unlock:'Vence a Kai Kogashiwa en Irohazaka'},
-  time:{id:'time',name:'Time Master',color:'#ffe57f',aura:'#569bff',grip:1.08,topSpeed:1.08,acceleration:1.65,braking:1.90,alignment:1.10,description:'Impulso amarillo y aura azul: +65% de aceleración, +90% de frenada y +8% de punta.',unlock:'Vence a Keisuke en Akagi'}
+  balance:{id:'balance',name:'Balance',color:'#bd8cff',aura:'#9c6dff',grip:1.22,topSpeed:1.06,acceleration:1.10,braking:1.1,alignment:1.15,description:'Equilibrio: +22% de agarre, +10% de aceleración y +6% de punta.',unlock:'Abre el cofre de Akina después de vencer a Takumi'},
+  drift:{id:'drift',name:'Drift Master',color:'#b0f3ff',aura:'#76daff',grip:1.52,topSpeed:1.02,acceleration:1.04,braking:1.1,alignment:1.30,description:'Alas celestes: +52% de agarre y mayor control de la trayectoria. +2% de punta.',unlock:'Abre el cofre de Irohazaka después de vencer a Kai'},
+  time:{id:'time',name:'Time Master',color:'#ffe57f',aura:'#569bff',grip:1.08,topSpeed:1.08,acceleration:1.65,braking:1.90,alignment:1.10,description:'Impulso amarillo y aura azul: +65% de aceleración, +90% de frenada y +8% de punta.',unlock:'Abre el cofre de Akagi después de vencer a Keisuke'}
 };
 export const focusType=r=>FOCUS_TYPES[r.focus?.type]||FOCUS_TYPES.balance;
 export function createFocus(type='balance',enabled=true){return {type:FOCUS_TYPES[type]?type:'balance',enabled,charge:0,remaining:0,duration:0,cooldown:0,activations:0};}

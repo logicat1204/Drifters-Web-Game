@@ -140,12 +140,12 @@ test('loading holds the direct start until every pilot confirms the current run'
   f.send(f.host,'loaded',{runId});
   f.step(2,false);
   assert.equal(f.room.phase,'loading');
-  assert.equal(f.room.players.get(g.id).race.countdown,3);
+  assert.equal(f.room.players.get(g.id).race.countdown,3+f.room.introSeconds);
   assert.equal(g.out.at(-1).players.filter(p=>p.loaded).length,1);
   f.send(g,'loaded',{runId});
   assert.equal(f.room.phase,'racing');
   assert.equal(g.out.at(-1).type,'snapshot');
-  assert.equal(g.out.at(-1).players[1].state.countdown,3);
+  assert.equal(g.out.at(-1).players[1].state.countdown,3+f.room.introSeconds);
 });
 
 test('a browser without WebRTC uses the server through the same loading screen',()=>{

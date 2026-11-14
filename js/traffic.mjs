@@ -51,6 +51,6 @@ export function resolveVehicleContact(a,b,previousA=vehiclePose(a),previousB=veh
  }
  if(fresh){a.contactCooldown=b.contactCooldown=CONTACT.cooldown;a.collision=b.collision=.55;cancelFocus(a);cancelFocus(b);}
  clearDraft(a);clearDraft(b);
- for(const r of [a,b])if(r.finished&&r.s<r.track.length&&r.timeLeft>0){r.finished=false;r.won=false;}
+ for(const r of [a,b])if(r.finished&&r.s<(r.finishDistance||r.track.length)&&r.timeLeft>0){r.finished=false;r.won=false;}
  return true;
 }

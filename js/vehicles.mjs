@@ -1,3 +1,4 @@
+import {EXPANSION_CARS} from './expansion-vehicles.mjs';
 // Original arcade preparations, not real-world homologation specifications.
 // Model identity survives driver style: no two machines share a generic setup.
 const rows=[
@@ -42,7 +43,7 @@ const preparations={
  cayman:     {competitionTier:3,accel:17.05,max:73.2,grip:1.205,brakePower:1.10},
  gt86:       {competitionTier:2,accel:15.65,max:69.4,grip:1.140,brakePower:1.03}
 };
-export const EXTRA_CARS=rows.map(([id,brand,name,code,year,color,profile,mesh,price])=>{
+export const EXTRA_CARS=[...rows.map(([id,brand,name,code,year,color,profile,mesh,price])=>{
  const labels={agile:{weight:'1120',power:'220'},balanced:{weight:'1280',power:'280'},power:{weight:'1410',power:'320'}}[profile],setup=preparations[id];
  return {id,brand,name,code,year,color,profile,mesh,price,drive:['r8','r34','evo3'].includes(id)?'4WD':id==='civic'?'FF':['alfa4c','a110','cayman','exige'].includes(id)?'MR':'FR',...labels,...setup,label:setup.competitionTier===3?'PREPARACIÓN DE COMPETICIÓN':setup.competitionTier===2?'EDICIÓN DE CAMPAÑA':'CLÁSICO TOUGE',stats:[Math.round(setup.accel/17*100),Math.round(setup.grip/1.2*100),Math.round(setup.max/75*100)]};
-});
+}),...EXPANSION_CARS];

@@ -1,0 +1,116 @@
+{
+  "id": "gt3",
+  "rig": {
+    "track": 0.8270000000000001,
+    "wheelY": 0.339,
+    "radius": 0.333,
+    "front": 1.2534999999999998,
+    "rear": -1.2035,
+    "popupAngle": 0.65,
+    "id": "gt3",
+    "size": [
+      4.545,
+      1.85,
+      1.27
+    ],
+    "label": "911 GT3"
+  },
+  "reference": "Stylized body proportions from the campaign car specification",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 4602
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 700
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1760
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 180
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 128
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1127
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 132
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 86
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 52
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 139
+    }
+  ]
+}

@@ -6,7 +6,12 @@ const fields=['s','lateral','yaw','speed','steer','rivalS','rivalLateral','rival
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
 const mix=(a,b,t)=>a+(b-a)*t;
 export const angleMix=(a,b,t)=>a+Math.atan2(Math.sin(b-a),Math.cos(b-a))*t;
-export function presentationPose(r,p={}){p.resetId=r.resetId||0;for(const k of fields)p[k]=Number.isFinite(r[k])?r[k]:0;return p;}
+export function presentationPose(r,p={}){
+  p.resetId=r.resetId||0;
+  for(const k of fields)p[k]=Number.isFinite(r[k])?r[k]:0;
+  if(r.eventKind==='grid')p.grid=r.netOpponents;
+  return p;
+}
 
 export class RacePresentation {
   constructor(){this.race=null;this.view={};this.offset={s:0,lateral:0,yaw:0};}
@@ -25,6 +30,10 @@ export class RacePresentation {
     if(!active||r.finished){this.reset(r);return r;}
     const v=Object.assign(this.view,r),a=clamp(alpha,0,1),prev=this.previous;this.lastView=v;this.alpha=a;
     for(const k of fields){const current=Number.isFinite(r[k])?r[k]:0;v[k]=k==='yaw'||k==='rivalYaw'?angleMix(prev[k],current,a):mix(prev[k],current,a);}
+    if(prev.grid)v.netOpponents=r.netOpponents.map((p,i)=>{
+      const prior=prev.grid[i];
+      return {...p,s:mix(prior.s,p.s,a),lateral:mix(prior.lateral,p.lateral,a),yaw:angleMix(prior.yaw,p.yaw,a),steer:mix(prior.steer,p.steer,a)};
+    });
     v.s+=this.offset.s;v.lateral=clamp(v.lateral+this.offset.lateral,-roadEdge(r.track),roadEdge(r.track));v.yaw+=this.offset.yaw;
     const decay=Math.exp(-Math.max(0,dt)*14);this.offset.s*=decay;this.offset.lateral*=decay;this.offset.yaw*=decay;
     return v;

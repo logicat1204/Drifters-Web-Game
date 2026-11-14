@@ -31,7 +31,7 @@ test('replaying the dry season preserves its original weather despite client rem
   } finally {store.close();}
 });
 test('the guide has 24 ordered opponents, nine campaigns and real portrait/comic files',()=>{
-  assert.equal(CAMPAIGN_STAGES.length,24);assert.equal(CAMPAIGN_CHAPTERS.length,9);assert.equal(CAMPAIGN_LEVELS.length,5);assert.equal(new Set(CAMPAIGN_STAGES.map(s=>s.id)).size,24);
+  assert.equal(CAMPAIGN_STAGES.length,24);assert.equal(CAMPAIGN_CHAPTERS.length,19);assert.equal(CAMPAIGN_LEVELS.length,5);assert.equal(new Set(CAMPAIGN_STAGES.map(s=>s.id)).size,24);
   for(const stage of CAMPAIGN_STAGES){assert.ok(stage.level>=1&&stage.level<=5);assert.ok(DRIVER_STYLES[stage.style]);assert.ok(ALL_CARS.some(c=>c.id===stage.car));assert.ok(ALL_TRACKS.some(t=>t.id===stage.track));for(const src of [media.stages[stage.id].portrait,...media.stages[stage.id].comics])assert.ok(existsSync(new URL('..'+decodeURIComponent(src),import.meta.url)),src);}
   assert.deepEqual(CAMPAIGN_STAGES.filter(s=>s.unlock).map(s=>[s.id,s.unlock]),[['takumi-initial','balance'],['keisuke-initial','time'],['kai-campaign','drift']]);
 });

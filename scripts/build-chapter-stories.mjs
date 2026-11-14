@@ -4,6 +4,7 @@ import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES} from '../js/campaign.mjs';
+import {WORLD_DESTINATIONS} from '../js/campaign-worlds.mjs';
 const require=createRequire(import.meta.url),sharp=require(process.env.SHARP_MODULE||'sharp'),root=fileURLToPath(new URL('../',import.meta.url)),media=JSON.parse(await readFile(path.join(root,'assets/campaign-media.json'),'utf8'));
 const texts={
  akina:['Todo comienza con una carretera conocida.','En Akina, los nombres se ganan curva a curva. Kenji e Iketani vigilan el paso.','Tras ellos espera un panda blanco y negro. Para alcanzar a Takumi necesitarás escuchar la montaña.','La primera leyenda ya tiene un nuevo perseguidor.','Akina te enseñó que una buena trazada vale más que toda la potencia.','Pero las luces de Akagi ya se encienden. Los RedSuns han oído hablar de ti.'],
@@ -18,12 +19,17 @@ const texts={
 };
 const esc=s=>s.replaceAll('&','&amp;').replaceAll('<','&lt;'),lines=s=>{const words=s.split(' '),result=[];let l='';for(const word of words){if((l+' '+word).length>63){result.push(l);l=word;}else l+=(l?' ':'')+word;}if(l)result.push(l);return result;};
 for(const [n,chapter]of CAMPAIGN_CHAPTERS.entries()){
- const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter.id),portrait=media.stages[stages.at(-1).id]?.portrait,portraitBytes=portrait?await sharp(await readFile(path.resolve(root,decodeURIComponent(portrait).replace(/^\//,'')))).resize(600,620,{fit:'cover',position:'top'}).png().toBuffer():null;
+ const stages=CAMPAIGN_STAGES.filter(s=>s.chapter===chapter.id),portrait=chapter.referenceCover||media.stages[stages.at(-1)?.id]?.portrait;
+ const portraitBytes=portrait?await sharp(await readFile(path.resolve(root,(chapter.referenceCover||decodeURIComponent(portrait)).replace(/^\//,'')))).resize(600,620,{fit:'cover',position:'top'}).png().toBuffer():null;
  for(const dir of ['story_start','story_end','narrative_music_start','narrative_music_end']){await mkdir(path.join(root,'campaign_files',chapter.id,'_chapter',dir),{recursive:true});await writeFile(path.join(root,'campaign_files',chapter.id,'_chapter',dir,'.gitkeep'),'');}
  for(const phase of ['start','end']){const dir=path.join(root,'campaign_files',chapter.id,'_chapter','story_'+phase),target=path.join(dir,'001.png');try{await access(target);if(!process.argv.includes('--refresh-generated'))continue;}catch{}
-  const copy=texts[chapter.id].slice(phase==='start'?0:3,phase==='start'?3:6),title=copy[0],body=copy.slice(1).flatMap(lines),color=chapter.wet?'#87b4cc':'#a8c9ed';
+  const narrative=texts[chapter.id]||[
+   'La siguiente carretera te espera.',WORLD_DESTINATIONS[chapter.id].description,'Supera a los pilotos locales y valida tu tiempo en el descenso.',
+   'Nueva etapa en tu licencia.','Has superado los duelos y la clasificación de '+chapter.name+'.','Vuelve al atlas para continuar.'
+  ];
+  const copy=narrative.slice(phase==='start'?0:3,phase==='start'?3:6),title=copy[0],body=copy.slice(1).flatMap(lines),color=chapter.wet?'#87b4cc':'#a8c9ed';
   const art=`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="1000" viewBox="0 0 1600 1000"><defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#0a121f"/><stop offset="1" stop-color="#405e79"/></linearGradient><clipPath id="portrait"><path d="M1050 50H1550V665H900Z"/></clipPath></defs><rect width="1600" height="1000" fill="#080c13"/><rect x="50" y="50" width="1500" height="615" fill="url(#sky)"/><circle cx="750" cy="164" r="64" fill="#eaf3f6"/><path d="M50 490L190 315 320 395 490 220 670 413 860 300 1070 495V665H50Z" fill="#142738"/><path d="M50 580L280 414 451 513 590 405 816 580 1040 444V665H50Z" fill="#20384a"/><path d="M292 665Q930 530 603 479Q277 429 727 370" stroke="#8ca2ad" stroke-width="42" fill="none"/><path d="M292 665Q930 530 603 479Q277 429 727 370" stroke="#17212e" stroke-width="35" fill="none"/><path d="M292 665Q930 530 603 479Q277 429 727 370" stroke="#e7e6d1" stroke-width="2" stroke-dasharray="14 11" fill="none"/>${portraitBytes?`<image x="950" y="50" width="600" height="620" preserveAspectRatio="xMidYMin slice" xlink:href="data:image/png;base64,${portraitBytes.toString('base64')}" clip-path="url(#portrait)"/>`:''}<path d="M1050 50L900 665" stroke="#f4f5f6" stroke-width="8"/><path d="M50 50H1550V665H50Z" fill="none" stroke="#eef2f5" stroke-width="5"/><rect x="80" y="78" width="350" height="47" fill="#f1f3f5"/><text x="99" y="110" font-family="sans-serif" font-weight="700" font-size="21" fill="#111a28">CHAPTER ${String(n+1).padStart(2,'0')} / ${phase==='start'?'PROLOGUE':'EPILOGUE'}</text><text x="85" y="220" font-family="sans-serif" font-size="61" font-weight="700" fill="white">${esc(chapter.name.toUpperCase().slice(0,24))}</text><text x="87" y="258" font-family="monospace" font-size="17" letter-spacing="4" fill="${color}">${esc(chapter.tag)}</text><text x="70" y="739" font-family="sans-serif" font-size="37" font-weight="700" fill="#f1f3f5">${esc(title)}</text>${body.map((l,i)=>`<text x="73" y="794" dy="${i*37}" font-family="sans-serif" font-size="25" fill="#bdcbd9">${esc(l)}</text>`).join('')}<text x="1530" y="965" text-anchor="end" font-family="monospace" font-size="14" letter-spacing="3" fill="${color}">AFTER HOURS / MOUNTAIN CHRONICLES</text></svg>`;
   await sharp(Buffer.from(art)).png().toFile(target);
  }
 }
-console.log('Nueve prólogos y nueve epílogos listos; se conservaron las páginas existentes.');
+console.log(CAMPAIGN_CHAPTERS.length+' prólogos y epílogos listos; se conservaron las páginas existentes.');

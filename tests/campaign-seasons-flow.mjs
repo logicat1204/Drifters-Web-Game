@@ -40,13 +40,13 @@ try{
   Object.assign(race,{s:track.length,finished:true,won:true,elapsed:220});
   store.addRun('browser-'+stage.id,session.user.id,race);
  };
- await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await openPlayMode(page,'campaign');assert.equal(await page.locator('#campaign-seasons').isVisible(),false);await home();
+ await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await openPlayMode(page,'campaign');assert.equal(await page.locator('#campaign-map-seasons').isVisible(),false);await home();
  for(const stage of campaignStages())win(stage);
- await openPlayMode(page,'campaign');await page.waitForFunction(()=>document.querySelector('[data-season=rain]')?.getAttribute('aria-pressed')==='true');assert.equal(await page.locator('[data-season]').count(),2);assert.equal(await page.locator('[data-season=rain]').getAttribute('aria-pressed'),'true');assert.match(await page.locator('#campaign-counter').textContent(),/^0 \/ 24/);
+ await openPlayMode(page,'campaign',{season:'rain'});assert.match(await page.locator('#campaign-counter').textContent(),/^0 \/ 3/);
  await page.locator('#campaign-start').click();await page.locator('#comic-dialogue').waitFor({state:'visible'});assert.match(await page.locator('#comic-dialogue').textContent(),/asfalto|lluvia/);await page.waitForTimeout(350);await page.screenshot({path:'screenshots/season-rain-story.png'});
  while(await page.locator('#comic-overlay').isVisible())await page.locator('#comic-next').click();await page.waitForFunction(()=>window.touge.state.screen==='race');assert.equal((await page.evaluate(()=>window.touge.state)).race.wet,true);assert.equal((await page.evaluate(()=>window.touge.state)).race.campaignStage,'rain:kenji');await page.locator('[data-action=pause]').click();await page.locator('#pause-panel [data-action=quit]').click();
  for(const stage of campaignStages('rain'))win(stage);
- await openPlayMode(page,'campaign');await page.waitForFunction(()=>document.querySelector('[data-season=ngplus]')?.getAttribute('aria-pressed')==='true');assert.equal(await page.locator('[data-season]').count(),3);assert.equal(await page.locator('[data-season=ngplus]').getAttribute('aria-pressed'),'true');assert.match(await page.locator('#campaign-detail').textContent(),/NIVEL 3/);
+ await openPlayMode(page,'campaign',{season:'ngplus'});assert.match(await page.locator('#campaign-detail').textContent(),/NIVEL 3/);
  const start=page.locator('#campaign-start');
  assert.equal(await start.isDisabled(),true);
  assert.match(await page.locator('#campaign-detail').textContent(),/categoría 3/i);
@@ -55,7 +55,7 @@ try{
  const shop=page.getByRole('button',{name:'VER COCHES EN TIENDA'});
  await shop.click();await screen('shop');
  await page.getByRole('tab',{name:'Música'}).click();
- await home();await openPlayMode(page,'campaign');
+ await home();await openPlayMode(page,'campaign',{season:'ngplus'});
  await shop.click();await screen('shop');
  await page.waitForFunction(()=>document.querySelector('[data-shop-category=car]')?.getAttribute('aria-selected')==='true');
  const card=page.locator('[data-item=gt3rs]');
@@ -66,7 +66,7 @@ try{
  await page.waitForFunction(()=>document.getElementById('shop-buy')?.textContent.startsWith('EQUIPAR'));
  await action(page.locator('#shop-buy'),'/api/profile','PATCH');
  await page.waitForFunction(()=>window.touge.state.car==='gt3rs');
- await home();await openPlayMode(page,'campaign');
+ await home();await openPlayMode(page,'campaign',{season:'ngplus'});
  assert.equal(await start.isDisabled(),true);
  assert.match(await page.locator('#campaign-detail').textContent(),/frenos al nivel 3/i);
  await page.getByRole('button',{name:'IR AL GARAJE'}).click();
@@ -78,7 +78,7 @@ try{
   }
  }
  await page.waitForFunction(()=>document.getElementById('workshop-build').textContent==='PREPARACIÓN AL MÁXIMO');
- await home();await openPlayMode(page,'campaign');
+ await home();await openPlayMode(page,'campaign',{season:'ngplus'});
  assert.equal(await start.isEnabled(),true);
  const ngplusRace=await launchDuel();
  assert.equal(ngplusRace.campaignStage,'ngplus:kenji');
@@ -86,7 +86,7 @@ try{
  for(const system of ['engine','chassis','brakes'])assert.equal(ngplusRace.build[system],3);
  await quitDuel();
 
- for(const stage of campaignStages('ngplus'))win(stage);await openPlayMode(page,'campaign');await page.waitForFunction(()=>document.getElementById('campaign-completion').textContent.includes('JUEGO COMPLETADO'));assert.match(await page.locator('#campaign-completion').textContent(),/JUEGO COMPLETADO/);assert.equal(await start.isEnabled(),true);assert.match(await start.textContent(),/VOLVER A COMPETIR/);assert.equal(await page.locator('#chapter-story-start').isEnabled(),true);assert.equal(await page.locator('#chapter-story-end').isEnabled(),true);assert.equal(await page.locator('#campaign-next').isDisabled(),true);
+ for(const stage of campaignStages('ngplus'))win(stage);await openPlayMode(page,'campaign',{season:'ngplus'});assert.match(await page.locator('#campaign-completion').textContent(),/Destino completado/);assert.equal(await start.isEnabled(),true);assert.match(await start.textContent(),/VOLVER A COMPETIR/);assert.equal(await page.locator('#chapter-story-start').isEnabled(),true);assert.equal(await page.locator('#chapter-story-end').isEnabled(),true);assert.equal(await page.locator('#campaign-next').isDisabled(),true);
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),390);await page.screenshot({path:'screenshots/season-completed-mobile.png'});
  const replay=await launchDuel();
  assert.match(replay.campaignStage,/^ngplus:/);

@@ -1,0 +1,9 @@
+{
+  "type": "cosmetic",
+  "slot": "eyes",
+  "keys": {
+    "male": "focused",
+    "female": "cat"
+  },
+  "name": "Mirada de competición"
+}

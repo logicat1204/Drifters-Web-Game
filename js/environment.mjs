@@ -14,7 +14,17 @@ export const ENVIRONMENTS={
  atami:{name:'Ciudad termal, túnel y costa',tree:'green',uphill:1,forest:.75,coast:true,tunnel:[.42,.46]},
  odawara:{name:'Acceso urbano y paso de montaña',tree:'cedar',uphill:-1,forest:1,tunnel:[.54,.58]},
  ashinoko:{name:'Ribera del lago, embarcaderos y bosque',tree:'green',uphill:1,forest:1,lake:true},
- manazuru:{name:'Pueblos pesqueros y pinar costero',tree:'pine',uphill:1,forest:.9,coast:true,tunnel:[.22,.25]}
+ manazuru:{name:'Pueblos pesqueros y pinar costero',tree:'pine',uphill:1,forest:.9,coast:true,tunnel:[.22,.25]},
+ myogi:{name:'Barrancos y cedros de Myogi',tree:'cedar',uphill:-1,forest:1.05},
+ momiji:{name:'Bosque de arces de Momiji',tree:'autumn',uphill:1,forest:1.2},
+ nanamagari:{name:'Antiguo Tōkaidō',tree:'green',uphill:-1,forest:1.05},
+ nagao:{name:'Arcenes estrechos de Nagao',tree:'pine',uphill:1,forest:.85},
+ happogahara:{name:'Túnel Yūhi y bosque de Tochigi',tree:'cedar',uphill:1,forest:1.1,tunnel:[.672,.693]},
+ sadamine:{name:'Paredes de Saitama',tree:'green',uphill:-1,forest:1.08},
+ turnpike:{name:'Rectas panorámicas y peaje',tree:'pine',uphill:-1,forest:.73,toll:.965},
+ enna:{name:'Descenso del Todo School',tree:'cedar',uphill:1,forest:.9},
+ tsuchisaka:{name:'Galería y laderas de Tsuchisaka',tree:'pine',uphill:-1,forest:.92,tunnel:[.075,.095]},
+ yabitsu:{name:'Bosque y mirador de Yabitsu',tree:'autumn',uphill:1,forest:1.05}
 };
 export function environmentZone(id,t){
  if(id==='atami')return t<.24||t>.87?'urban':t>.57&&t<.74?'coast':'forest';
@@ -105,6 +115,13 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   if(i%Math.max(1,Math.round(8/track.step))!==0)return;
   layer('detail');
   i=Math.round(a.s/8);
+  if(profile.toll&&Math.abs(a.s-track.length*profile.toll)<4.05){
+   for(const side of [-1,1]){
+    const p=point(a,side*9.4);
+    stamp('building_shop',p,a.heading,[.44,.60,.48],'toll-booth');
+    stamp('traffic_cone',point(a,side*6.55),a.heading,.95,'toll-cone');
+   }
+  }
   if((city||village)&&i%(city?3:6)===0){
    for(const side of [-1,1]){const p=point(a,side*(city?23+rand()*8:21+rand()*9),0),h=a.heading+(side>0?-Math.PI/2:Math.PI/2);
     if(city){const name=rand()<.45?'building_office':rand()<.5?'building_apartment':'building_shop';if(stamp(name,p,h,[.65+rand()*.25,.65+rand()*.45,.7+rand()*.2],'building')&&name==='building_shop'){const c=Math.cos(h),s=Math.sin(h),v=(x,y,z)=>[p[0]+x*c+z*s,p[1]+y,p[2]-x*s+z*c],panel=i%4/4;g.surface(v(-2.5,3.2,3.3),v(2.5,3.2,3.3),v(2.5,4.3,3.3),v(-2.5,4.3,3.3),T.neon_signs,[[panel,0],[panel+.249,0],[panel+.249,1],[panel,1]],[1,1,1,1]);}}else if(i%12===0)stamp('building_shop',p,h,.8,'shop');else house(p,h,.85+rand()*.18);

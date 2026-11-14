@@ -142,5 +142,269 @@
     "level": "kanata-final",
     "rival": "Kanata Rivington (Fujiwara)",
     "path": "campaign_files/manazuru/kanata-final"
+  },
+  {
+    "campaign": "akina",
+    "level": "trial-akina",
+    "rival": "Time Trial",
+    "path": "campaign_files/akina/trial-akina"
+  },
+  {
+    "campaign": "myogi",
+    "level": "shingo-myogi",
+    "rival": "Shingo Shoji",
+    "path": "campaign_files/myogi/shingo-myogi"
+  },
+  {
+    "campaign": "myogi",
+    "level": "takeshi-myogi",
+    "rival": "Takeshi Nakazato",
+    "path": "campaign_files/myogi/takeshi-myogi"
+  },
+  {
+    "campaign": "myogi",
+    "level": "trial-myogi",
+    "rival": "Time Trial",
+    "path": "campaign_files/myogi/trial-myogi"
+  },
+  {
+    "campaign": "akagi",
+    "level": "trial-akagi",
+    "rival": "Time Trial",
+    "path": "campaign_files/akagi/trial-akagi"
+  },
+  {
+    "campaign": "iroha",
+    "level": "trial-iroha",
+    "rival": "Time Trial",
+    "path": "campaign_files/iroha/trial-iroha"
+  },
+  {
+    "campaign": "usui",
+    "level": "trial-usui",
+    "rival": "Time Trial",
+    "path": "campaign_files/usui/trial-usui"
+  },
+  {
+    "campaign": "tsukuba",
+    "level": "trial-tsukuba",
+    "rival": "Time Trial",
+    "path": "campaign_files/tsukuba/trial-tsukuba"
+  },
+  {
+    "campaign": "tsubaki",
+    "level": "trial-tsubaki",
+    "rival": "Time Trial",
+    "path": "campaign_files/tsubaki/trial-tsubaki"
+  },
+  {
+    "campaign": "momiji",
+    "level": "toru-momiji",
+    "rival": "Toru Suetsugu",
+    "path": "campaign_files/momiji/toru-momiji"
+  },
+  {
+    "campaign": "momiji",
+    "level": "atsuro-momiji",
+    "rival": "Atsuro Kawai",
+    "path": "campaign_files/momiji/atsuro-momiji"
+  },
+  {
+    "campaign": "momiji",
+    "level": "trial-momiji",
+    "rival": "Time Trial",
+    "path": "campaign_files/momiji/trial-momiji"
+  },
+  {
+    "campaign": "nanamagari",
+    "level": "ikeda-nanamagari",
+    "rival": "Ryuji Ikeda",
+    "path": "campaign_files/nanamagari/ikeda-nanamagari"
+  },
+  {
+    "campaign": "nanamagari",
+    "level": "hiroya-nanamagari",
+    "rival": "Hiroya Okuyama",
+    "path": "campaign_files/nanamagari/hiroya-nanamagari"
+  },
+  {
+    "campaign": "nanamagari",
+    "level": "trial-nanamagari",
+    "rival": "Time Trial",
+    "path": "campaign_files/nanamagari/trial-nanamagari"
+  },
+  {
+    "campaign": "nagao",
+    "level": "hideo-nagao",
+    "rival": "Hideo Minagawa",
+    "path": "campaign_files/nagao/hideo-nagao"
+  },
+  {
+    "campaign": "nagao",
+    "level": "kai-nagao",
+    "rival": "Kai Kogashiwa",
+    "path": "campaign_files/nagao/kai-nagao"
+  },
+  {
+    "campaign": "nagao",
+    "level": "trial-nagao",
+    "rival": "Time Trial",
+    "path": "campaign_files/nagao/trial-nagao"
+  },
+  {
+    "campaign": "happogahara",
+    "level": "daiki-happogahara",
+    "rival": "Daiki Ninomiya",
+    "path": "campaign_files/happogahara/daiki-happogahara"
+  },
+  {
+    "campaign": "happogahara",
+    "level": "sakai-happogahara",
+    "rival": "Smiley Sakai",
+    "path": "campaign_files/happogahara/sakai-happogahara"
+  },
+  {
+    "campaign": "happogahara",
+    "level": "trial-happogahara",
+    "rival": "Time Trial",
+    "path": "campaign_files/happogahara/trial-happogahara"
+  },
+  {
+    "campaign": "sadamine",
+    "level": "nobuhiko-sadamine",
+    "rival": "Nobuhiko Akiyama",
+    "path": "campaign_files/sadamine/nobuhiko-sadamine"
+  },
+  {
+    "campaign": "sadamine",
+    "level": "kyoko-sadamine",
+    "rival": "Kyōko Iwase",
+    "path": "campaign_files/sadamine/kyoko-sadamine"
+  },
+  {
+    "campaign": "sadamine",
+    "level": "trial-sadamine",
+    "rival": "Time Trial",
+    "path": "campaign_files/sadamine/trial-sadamine"
+  },
+  {
+    "campaign": "turnpike",
+    "level": "rin-turnpike",
+    "rival": "Rin Hojo",
+    "path": "campaign_files/turnpike/rin-turnpike"
+  },
+  {
+    "campaign": "turnpike",
+    "level": "ryosuke-turnpike",
+    "rival": "Ryosuke Takahashi",
+    "path": "campaign_files/turnpike/ryosuke-turnpike"
+  },
+  {
+    "campaign": "turnpike",
+    "level": "trial-turnpike",
+    "rival": "Time Trial",
+    "path": "campaign_files/turnpike/trial-turnpike"
+  },
+  {
+    "campaign": "enna",
+    "level": "tachi-enna",
+    "rival": "Tomoyuki Tachi",
+    "path": "campaign_files/enna/tachi-enna"
+  },
+  {
+    "campaign": "enna",
+    "level": "keisuke-enna",
+    "rival": "Keisuke Takahashi · Project D",
+    "path": "campaign_files/enna/keisuke-enna"
+  },
+  {
+    "campaign": "enna",
+    "level": "trial-enna",
+    "rival": "Time Trial",
+    "path": "campaign_files/enna/trial-enna"
+  },
+  {
+    "campaign": "tsuchisaka",
+    "level": "aikawa-tsuchisaka",
+    "rival": "Aikawa",
+    "path": "campaign_files/tsuchisaka/aikawa-tsuchisaka"
+  },
+  {
+    "campaign": "tsuchisaka",
+    "level": "ichijo-tsuchisaka",
+    "rival": "Ichijo",
+    "path": "campaign_files/tsuchisaka/ichijo-tsuchisaka"
+  },
+  {
+    "campaign": "tsuchisaka",
+    "level": "trial-tsuchisaka",
+    "rival": "Time Trial",
+    "path": "campaign_files/tsuchisaka/trial-tsuchisaka"
+  },
+  {
+    "campaign": "yabitsu",
+    "level": "kobayakawa-yabitsu",
+    "rival": "Kobayakawa",
+    "path": "campaign_files/yabitsu/kobayakawa-yabitsu"
+  },
+  {
+    "campaign": "yabitsu",
+    "level": "omiya-yabitsu",
+    "rival": "Satoshi Omiya",
+    "path": "campaign_files/yabitsu/omiya-yabitsu"
+  },
+  {
+    "campaign": "yabitsu",
+    "level": "trial-yabitsu",
+    "rival": "Time Trial",
+    "path": "campaign_files/yabitsu/trial-yabitsu"
+  },
+  {
+    "campaign": "odawara",
+    "level": "trial-odawara",
+    "rival": "Time Trial",
+    "path": "campaign_files/odawara/trial-odawara"
+  },
+  {
+    "campaign": "odawara",
+    "level": "odawara-grid",
+    "rival": "Carrera múltiple",
+    "path": "campaign_files/odawara/odawara-grid"
+  },
+  {
+    "campaign": "ashinoko",
+    "level": "trial-ashinoko",
+    "rival": "Time Trial",
+    "path": "campaign_files/ashinoko/trial-ashinoko"
+  },
+  {
+    "campaign": "ashinoko",
+    "level": "ashinoko-grid",
+    "rival": "Carrera múltiple",
+    "path": "campaign_files/ashinoko/ashinoko-grid"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "trial-manazuru",
+    "rival": "Time Trial",
+    "path": "campaign_files/manazuru/trial-manazuru"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "manazuru-grid-1",
+    "rival": "Carrera múltiple 1",
+    "path": "campaign_files/manazuru/manazuru-grid-1"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "manazuru-grid-2",
+    "rival": "Carrera múltiple 2",
+    "path": "campaign_files/manazuru/manazuru-grid-2"
+  },
+  {
+    "campaign": "manazuru",
+    "level": "manazuru-grid-3",
+    "rival": "Final de parrilla",
+    "path": "campaign_files/manazuru/manazuru-grid-3"
   }
 ]

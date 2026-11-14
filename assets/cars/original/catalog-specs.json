@@ -574,6 +574,462 @@
       "wing": "lip",
       "vents": "gt86",
       "source": "https://global.toyota/en/detail/173965"
+    },
+    {
+      "id": "eg6",
+      "label": "Civic EG6",
+      "size": [
+        4.07,
+        1.695,
+        1.35
+      ],
+      "wb": 2.57,
+      "radius": 0.288,
+      "shape": "modern",
+      "roof": [
+        0.85,
+        0.35,
+        -1.15,
+        -1.8
+      ],
+      "belt": 0.74,
+      "nose": 0.57,
+      "lights": "slit",
+      "tail": "rectangle",
+      "spokes": 5,
+      "wing": "lip"
+    },
+    {
+      "id": "r32v2",
+      "label": "Skyline R32 V-Spec II",
+      "size": [
+        4.545,
+        1.755,
+        1.34
+      ],
+      "wb": 2.615,
+      "radius": 0.316,
+      "shape": "angular",
+      "roof": [
+        0.82,
+        0.2,
+        -0.85,
+        -1.51
+      ],
+      "belt": 0.76,
+      "nose": 0.56,
+      "lights": "rectangle",
+      "tail": "round4",
+      "spokes": 6,
+      "wing": "pedestal"
+    },
+    {
+      "id": "na6ce",
+      "label": "Eunos NA6CE",
+      "size": [
+        3.97,
+        1.675,
+        1.235
+      ],
+      "wb": 2.265,
+      "radius": 0.286,
+      "shape": "round",
+      "roof": [
+        0.68,
+        0.05,
+        -0.64,
+        -1.15
+      ],
+      "belt": 0.665,
+      "nose": 0.46,
+      "lights": "popup",
+      "tail": "oval",
+      "spokes": 7,
+      "wing": "lip"
+    },
+    {
+      "id": "er34",
+      "label": "Skyline ER34",
+      "size": [
+        4.58,
+        1.725,
+        1.34
+      ],
+      "wb": 2.665,
+      "radius": 0.312,
+      "shape": "modern",
+      "roof": [
+        0.83,
+        0.14,
+        -0.97,
+        -1.53
+      ],
+      "belt": 0.74,
+      "nose": 0.57,
+      "lights": "slit",
+      "tail": "round4",
+      "spokes": 5,
+      "wing": "lip"
+    },
+    {
+      "id": "z33",
+      "label": "Fairlady Z33",
+      "size": [
+        4.31,
+        1.815,
+        1.315
+      ],
+      "wb": 2.65,
+      "radius": 0.324,
+      "shape": "round",
+      "roof": [
+        0.83,
+        0.12,
+        -0.47,
+        -1.6
+      ],
+      "belt": 0.735,
+      "nose": 0.54,
+      "lights": "swept",
+      "tail": "boomerang",
+      "spokes": 6,
+      "wing": "lip"
+    },
+    {
+      "id": "s15",
+      "label": "Silvia S15",
+      "size": [
+        4.445,
+        1.695,
+        1.285
+      ],
+      "wb": 2.525,
+      "radius": 0.307,
+      "shape": "round",
+      "roof": [
+        0.75,
+        0.07,
+        -0.87,
+        -1.52
+      ],
+      "belt": 0.711,
+      "nose": 0.51,
+      "lights": "slit",
+      "tail": "rectangle",
+      "spokes": 6,
+      "wing": "pedestal"
+    },
+    {
+      "id": "zzw30",
+      "label": "MR-S ZZW30",
+      "size": [
+        3.885,
+        1.695,
+        1.235
+      ],
+      "wb": 2.45,
+      "radius": 0.296,
+      "shape": "round",
+      "roof": [
+        0.75,
+        0.23,
+        -0.51,
+        -1.22
+      ],
+      "belt": 0.685,
+      "nose": 0.49,
+      "lights": "swept",
+      "tail": "oval",
+      "spokes": 5,
+      "wing": "lip"
+    },
+    {
+      "id": "ek9",
+      "label": "Civic EK9",
+      "size": [
+        4.18,
+        1.695,
+        1.36
+      ],
+      "wb": 2.62,
+      "radius": 0.3,
+      "shape": "modern",
+      "roof": [
+        0.91,
+        0.39,
+        -1.16,
+        -1.84
+      ],
+      "belt": 0.747,
+      "nose": 0.59,
+      "lights": "swept",
+      "tail": "rectangle",
+      "spokes": 7,
+      "wing": "lip"
+    },
+    {
+      "id": "dc2",
+      "label": "Integra DC2",
+      "size": [
+        4.38,
+        1.695,
+        1.32
+      ],
+      "wb": 2.57,
+      "radius": 0.301,
+      "shape": "modern",
+      "roof": [
+        0.81,
+        0.18,
+        -0.76,
+        -1.55
+      ],
+      "belt": 0.725,
+      "nose": 0.53,
+      "lights": "quad",
+      "tail": "rectangle",
+      "spokes": 8,
+      "wing": "pedestal"
+    },
+    {
+      "id": "sxe10",
+      "label": "Altezza SXE10",
+      "size": [
+        4.4,
+        1.725,
+        1.41
+      ],
+      "wb": 2.67,
+      "radius": 0.308,
+      "shape": "modern",
+      "roof": [
+        0.85,
+        0.23,
+        -1.08,
+        -1.62
+      ],
+      "belt": 0.775,
+      "nose": 0.595,
+      "lights": "swept",
+      "tail": "round4",
+      "spokes": 6,
+      "wing": "lip"
+    },
+    {
+      "id": "fc3s",
+      "label": "RX-7 FC3S",
+      "size": [
+        4.33,
+        1.69,
+        1.26
+      ],
+      "wb": 2.43,
+      "radius": 0.303,
+      "shape": "angular",
+      "roof": [
+        0.75,
+        0.11,
+        -0.79,
+        -1.62
+      ],
+      "belt": 0.716,
+      "nose": 0.5,
+      "lights": "popup",
+      "tail": "rectangle",
+      "spokes": 7,
+      "wing": "pedestal"
+    },
+    {
+      "id": "ek9spoon",
+      "label": "Spoon Civic EK9",
+      "size": [
+        4.18,
+        1.7,
+        1.32
+      ],
+      "wb": 2.62,
+      "radius": 0.297,
+      "shape": "modern",
+      "roof": [
+        0.91,
+        0.39,
+        -1.16,
+        -1.84
+      ],
+      "belt": 0.728,
+      "nose": 0.574,
+      "lights": "swept",
+      "tail": "rectangle",
+      "spokes": 5,
+      "wing": "gt"
+    },
+    {
+      "id": "evo5",
+      "label": "Lancer Evo V",
+      "size": [
+        4.35,
+        1.77,
+        1.4
+      ],
+      "wb": 2.51,
+      "radius": 0.317,
+      "shape": "angular",
+      "roof": [
+        0.78,
+        0.18,
+        -1.02,
+        -1.58
+      ],
+      "belt": 0.755,
+      "nose": 0.59,
+      "lights": "rectangle",
+      "tail": "rectangle",
+      "spokes": 6,
+      "wing": "hoop"
+    },
+    {
+      "id": "evo6",
+      "label": "Lancer Evo VI TME",
+      "size": [
+        4.35,
+        1.77,
+        1.4
+      ],
+      "wb": 2.51,
+      "radius": 0.315,
+      "shape": "modern",
+      "roof": [
+        0.77,
+        0.16,
+        -1.06,
+        -1.61
+      ],
+      "belt": 0.749,
+      "nose": 0.58,
+      "lights": "rectangle",
+      "tail": "rectangle",
+      "spokes": 7,
+      "wing": "hoop"
+    },
+    {
+      "id": "evo7",
+      "label": "Lancer Evo VII",
+      "size": [
+        4.455,
+        1.77,
+        1.45
+      ],
+      "wb": 2.625,
+      "radius": 0.319,
+      "shape": "modern",
+      "roof": [
+        0.85,
+        0.25,
+        -1.19,
+        -1.67
+      ],
+      "belt": 0.779,
+      "nose": 0.61,
+      "lights": "swept",
+      "tail": "rectangle",
+      "spokes": 8,
+      "wing": "tall"
+    },
+    {
+      "id": "nb8c",
+      "label": "Roadster NB8C",
+      "size": [
+        3.955,
+        1.68,
+        1.235
+      ],
+      "wb": 2.265,
+      "radius": 0.293,
+      "shape": "round",
+      "roof": [
+        0.68,
+        0.07,
+        -0.64,
+        -1.18
+      ],
+      "belt": 0.677,
+      "nose": 0.481,
+      "lights": "swept",
+      "tail": "oval",
+      "spokes": 6,
+      "wing": "lip"
+    },
+    {
+      "id": "m6f13",
+      "label": "BMW M6 F13",
+      "size": [
+        4.9,
+        1.895,
+        1.37
+      ],
+      "wb": 2.85,
+      "radius": 0.342,
+      "shape": "modern",
+      "roof": [
+        0.69,
+        0.14,
+        -1.11,
+        -1.7
+      ],
+      "belt": 0.78,
+      "nose": 0.615,
+      "lights": "swept",
+      "tail": "rectangle",
+      "spokes": 10,
+      "wing": "lip"
+    },
+    {
+      "id": "gt3",
+      "label": "911 GT3",
+      "size": [
+        4.545,
+        1.85,
+        1.27
+      ],
+      "wb": 2.457,
+      "radius": 0.333,
+      "shape": "porsche",
+      "roof": [
+        1.08,
+        0.46,
+        -0.55,
+        -1.66
+      ],
+      "belt": 0.731,
+      "nose": 0.53,
+      "lights": "oval",
+      "tail": "slit",
+      "spokes": 9,
+      "wing": "pedestal"
+    },
+    {
+      "id": "amggtr",
+      "label": "AMG GT R",
+      "size": [
+        4.55,
+        1.94,
+        1.28
+      ],
+      "wb": 2.63,
+      "radius": 0.337,
+      "shape": "round",
+      "roof": [
+        0.43,
+        -0.02,
+        -0.95,
+        -1.65
+      ],
+      "belt": 0.746,
+      "nose": 0.56,
+      "lights": "swept",
+      "tail": "slit",
+      "spokes": 10,
+      "wing": "gt"
     }
   ]
 }

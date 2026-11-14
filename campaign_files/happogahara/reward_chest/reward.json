@@ -1,0 +1,9 @@
+{
+  "type": "cosmetic",
+  "slot": "eyes",
+  "keys": {
+    "male": "bright",
+    "female": "starlight"
+  },
+  "name": "Mirada brillante"
+}

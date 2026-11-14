@@ -24,7 +24,7 @@ test('terrain footprint checks reject a road through the middle, edge grazing an
  assert.equal(index.polygonClear([[10,0,-10],[20,0,10],[10,0,10],[20,0,-10]]),false,'folded strips must be rejected before triangulation');
 });
 
-test('all ten decorated maps retain safe road corridors and sector culling, including campaign roads',()=>{
+test('all decorated maps retain safe road corridors and sector culling, including expansion roads',()=>{
  const summary={};
  for(const config of ALL_TRACKS){
   const track=makeTrack(config),index=createRoadIndex(track),renderer=Object.create(Renderer.prototype);let uploads=0;
@@ -41,10 +41,10 @@ test('all ten decorated maps retain safe road corridors and sector culling, incl
   for(const tunnel of env.tunnels){assert.ok(tunnel.clearance>5);for(let i=tunnel.first;i<=tunnel.last;i+=3)for(let j=0;j<track.points.length;j++){if(j>=tunnel.first-7&&j<=tunnel.last+7)continue;assert.ok(Math.hypot(track.points[i].x-track.points[j].x,track.points[i].z-track.points[j].z)>=25,config.id+' tunnel crosses another road');}}
   summary[config.id]=env.counts;
  }
- assert.equal(Object.keys(summary).length,10);assert.ok(summary.iroha['tree-autumn']>1500);assert.ok(summary.atami.building>100);assert.equal(summary.usui['railway-bridge'],1);assert.ok(summary.ashinoko.dock>=1);assert.ok(summary.akagi['tunnel-segment']>10);
+ assert.equal(Object.keys(summary).length,20);assert.ok(summary.iroha['tree-autumn']>1500);assert.ok(summary.atami.building>100);assert.equal(summary.usui['railway-bridge'],1);assert.ok(summary.ashinoko.dock>=1);assert.ok(summary.akagi['tunnel-segment']>10);
 });
 
 test('course identities and inhabited areas follow authored regional patterns',()=>{
- assert.equal(Object.keys(ENVIRONMENTS).length,10);assert.equal(ENVIRONMENTS.iroha.tree,'autumn');assert.ok(ENVIRONMENTS.ashinoko.lake);assert.ok(ENVIRONMENTS.manazuru.coast);
+ assert.equal(Object.keys(ENVIRONMENTS).length,20);assert.equal(ENVIRONMENTS.iroha.tree,'autumn');assert.ok(ENVIRONMENTS.ashinoko.lake);assert.ok(ENVIRONMENTS.manazuru.coast);
  assert.equal(environmentZone('atami',.08),'urban');assert.equal(environmentZone('atami',.4),'forest');assert.equal(environmentZone('tsukuba',.5),'orchard');assert.equal(environmentZone('manazuru',.58),'coast');
 });

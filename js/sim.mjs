@@ -9,10 +9,15 @@ import {createDraft,clearDraft,updateSlipstream,draftSpeedMultiplier,SLIPSTREAM,
 import {applyBuild} from './tuning.mjs';
 import {AUTHORED_COURSES as TRACED_COURSES} from './authored-courses.mjs';
 import {ASHINOKO_COURSE} from './ashinoko-course.mjs';
+import {EXPANSION_TRACKS} from './expansion-courses.mjs';
+import {EXPANSION_PATHS} from './expansion-paths.mjs';
+import {EXPANSION_DRIVERS} from './expansion-drivers.mjs';
 import {buildAuthoredTrack} from './track-geometry.mjs';
-const AUTHORED_COURSES={...TRACED_COURSES,ashinoko:ASHINOKO_COURSE};
+const AUTHORED_COURSES={...TRACED_COURSES,...EXPANSION_PATHS,ashinoko:ASHINOKO_COURSE};
+const guestRivals=Object.fromEntries(EXPANSION_DRIVERS.map(([,id,name,car,color,level,style])=>[id,{id,name,short:name,car,color,level,style}]));
+Object.assign(RIVALS,guestRivals);
 export { TRACKS, RIVALS };
-export const ALL_TRACKS=[...TRACKS,...CAMPAIGN_TRACKS];
+export const ALL_TRACKS=[...TRACKS,...CAMPAIGN_TRACKS,...EXPANSION_TRACKS];
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export const mix = (a, b, t) => a + (b - a) * t;
 export const HANDLING_VERSION='v10';
@@ -84,9 +89,12 @@ export function makeTrack(config) {
   return result;
 }
 export function sample(track, s) {
+  const lap=track.closed?Math.floor(s/track.length):0;
+  s-=lap*track.length;
   const f = clamp(s / track.step, 0, track.points.length - 1.001), i = Math.floor(f), t = f - i;
   const a = track.points[i], b = track.points[i + 1];
-  return { x: mix(a.x, b.x, t), y: mix(a.y, b.y, t), z: mix(a.z, b.z, t), heading: mix(a.heading, b.heading, t), curve: mix(a.curve, b.curve, t) };
+  const turn=lap?track.points[track.renderSegments].heading-track.points[0].heading:0;
+  return { x: mix(a.x, b.x, t), y: mix(a.y, b.y, t), z: mix(a.z, b.z, t), heading: mix(a.heading, b.heading, t)+lap*turn, curve: mix(a.curve, b.curve, t) };
 }
 export function worldAt(track, s, lateral = 0) {
   const p = sample(track, s);
@@ -96,8 +104,20 @@ export function worldAt(track, s, lateral = 0) {
 export function createRace(car, track, opts = {}) {
   if(opts.build)car=applyBuild(car,opts.build);
   const mode=opts.mode||'battle',rival=opts.rival||RIVALS[track.rival];
-  return { car, track, rival,draft:createDraft(),contactCooldown:0,boss:createBossState(rival),aiDriver:opts.aiDriver?createAIDriver(opts.aiDriver):null, campaignStage:opts.campaignStage||null,rematch:opts.rematch===true,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false,handbrakeTime:0, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(track.length/22)+35, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, rivalLevel:rivalLevel(rival) };
+  const laps=track.closed?(opts.laps||1):1,finishDistance=track.length*laps;
+  const race={ car, track, rival,draft:createDraft(),contactCooldown:0,boss:createBossState(rival),aiDriver:opts.aiDriver?createAIDriver(opts.aiDriver):null, campaignStage:opts.campaignStage||null, eventKind:opts.eventKind||null,campaignRules:!!opts.campaignRules,laps,finishDistance,targetTime:opts.targetTime||null,rematch:opts.rematch===true,fog:!!opts.fog,s: 12, lateral: -1.7, speed: 0, yaw: 0, yawRate:0, travelYaw:0, lateralV: 0, steer: 0, gripUsage:0, understeer:0, cornerSpeed:car.max, handbrakeDown:false,handbrakeTime:0, driftAssist:0, slipAngle:0, gear: 1, rpm: 1000, elapsed: 0, countdown: 3, rivalS: 24, rivalSpeed: 0, rivalLateral:1.5,rivalYaw:0,rivalFinished:false, opponent:null,rivalBraking:false,rivalSteer:0,headlights:true,night:opts.night!==false,blindTime:0,blindPasses:0,blindAward:0,blindArmed:false,braking:false,skill:createSkillState(),focus:createFocus(opts.focusType,opts.focusEnabled!==false),resetId:0,resetHold:0,resetCooldown:0,wallContact:0,wallTouch:0,wallSlow:0, drift: 0, driftPoints: 0, combo: 0, bestCombo: 0, wallCooldown: 0, collision: 0, checkpoints: 0, timeLeft: Math.ceil(finishDistance/22)+35, finished: false, won: false, manual: !!opts.manual, wet: !!opts.wet, mode, rivalLevel:rivalLevel(rival) };
+  if(race.eventKind==='trial'){race.lateral=0;race.boss=null;race.timeLeft=Math.max(race.timeLeft,race.targetTime+30);}
+  if(race.eventKind==='grid'){
+    race.boss=null;race.place=opts.rivals.length+1;race.fieldSize=race.place;
+    race.grid=opts.rivals.map((driver,index)=>{
+      const opponent=createRace(rivalCar(driver),track,{mode:'time',rival:driver,wet:race.wet,night:race.night,focusEnabled:false,aiDriver:driver,laps});
+      return Object.assign(opponent,{s:index<2?22:12,lateral:index%2===0?1.7:-1.7,countdown:0,timeLeft:10000});
+    });
+    race.netOpponents=race.grid.map(gridPose);
+  }
+  return race;
 }
+function gridPose(o){return {...vehiclePose(o),id:'grid-'+o.rival.id,carId:o.car.id,steer:o.steer,headlights:o.headlights,braking:o.braking,drift:o.drift,slipAngle:o.slipAngle};}
 export function rivalCar(rival){
  const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0],style=rivalStyle(rival);
  const tune={Grip:{accel:1.15,max:1.09,grip:1,brakes:1.30},Complete:{accel:1.09,max:1.025,grip:1.04,brakes:1.16},Skiller:{accel:1.055,max:.96,grip:1.08,brakes:1.08}}[style];
@@ -110,10 +130,12 @@ export function updateRace(r, input, dt, traffic=null) {
   dt = clamp(dt, 0, .05);
   if (r.countdown > 0) { r.countdown = Math.max(0, r.countdown - dt); return; }
   const beforePlayer=vehiclePose(r),frameStartS=r.s;
-  if(r.mode!=='time'&&!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false,aiDriver:r.rival});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
+  const duel=r.mode!=='time'&&!['trial','grid'].includes(r.eventKind);
+  if(duel&&!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false,aiDriver:r.rival});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
   const beforeOpponent=r.opponent?vehiclePose(r.opponent):null;
+  const gridBefore=r.grid?.map(vehiclePose);
   r.contactCooldown=Math.max(0,(r.contactCooldown||0)-dt);
-  updateSlipstream(r,traffic||(r.opponent?[beforeOpponent]:[]),dt,worldAt);
+  updateSlipstream(r,traffic||gridBefore||(r.opponent?[beforeOpponent]:[]),dt,worldAt);
   r.elapsed += dt; r.timeLeft -= dt; r.collision = Math.max(0, r.collision - dt * 2); r.wallCooldown -= dt;
   const resetHeld=r.resetHold>0;r.resetHold=Math.max(0,r.resetHold-dt);r.resetCooldown=Math.max(0,r.resetCooldown-dt);
   if(resetHeld)input={steer:0,throttle:false,brake:true,handbrake:false};
@@ -193,12 +215,13 @@ export function updateRace(r, input, dt, traffic=null) {
   r.rpm = clamp(1000 + r.speed / gearMax[r.gear] * 7000, 900, 8500);
   r.s+=r.speed*Math.max(.12,Math.cos(r.travelYaw))/clamp(1-p.curve*r.lateral,.65,1.35)*dt;
   if (r.drift > .25 && Math.abs(r.slipAngle)>.09 && r.speed > 12 && Math.abs(r.lateral) < edge-.45) { r.combo += dt * r.speed * r.drift * 7; r.driftPoints += dt * r.speed * r.drift * 7; r.bestCombo = Math.max(r.bestCombo, r.combo); } else r.combo = Math.max(0, r.combo - dt * 180);
-  const checkpoint = r.track.sectionEnds?r.track.sectionEnds.slice(0,-1).filter(s=>r.s>=s).length:Math.min(3,Math.floor(r.s/(r.track.length/4)));
+  const lap=Math.min(r.laps-1,Math.floor(r.s/r.track.length)),lapS=r.s-lap*r.track.length;
+  const checkpoint = 4*lap+(r.track.sectionEnds?r.track.sectionEnds.slice(0,-1).filter(s=>lapS>=s).length:Math.min(3,Math.floor(lapS/(r.track.length/4))));
   if (checkpoint > r.checkpoints) { r.timeLeft += 14; r.checkpoints = checkpoint; }
   updateCornerSkill(r,dt,p.curve,grip);
   updateFocus(r,dt,p.curve,baseGrip);
   r.blindAward=Math.max(0,r.blindAward-dt);
-  if(r.mode!=='time'){
+  if(duel){
     const previousGap=r.rivalS-r.s;
     const opponentStartS=r.opponent.s;
     const sensedPlayer={...beforePlayer,lateralV:Math.sin(beforePlayer.travelYaw)*beforePlayer.speed,rival:r.rival,boss:r.boss,night:r.night,headlights:r.headlights,rematch:r.rematch};
@@ -210,5 +233,29 @@ export function updateRace(r, input, dt, traffic=null) {
     if(r.blindArmed&&!r.headlights&&r.night&&r.s>r.rivalS+6&&r.collision===0){r.blindPasses++;r.blindAward=2.5;r.skill.points+=600;r.blindArmed=false;}
     if(r.headlights||!r.night||r.collision>0||r.rivalS-r.s>65){r.blindArmed=false;r.blindTime=0;}
   }
-  if (r.s >= r.track.length || r.timeLeft <= 0 || (r.mode!=='time'&&r.rivalFinished)) { r.finished = true; r.won = r.s >= r.track.length && (r.mode === 'time' || !r.rivalFinished || (r.track.length-frameStartS)/Math.max(.00001,r.s-frameStartS)<r.rivalFinishFraction); }
+  if(r.grid)updateGrid(r,dt,beforePlayer,gridBefore,frameStartS);
+  if (r.s >= r.finishDistance || r.timeLeft <= 0 || (duel&&r.rivalFinished)) {
+    r.finished=true;
+    const crossed=r.s>=r.finishDistance;
+    const fraction=crossed?clamp((r.finishDistance-frameStartS)/Math.max(.00001,r.s-frameStartS),0,1):1;
+    if(crossed&&(r.eventKind||r.laps>1))r.elapsed-=dt*(1-fraction);
+    r.won=crossed&&(r.eventKind==='trial'?r.elapsed<=r.targetTime:r.eventKind==='grid'?r.place===1:!duel||!r.rivalFinished||fraction<r.rivalFinishFraction);
+  }
+}
+
+function updateGrid(r,dt,beforePlayer,before,frameStartS){
+  const poses=[beforePlayer,...before],cars=[r,...r.grid];
+  for(const [index,opponent] of r.grid.entries()){
+    if(opponent.finished)continue;
+    const prior=before[index],traffic=poses.filter(p=>p!==prior);
+    const obstruction=traffic.filter(p=>!p.finished&&p.s>prior.s)
+      .sort((a,b)=>(a.s-prior.s)+Math.abs(a.lateral-prior.lateral)*8-((b.s-prior.s)+Math.abs(b.lateral-prior.lateral)*8))[0];
+    const sensed={...(obstruction||{...prior,finished:true}),rival:opponent.rival,night:r.night,headlights:r.headlights};
+    updateRace(opponent,rivalDriverInput(sensed,opponent,dt),dt,traffic);
+  }
+  for(let i=0;i<cars.length;i++)for(let j=i+1;j<cars.length;j++)resolveVehicleContact(cars[i],cars[j],poses[i],poses[j]);
+  const finishFraction=(car,start)=>clamp((r.finishDistance-start)/Math.max(.00001,car.s-start),0,1);
+  r.place=1+r.grid.filter((opponent,i)=>r.s<r.finishDistance?opponent.s>r.s:
+    opponent.s>=r.finishDistance&&(before[i].finished||finishFraction(opponent,before[i].s)<=finishFraction(r,frameStartS))).length;
+  r.netOpponents=r.grid.map(gridPose);
 }

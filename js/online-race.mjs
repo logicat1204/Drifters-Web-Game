@@ -9,7 +9,7 @@ export function placeOnlineCar(room,other,i,now,focus){
   const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',manual:!!other.manual,build:other.build,night:room.config.night,wet:room.config.wet,...focus});
   r.s=24-Math.floor(i/2)*7;
   r.lateral=i%2?2:-2;
-  r.countdown=3;
+  r.countdown=3+(room.introSeconds||0);
   r.timeLeft=Math.ceil(room.track.length/20)+90;
   other.input={...IDLE_INPUT};
   other.inputAt=now;
@@ -50,7 +50,7 @@ export function stepOnlineRace(room,dt,now,onFinish=()=>{}){
   const newlyFinished=[];
   for(const p of active)if(p.race.finished){if(p.race.s>=room.track.length)newlyFinished.push({p,fraction:clamp((room.track.length-poses.get(p).s)/Math.max(.00001,p.race.s-poses.get(p).s),0,1)});else p.dnf=true;}
   newlyFinished.sort((a,b)=>a.fraction-b.fraction);
-  for(const {p,fraction} of newlyFinished){p.place=room.finishOrder.length+1;p.finishTime=room.elapsed-3-dt*(1-fraction);room.finishOrder.push(p.client.id);if(room.firstFinish===null)room.firstFinish=room.elapsed;
+  for(const {p,fraction} of newlyFinished){p.place=room.finishOrder.length+1;p.finishTime=p.race.elapsed-dt*(1-fraction);room.finishOrder.push(p.client.id);if(room.firstFinish===null)room.firstFinish=room.elapsed;
     onFinish(p);
   }
   const players=[...room.players.values()];

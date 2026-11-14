@@ -26,7 +26,26 @@ const rows=[
  ['grsupra','modern',.36,1.10,1.82,'#2c3038','#e6e9e7',3,'virtual'],
  ['a110','alpine',-.34,1.06,1.73,'#2b343d','#a5d4e8',3,'digital'],
  ['cayman','porsche',-.35,1.09,1.78,'#303238','#e1e4dd',3,'center'],
- ['gt86','modern',.35,1.12,1.72,'#2d3036','#e9d4ca',3,'center']
+ ['gt86','modern',.35,1.12,1.72,'#2d3036','#e9d4ca',3,'center'],
+ ['eg6','honda',.35,1.17,1.66,'#32353b','#b1c6a5',3,'analog'],
+ ['r32v2','skyline',.37,1.16,1.76,'#292d33','#c4dec7',3,'analog'],
+ ['na6ce','roadster',.34,1.06,1.66,'#35363a','#afc6a6',3,'analog'],
+ ['er34','skyline',.37,1.15,1.73,'#2c313a','#e1dbce',3,'center'],
+ ['z33','nissan',.36,1.10,1.77,'#292c33','#ffc58b',3,'center'],
+ ['s15','nissan',.35,1.11,1.69,'#303339','#f3e0c4',3,'analog'],
+ ['zzw30','midship',.34,1.05,1.65,'#272f30','#d6b398',3,'center'],
+ ['ek9','honda',.35,1.19,1.67,'#35373b','#dbc0ad',3,'analog'],
+ ['dc2','honda',.35,1.14,1.67,'#303238','#f2e4ce',3,'analog'],
+ ['sxe10','touring',.36,1.20,1.71,'#33363a','#ebd6a4',3,'five'],
+ ['fc3s','rotary',.35,1.10,1.66,'#2a2c32','#b4d8ad',3,'analog'],
+ ['ek9spoon','honda',.35,1.16,1.67,'#2e3033','#f7e2a6',3,'race'],
+ ['evo5','rally',.36,1.20,1.74,'#373539','#d4c7bd',3,'analog'],
+ ['evo6','rally',.36,1.19,1.75,'#302d32','#e0d5c7',3,'analog'],
+ ['evo7','rally',.36,1.21,1.74,'#30343c','#ead6b0',3,'center'],
+ ['nb8c','roadster',.34,1.07,1.67,'#384044','#c8d1aa',3,'analog'],
+ ['m6f13','touring',-.37,1.13,1.84,'#292d35','#ffd8a0',3,'five'],
+ ['gt3','porsche',-.36,1.075,1.81,'#303640','#e8efe8',3,'five'],
+ ['amggtr','modern',-.38,1.066,1.86,'#272c36','#ffdf9d',3,'virtual']
 ];
 export const CABIN_PROFILES=Object.freeze(Object.fromEntries(rows.map(([id,family,seat,height,width,trim,accent,spokes,instruments],i)=>[id,Object.freeze({id,family,seat,height,width,trim,accent,spokes,instruments,yOffset:height-1.13,depth:.97+(i%4)*.025,wheelRadius:id==='exige'?.17:.188,open:id==='s2000',sport:['ae86carbon','rx7amemiya','gt3rs','exige'].includes(id),roundVents:['rotary','exotic','lightweight','alpine','audi','midship'].includes(family)})])));
 export const cabinProfile=id=>CABIN_PROFILES[id]||CABIN_PROFILES.ae86;

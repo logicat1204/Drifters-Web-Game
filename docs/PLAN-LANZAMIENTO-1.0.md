@@ -42,17 +42,19 @@ El pedido de lanzamiento se conserva íntegro en [Prompt version 1](Prompt%20ver
 
 ## Fase 2 · Mundos, progresión y recursos de campaña
 
+Los destinos tienen un submapa navegable después de «Viajar». Cada uno conecta sus eventos en orden, con un desvío hacia el cofre donde corresponde. Cada destino de Initial D cierra con una Time Trial. Las tres etapas de MF Ghost abren con una clasificación y usan las parrillas del inventario de esta fase. Asfalto mojado y niebla se mantienen en todo Ashinoko.
+
 - Entrada a campaña con dos botones ilustrados, **Mundo Initial D** y **Mundo MF Ghost**. Cada mundo tiene su propio minimapa. Initial D mantiene regiones y es el único con selector de temporada. MF Ghost se organiza por etapas con clima definido por evento. La imagen, descripción acotada y botón «Viajar» aparecen en el panel lateral al elegir un destino. La fuente indicada para los minimapas es `assets/campaing_miniworld/`.
 - «Viajar» abre el submundo. En la primera visita se muestra el prólogo del destino y, al terminar el último evento del mundo, se muestra su epílogo. Los accesos para volver a verlos quedan en el submundo correspondiente. Los eventos se muestran como nodos circulares con iconos de contrarreloj, duelo, carrera múltiple o cofre.
 - Initial D conserva duelos 1 contra 1 y cierra cada región con una **Time Trial** y una marca mínima de clasificación. Cada etapa de MF Ghost comienza con su **Time Trial** y admite carreras múltiples además de duelos. Los umbrales de clasificación se calibran en la fase 3.
 - Repartir cofres desbloqueables por el mapa. Otorgan cosméticos, música o superconcentraciones. Las técnicas pasan a obtenerse al abrir sus cofres. La migración conserva las que ya posee cada licencia y registra la apertura de forma que un premio se cobre una sola vez.
 - Antes de cada carrera, mostrar participantes, retratos, coches y selector musical por carrusel. La lista personalizada admite hasta siete canciones disponibles para el jugador. La canción del evento sigue siendo la opción por defecto, para un máximo de ocho opciones.
-- **Comenzar NG+** se habilita al completar ambos mundos y vencer a Kanata en el evento final. El modal anticipa el reinicio del progreso de las etapas, la dificultad aumentada y las mayores recompensas. El ciclo de NG+ conserva el equipamiento de la cuenta y el requisito de coche de competición al máximo de la versión actual. Al completarlo se marca el final de campaña. Queda por fijar qué revancha lluviosa será obligatoria en Initial D, con el objetivo de acortar la campaña y evitar exigir toda la misma ruta dos veces.
+- **Comenzar NG+** se habilita al completar ambos mundos y vencer a Kanata en el evento final. El modal anticipa el nuevo ciclo de etapas, la dificultad aumentada y las mayores recompensas. El ciclo de NG+ conserva el equipamiento de la cuenta y el requisito de coche de competición al máximo de la versión actual. Al completarlo se marca el final de campaña. La temporada lluviosa de Initial D es una revancha opcional, disponible al terminar su campaña inicial.
 - La estructura de recursos por etapa y evento continúa en `campaign_files/`. Cada etapa nueva tendrá portada y descripción. Cada evento tendrá sus recursos de retrato, cómics y música, y cada cofre su referencia de recompensa. Mantener compatibles las carpetas actuales de prólogo, epílogo, música narrativa y sonidos de página.
 
 ### Mundo Initial D · Inventario de trayectos
 
-Akina, Akagi, Irohazaka, Usui, Tsukuba y Tsubaki Line ya tienen trayecto. Se integran en el nuevo mapa de regiones con sus duelos existentes y una Time Trial al cierre de cada región. Los diez trayectos siguientes son incorporaciones. La tabla conserva el orden relativo de los nuevos trayectos en la solicitud. Los niveles concretos de estos rivales se asignarán durante el balance.
+Akina, Akagi, Irohazaka, Usui, Tsukuba y Tsubaki Line conservan sus trayectos. Los diez siguientes se integran en el atlas con dos duelos y una Time Trial por destino. La tabla conserva el orden relativo de la solicitud. Keisuke en Enna conduce con estilo Balance.
 
 | Trayecto nuevo | Duelo 1 | Duelo 2 | Carpeta de referencia bajo `Intiial D/` |
 | --- | --- | --- | --- |
@@ -80,9 +82,11 @@ Los tres trayectos base ya existen. La ampliación cambia la secuencia de evento
 | Peninsula Manazuru | 1. Time Trial. 2. Carrera múltiple contra Ohtani, Sakamoto y Maezono. 3. Carrera múltiple contra Moroboshi, Ishigami y Akaba. 4. Carrera final múltiple contra Sawatari, Beckenbauer y Kanata. 5. Evento final especial de Kanata, conservando el duelo existente. |
 
 - Yanagida conserva su carrera de Ashinoko. La segunda carrera múltiple de Manazuru queda en cuatro coches contando al jugador.
-- Faltan por concretar las vueltas de los demás eventos, los tiempos de clasificación, las fichas de los pilotos nuevos de MF Ghost y la colocación de cofres. `assets/Assets nuevos y campañas y trayectos nuevos/Mf ghost/` es la carpeta reservada para referencias nuevas de este mundo. Los trazados actuales son el punto de partida.
+- Manazuru usa una vuelta por evento. Los coches de los invitados son BMW M6 F13 en Ashinoko, Porsche 911 GT3 y Mercedes-AMG GT R. [BMW M6 en MF Ghost](https://initiald.bestcarweb.jp/mf-ghost/3846?prd=2) · [Porsche 911 GT3](https://initiald.bestcarweb.jp/mf-ghost/2915) · [Mercedes-AMG GT R](https://initiald.bestcarweb.jp/mf-ghost/3794?prd=2)
 
 ## Fase 3 · Trayectos, desafío y presentación de carrera
+
+Los diez nuevos trazados están en el atlas, Time Attack y online. Se conservan las longitudes de las hojas con escala. Enna usa una estimación de 5,51 km con sectores aproximados. El desnivel y el peralte visual de los diez cursos son estimaciones de juego. Se añadieron 19 variantes externas con dos LOD y perfiles de cabina. Los rivales con retrato suministrado o ya existente lo reutilizan, y los demás muestran iniciales en carrera y la imagen del trayecto en la ficha. El ritmo se calibró con conducción de referencia en seco, lluvia y NG+. El ajuste final de marcas queda sujeto a pruebas humanas.
 
 - Construir cada trayecto nuevo desde sus mapas y fotos, con el método de trazado usado para los circuitos actuales. Verificar punto de salida, sentido, ancho, horquillas, desnivel, peralte visual, cruce de caminos y continuidad. Añadir paisaje y señalización a partir de las referencias disponibles. Preparar coches nuevos o variantes que exige el inventario de rivales y reutilizar los vehículos existentes que ya correspondan.
 - Ajustar el desafío por rival y curso, en particular velocidad de paso por curva, pérdida de tiempo al frenar y recuperación al salir. Mantener Grip, Balance y Skiller distinguibles. Probar vueltas comparables con distintos coches, uso temprano y tardío de superconcentración, salida de la trazada ideal y tráfico. El objetivo es que un buen tiempo y el momento de usar la técnica importen para ganar, con dificultad escalonada por rival y ciclo.

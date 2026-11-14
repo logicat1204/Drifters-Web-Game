@@ -1,4 +1,5 @@
 import {BOSS_TRAITS} from './bosses.mjs';
+import {EXPANSION_TRACKS} from './expansion-courses.mjs';
 // Canonical order and roster transcribed from assets/lista_de_pilotos_y_autos.md.
 // Presentation asset paths live in the generated campaign-media.json manifest.
 export const CAMPAIGN_LEVELS=['Fácil','Medio','Difícil','Profesional','Leyenda'];
@@ -16,7 +17,8 @@ export const CAMPAIGN_CHAPTERS=[
   {id:'tsubaki',name:'Tsubaki Line',folder:'6 Tsubaki line',track:'tsubaki',tag:'INITIAL D / PROJECT D'},
   {id:'odawara',name:'Odawara Pikes Peak',folder:'7 Odawara Pines Peak',track:'odawara',tag:'MF GHOST / PRIMERA RONDA'},
   {id:'ashinoko',name:'Lake Ashinoko GT',folder:'8 Lake ashinoko GT',track:'ashinoko',tag:'MF GHOST / LLUVIA Y NIEBLA',wet:true,fog:true},
-  {id:'manazuru',name:'Peninsula Manazuru',folder:'9 Peninsula Manazuru',track:'manazuru',tag:'MF GHOST / FINAL'}
+  {id:'manazuru',name:'Peninsula Manazuru',folder:'9 Peninsula Manazuru',track:'manazuru',tag:'MF GHOST / FINAL'},
+  ...EXPANSION_TRACKS.map(track=>({id:track.id,name:track.title,folder:track.folder,track:track.id,tag:'INITIAL D / '+track.region,referenceCover:track.referenceCover,expansion:true}))
 ];
 const rows=[
   ['akina','kenji','Kenji','180sx','#eeeae0',1,'Grip','Kenji'],
@@ -54,12 +56,18 @@ export function campaignStages(season='dry'){
  return season==='dry'?CAMPAIGN_STAGES:CAMPAIGN_STAGES.map(s=>({...s,id:seasonStageId(s.id,season),baseId:s.id,season,level:season==='ngplus'?Math.min(5,Math.max(3,s.level+1)):s.level,unlock:null,ngplus:season==='ngplus'}));
 }
 export const campaignStage=id=>{if(typeof id!=='string')return null;const parts=id.split(':');return parts.length===1?CAMPAIGN_STAGES.find(s=>s.id===id):parts.length===2?campaignStages(parts[0]).find(s=>s.id===id):null;};
-export function seasonUnlocked(season,cleared){const index=CAMPAIGN_SEASONS.findIndex(s=>s.id===season);return index>=0&&CAMPAIGN_SEASONS.slice(0,index).every(s=>campaignStages(s.id).every(level=>cleared.includes(level.id)));}
+export function seasonUnlocked(season,cleared){
+ const index=CAMPAIGN_SEASONS.findIndex(s=>s.id===season);
+ return index>=0&&CAMPAIGN_SEASONS.slice(0,index).every(s=>{
+  const startsRain=season==='rain'&&s.id==='dry';
+  return campaignStages(s.id).every(level=>((startsRain||s.id==='rain')&&level.index>=14)||cleared.includes(level.id));
+ });
+}
 export function stageAvailable(stage,cleared){return !!stage&&seasonUnlocked(stage.season||'dry',cleared)&&(stage.index===0||cleared.includes(seasonStageId(CAMPAIGN_STAGES[stage.index-1].id,stage.season||'dry')));}
 export function focusUnlocks(cleared){return CAMPAIGN_STAGES.filter(s=>s.unlock&&cleared.includes(s.id)).map(s=>s.unlock);}
 export function campaignReward(stage,points){return Math.round((220+stage.level*80+Math.floor(stage.index/3)*25+Math.min(160,Math.floor(Math.max(0,points)/150)))*(CAMPAIGN_SEASONS.find(s=>s.id===stage.season)?.reward||1));}
 export function campaignReplayReward(stage,points){return Math.round((35+stage.level*5+Math.min(25,Math.floor(Math.max(0,points)/600)))*(CAMPAIGN_SEASONS.find(s=>s.id===stage.season)?.reward||1));}
-export function campaignConditions(stage){const chapter=CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter),wet=stage.season==='rain'||!!chapter.wet||stage.season==='ngplus'&&stage.index%3===1;return {wet,night:stage.index<14,fog:!!chapter.fog,rematch:stage.season==='rain'||stage.season==='ngplus'&&wet};}
+export function campaignConditions(stage){const chapter=CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter),wet=stage.season==='rain'||!!chapter.wet||stage.season==='ngplus'&&stage.index%3===1;return {wet,night:stage.world?stage.world==='initial-d':stage.index<14,fog:!!chapter.fog,rematch:stage.season==='rain'||stage.season==='ngplus'&&wet};}
 
 // Circuit lengths follow the supplied arcade sheets; Ashinoko is the requested 8.433km lap.
 export const CAMPAIGN_TRACKS=[

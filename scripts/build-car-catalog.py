@@ -392,10 +392,11 @@ def build(c):
   for o in textobjs:o.select_set(True)
   bpy.context.view_layer.objects.active=textobjs[0];bpy.ops.object.join();o=bpy.context.object;o.name='LOD0_badges';bpy.context.scene.cursor.location=(0,0,0);bpy.ops.object.origin_set(type='ORIGIN_CURSOR');bpy.ops.object.transform_apply(location=False,rotation=True,scale=True);allparts.append(o)
  rig={'track':track,'wheelY':hub,'radius':r,'front':front,'rear':rear,'popupAngle':.65,'id':c['id'],'size':c['size'],'label':c['label']}
- scene=bpy.context.scene;scene['vehicleRig']=json.dumps(rig);scene['source']='Original authored surfaces; manufacturer imagery and dimensional reference; no downloaded geometry.';scene['reference']=c['source'];scene['coordinate_system']='+Y up, +Z forward, metres'
+ reference=c.get('source','Stylized body proportions from the campaign car specification')
+ scene=bpy.context.scene;scene['vehicleRig']=json.dumps(rig);scene['source']='Original authored surfaces';scene['reference']=reference;scene['coordinate_system']='+Y up, +Z forward, metres'
  bpy.context.preferences.filepaths.save_version=0;bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT,c['id']+'-source.blend'))
  bpy.ops.object.select_all(action='SELECT');pending=os.path.join(OUT,c['id']+'-pending.glb');bpy.ops.export_scene.gltf(filepath=pending,export_format='GLB',use_selection=True,export_extras=True,export_yup=True,export_apply=True,export_cameras=False,export_lights=False);replace_file(pending,os.path.join(OUT,c['id']+'.glb'))
- stats={'id':c['id'],'rig':rig,'reference':c['source'],'parts':[]}
+ stats={'id':c['id'],'rig':rig,'reference':reference,'parts':[]}
  for o in allparts:o.data.calc_loop_triangles();stats['parts'].append({'part':o['part'],'lod':o['lod'],'triangles':len(o.data.loop_triangles)})
  metadata=os.path.join(OUT,c['id']+'-pending.json')
  with open(metadata,'w',encoding='utf8')as f:json.dump(stats,f,indent=2)

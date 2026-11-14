@@ -1,0 +1,9 @@
+{
+  "type": "cosmetic",
+  "slot": "hair",
+  "keys": {
+    "male": "undercut",
+    "female": "pixie"
+  },
+  "name": "Cabello corto"
+}

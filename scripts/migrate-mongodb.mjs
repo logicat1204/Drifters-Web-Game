@@ -27,10 +27,12 @@ export function readSqlite(filename){
     for(const [field,table] of Object.entries({inventory:'inventory',cars:'owned_cars',builds:'vehicle_builds',parts:'owned_vehicle_parts',music:'owned_music',stories:'chapter_story_seen',campaign:'campaign_progress'})){
       for(const {user_id,...row} of rows(table))byId.get(user_id)[field].push(row);
     }
+    const ledger=rows('economy_ledger');
+    for(const row of ledger)if(row.reason.startsWith('chest:'))(byId.get(row.user_id).chests??=[]).push(row.reason.slice(6));
     return {
       pilots,sessions:rows('sessions').map(({token_hash,expires_at,...row})=>({_id:token_hash,...row,expires_at:new Date(expires_at)})),
       runs:rows('runs').map(({id,...row})=>({_id:id,...row})),
-      economy_ledger:rows('economy_ledger').map(({id,...row})=>({_id:id,...row})),
+      economy_ledger:ledger.map(({id,...row})=>({_id:id,...row})),
       cosmetics:rows('cosmetics').map(({id,...row})=>({_id:id,...row}))
     };
   }finally{sql.close();}

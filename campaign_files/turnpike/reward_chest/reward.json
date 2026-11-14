@@ -1,0 +1,9 @@
+{
+  "type": "cosmetic",
+  "slot": "outfit",
+  "keys": {
+    "male": "rally",
+    "female": "sapphire"
+  },
+  "name": "Traje especial"
+}

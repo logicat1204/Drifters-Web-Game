@@ -70,7 +70,8 @@ export class ReplayPlayer {
   cameraPose(race,environment=null){
     const shot=Math.floor(this.at/5),first=this.clip.sample(shot*5),p=worldAt(race.track,race.s,race.lateral);
     const angle=p.heading+race.yaw,target=[p.x,p.y+.85,p.z];
-    if(environment?.tunnels.some(tunnel=>race.s>=tunnel.start&&race.s<=tunnel.end)){
+    const lapS=race.track.closed?race.s%race.track.length:race.s;
+    if(environment?.tunnels.some(tunnel=>lapS>=tunnel.start&&lapS<=tunnel.end)){
       const q=worldAt(race.track,race.s-7,0);
       return {id:'tunnel',label:'SEGUIMIENTO EN TÚNEL',eye:[q.x,q.y+2,q.z],target,fov:56};
     }
@@ -83,7 +84,7 @@ export class ReplayPlayer {
     }
     const ahead=clamp(first.speed*1.5+24,28,85),side=shot%2?1:-1;
     // The shoulder is inside the guardrail, clear of generated hillside scenery.
-    const anchorS=clamp(first.s+ahead,0,race.track.length),anchor=worldAt(race.track,anchorS,side*4.25);
+    const anchorS=clamp(first.s+ahead,0,race.finishDistance||race.track.length),anchor=worldAt(race.track,anchorS,side*4.25);
     const headingGap=Math.abs(Math.atan2(Math.sin(anchor.heading-p.heading),Math.cos(anchor.heading-p.heading)));
     if(Math.abs(anchorS-race.s)>65||headingGap>.65){
       const q=worldAt(race.track,race.s-7,side*3.8);

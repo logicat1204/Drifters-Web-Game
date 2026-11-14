@@ -10,16 +10,17 @@ export function minimapView(track,race,width,height){
     return {x:width*.5+(z*Math.sin(heading)-x*Math.cos(heading))*scale,
       y:height*.77-(x*Math.sin(heading)+z*Math.cos(heading))*scale};
   };
-  const behind=height*.3/scale,start=Math.max(0,race.s-behind),end=Math.min(track.length,race.s+ahead+40),points=[];
+  const finish=race.finishDistance||track.length;
+  const behind=height*.3/scale,start=Math.max(0,race.s-behind),end=Math.min(finish,race.s+ahead+40),points=[];
   for(let s=start;s<end;s+=5)points.push({...project(worldAt(track,s)),s});
   points.push({...project(worldAt(track,end)),s:end});
-  const opponents=race.online?(race.netOpponents||[]):race.mode!=='time'?[{id:race.rival.id,s:race.rivalS,lateral:race.rivalLateral}]:[];
+  const opponents=race.netOpponents||(race.mode!=='time'&&race.eventKind!=='trial'?[{id:race.rival.id,s:race.rivalS,lateral:race.rivalLateral}]:[]);
   const positions=[{id:'player',s:race.s},...opponents].sort((a,b)=>b.s-a.s);
   const radius=Math.max(5,Math.min(width,height)*.033),margin=radius+5;
   const player={...project(worldAt(track,race.s,race.lateral)),player:true,rotation:-(race.yaw||0),rank:positions.findIndex(p=>p.id==='player')+1};
   const drivers=[player];
   for(const [i,opponent] of opponents.entries()){
-    const anchor=project(worldAt(track,clamp(opponent.s,0,track.length),opponent.lateral));
+    const anchor=project(worldAt(track,clamp(opponent.s,0,finish),opponent.lateral));
     const distant=opponent.s>race.s+ahead||opponent.s<start;
     let x=clamp(anchor.x,margin,width-margin),y=distant?(opponent.s>race.s?margin:height-margin):clamp(anchor.y,margin,height-margin);
     const baseX=x,baseY=y;
@@ -32,7 +33,7 @@ export function minimapView(track,race,width,height){
       color:opponentColors[i%opponentColors.length],rank:positions.findIndex(p=>p.id===opponent.id)+1,
       distant});
   }
-  return {points,drivers,scale,radius,heading,project,end:track.length<=end?project(worldAt(track,track.length)):null};
+  return {points,drivers,scale,radius,heading,project,end:finish<=end?project(worldAt(track,finish)):null};
 }
 
 export function drawNavigation(canvas,track,race){

@@ -17,7 +17,22 @@ export const AI_STYLES={
 // Pace reserves per road: a dry/rain baseline, then NG+ on dry and wet stages.
 // Applied to the planned speed/forces, never to race progress or the clock.
 const COURSE_PACE={akina:[.89,.87,.855],akagi:[.88,.88,.82],iroha:[.88,.86,.80],usui:[.87,.87,.81],tsukuba:[.89,.88,.82],tsubaki:[.84,.815,.774],odawara:[.86,.86,.80],ashinoko:[.84,.80,.79],manazuru:[.86,.84,.79]};
+// Calibrated against runs with stock and prepared cars on the new layouts.
+const EXPANSION_PACE={
+ myogi:[.91,.865,.915],momiji:[.885,.805,.875],nanamagari:[.90,.84,.818],nagao:[.88,.82,.853],
+ happogahara:[.845,.796,.817],sadamine:[.91,.844,.83],turnpike:[.92,.86,.915],enna:[.90,.855,.90],
+ tsuchisaka:[.865,.79,.78],yabitsu:[.895,.817,.89]
+};
+const RIVAL_PACE_ADJUSTMENTS={
+ 'daiki-happogahara':.94,'nobuhiko-sadamine':.974,'tachi-enna':.972,
+ 'ichijo-tsuchisaka':.974,'kobayakawa-yabitsu':.953
+};
 function paceFor(track,rival,wet){
+ const expansion=track.geometryVersion&&EXPANSION_PACE[track.id];
+ if(expansion){
+  const id=rival.baseId||rival.id,adjust=RIVAL_PACE_ADJUSTMENTS[id]||1;
+  return expansion[rival.ngplus?2:wet?1:0]*adjust;
+ }
  const row=track.geometryVersion&&COURSE_PACE[track.id];
  if(!row)return 1;
  return row[rival.ngplus?wet?2:1:0]*(!rival.ngplus&&rival.level===1?.96:1);
@@ -123,7 +138,7 @@ export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,steeringAlig
     const car=boost?{...o.car,max:o.car.max*boost.topSpeed,accel:o.car.accel*boost.acceleration,grip:o.car.grip*boost.grip,brakePower:(o.car.brakePower||1)*boost.braking}:o.car;
     driver.route=rivalRoute(o.track,car,r.rival,o.wet);driver.routeBoost=boost;
   }
-  const route=driver.route,ref=routeSample(route,o.s),draft=draftSpeedMultiplier(o),paceLimit=paceFor(o.track,r.rival,o.wet);
+  const route=driver.route,ref=routeSample(route,o.s),draft=draftSpeedMultiplier(o),paceLimit=paceFor(o.track,r.rival,o.wet)*(r.rival.gridPace||1);
   const routeSpeed=ref.speed*paceLimit;
   const plan=planRivalTraffic(r,o,dt,ref.line,routeSpeed*(ref.phase==='straight'?draft:1),{sample,clamp});
   const grip=lateralGrip(o.car,o.wet)*(boost?.grip||1),followingRoute=!plan.maneuver;

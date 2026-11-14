@@ -9,11 +9,25 @@ import {databaseUnavailable,isMongoError} from './database.mjs';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {MediaLibrary} from './media.mjs';
-import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,CAMPAIGN_SEASONS,campaignStages,seasonStageId} from '../js/campaign.mjs';
-import {ALL_CARS} from '../js/sim.mjs';
+import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,CAMPAIGN_SEASONS,seasonStageId} from '../js/campaign.mjs';
+import {campaignEvents,CAMPAIGN_CHESTS,trialTime} from '../js/campaign-events.mjs';
+import {EXPANSION_TRACKS,COURSE_REFERENCE_ROOT} from '../js/expansion-courses.mjs';
+import {ALL_CARS,ALL_TRACKS} from '../js/sim.mjs';
+import {CAMPAIGN_WORLDS} from '../js/campaign-worlds.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 const campaignMedia=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',import.meta.url),'utf8'));
 const campaignMap=JSON.parse(readFileSync(new URL('../assets/campaign-map/map.json',import.meta.url),'utf8'));
+const assetUrl=relative=>'/'+relative.split('/').map(encodeURIComponent).join('/');
+function worldStory(world,season){
+  if(season==='ngplus')return {
+    start:['Los aspirantes regresan con una misión: quitarte el título. Tu defensa empieza en la línea de salida.'],
+    end:[world==='initial-d'?'Has defendido tu título en todos los pasos de montaña. Los últimos aspirantes esperan en MF Ghost.':'Has defendido el trono hasta la bandera a cuadros en Manazuru. Japón vuelve a reconocer a su campeón.']
+  };
+  if(season==='rain')return {start:['Las montañas ya conocen tu nombre. Hoy las luces apenas se distinguen entre el agua y vuelves con referencias nuevas.'],end:['Los últimos faros se pierden entre la lluvia. Has completado la revancha del touge.']};
+  return world==='initial-d'?
+    {start:['Las carreteras de Gunma se vacían al caer la noche. Aquí empieza tu historia.'],end:['Has dejado tu nombre en los pasos de montaña. La próxima salida te espera en la parrilla de MF Ghost.']}:
+    {start:['El escenario cambia a Kanagawa. Clasifícate contra el cronómetro y gana tu sitio en la parrilla.'],end:['Cae la bandera a cuadros en la península. Has vencido a Kanata y puedes volver como campeón para defender el título.']};
+}
 import {sameOrigin,secureSession} from './origin.mjs';
 export {sameOrigin} from './origin.mjs';
 export const fail=(message,status=400)=>Object.assign(Error(message),{status});
@@ -59,7 +73,7 @@ export class Accounts {
         const user=p==='/api/register'?await this.store.register(data.username,data.password,emailAddress(data.email)):await this.store.login(data.email??data.username,data.password);
         const session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
-      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
+      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/campaign/chest','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
       const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
       if(p==='/api/logout'&&req.method==='POST'){await this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
@@ -83,13 +97,37 @@ export class Accounts {
         json(res,200,{user:await this.store.setPhoto(s.user.id,bytes,'image/'+match[1])});return true;
       }
       if(p==='/api/campaign'&&req.method==='GET'){
-        const seasons=await Promise.all(CAMPAIGN_SEASONS.map(async season=>({...season,
-          chapters:await Promise.all(CAMPAIGN_CHAPTERS.map(async c=>({...c,...(season.id!=='dry'?{season:season.id}:{}),storyKey:seasonStageId(c.id,season.id),map:campaignMap[c.id],media:{...await this.media.chapterMedia({...c,...(season.id!=='dry'?{season:season.id}:{})}),portrait:campaignMedia.stages[CAMPAIGN_STAGES.find(s=>s.chapter===c.id).id].portrait}}))),
-          stages:await Promise.all(campaignStages(season.id).map(async stage=>({...stage,carInfo:ALL_CARS.find(c=>c.id===stage.car),media:await this.media.stageMedia(stage,campaignMedia.stages[stage.baseId||stage.id])})))
-        })));
-        json(res,200,{...seasons[0],seasons,focusTypes:FOCUS_TYPES,user:s.user});return true;
+        const seasons=await Promise.all(CAMPAIGN_SEASONS.map(async season=>{
+          const alternate=season.id==='dry'?undefined:season.id;
+          const chapters=await Promise.all(CAMPAIGN_CHAPTERS.map(async chapter=>({
+            ...chapter,season:alternate,storyKey:'map:'+seasonStageId(chapter.id,season.id),map:campaignMap[chapter.id],
+            media:{...await this.media.chapterMedia({...chapter,season:alternate}),
+              portrait:chapter.referenceCover?assetUrl(chapter.referenceCover):campaignMedia.stages[CAMPAIGN_STAGES.find(s=>s.chapter===chapter.id).id].portrait}
+          })));
+          const stages=await Promise.all(campaignEvents(season.id).map(async stage=>{
+            const chapter=chapters.find(c=>c.id===stage.chapter),base=stage.baseId||stage.id;
+            const track=EXPANSION_TRACKS.find(t=>t.id===stage.track),supplied=track&&stage.portrait?
+              assetUrl(COURSE_REFERENCE_ROOT+'/'+track.folder+'/'+stage.portrait):null;
+            const related={'kai-nagao':'kai-campaign','keisuke-enna':'keisuke-project'}[base];
+            const legacy=campaignMedia.stages[base]||{portrait:supplied||campaignMedia.stages[related]?.portrait||chapter.media.portrait};
+            const media=await this.media.stageMedia({...stage,season:alternate},legacy);
+            const customPortrait=media.portraits[base]||Object.values(media.portraits)[0];
+            media.portrait=customPortrait||media.portrait;
+            media.driverPortrait=customPortrait||supplied||campaignMedia.stages[base]?.portrait||campaignMedia.stages[related]?.portrait||null;
+            const carInfo=driver=>ALL_CARS.find(c=>c.id===driver.car);
+            return {...stage,media,carInfo:carInfo(stage),
+              ...(stage.kind==='trial'?{targetTime:trialTime(stage,ALL_TRACKS.find(t=>t.id===stage.track).length)}:{}),
+              ...(stage.kind==='grid'?{rivals:stage.rivals.map(driver=>({...driver,carInfo:carInfo(driver),portrait:media.portraits[driver.id]||campaignMedia.stages[driver.id]?.portrait}))}:{})};
+          }));
+          const stories=await Promise.all(CAMPAIGN_WORLDS.map(async world=>[world.id,await this.media.chapterMedia({
+            ...world,world:true,season:alternate,fallback:worldStory(world.id,season.id)
+          })]));
+          return {...season,chapters,stages,worldStories:Object.fromEntries(stories)};
+        }));
+        json(res,200,{...seasons[0],seasons,chests:CAMPAIGN_CHESTS,worldMedia:await this.media.worldCovers(CAMPAIGN_WORLDS),focusTypes:FOCUS_TYPES,user:s.user});return true;
       }
       if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:await this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
+      if(p==='/api/campaign/chest'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,await this.store.claimCampaignChest(s.user.id,data.id));return true;}
       if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:ALL_CARS,cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
       if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?await this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):await this.store.buy(s.user.id,data.kind,data.id));return true;}
       if(p==='/api/garage'&&req.method==='GET'){json(res,200,{upgrades:UPGRADES,parts:VEHICLE_PARTS,paints:PAINTS,user:s.user});return true;}
@@ -102,7 +140,7 @@ export class Accounts {
       if(p==='/api/rankings'&&req.method==='GET'){const q=url.searchParams,filters={track:q.get('track')||'akina',source:'solo',mode:'time',wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',car:q.get('car')||null},records=await this.store.records(filters),personal=(await this.store.records({...filters,userId:s.user.id}))[0]||null;json(res,200,{records:records.map((r,i)=>({...r,rank:i+1})),personal:personal?{...personal,rank:records.findIndex(r=>r.userId===s.user.id)+1||null}:null,filters});return true;}
       if(p==='/api/records'&&req.method==='GET'){const q=url.searchParams;json(res,200,{records:await this.store.records({track:q.get('track')||'akina',source:q.get('source')||'solo',car:q.get('car')||null,wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',userId:q.get('mine')==='1'?s.user.id:null})});return true;}
       if(p==='/api/rooms'&&req.method==='GET'){json(res,200,{rooms:online.rooms.publicRooms()});return true;}
-      if(p==='/api/runs/start'&&req.method==='POST'){this.throttle(req,'start',40,60000);json(res,200,await this.runs.start(s.user.id,await jsonBody(req)));return true;}
+      if(p==='/api/runs/start'&&req.method==='POST'){this.throttle(req,'start',40,60000);json(res,200,await this.runs.start(s.user.id,{...await jsonBody(req),campaignRules:true}));return true;}
       if(p==='/api/runs/finish'&&req.method==='POST'){this.throttle(req,'finish',12,60000);const data=await jsonBody(req,4*1024*1024);json(res,200,await this.runs.submit(s.user.id,data.id,data.frames));return true;}
       throw fail('Método no permitido.',405);
     }catch(error){const unavailable=isMongoError(error);json(res,unavailable?503:error.status||400,{error:unavailable?databaseUnavailable:error.message});return true;}

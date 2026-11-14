@@ -10,7 +10,7 @@ const specs=JSON.parse(readFileSync(new URL('../assets/cars/original/catalog-spe
 const bytes=id=>{const b=readFileSync(new URL('../assets/cars/original/'+VEHICLE_FILES[id]+'.glb',import.meta.url));return b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);};
 const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
 test('every playable car selects its original asset by exact ID and all new bodies are valid with useful LODs',()=>{
- assert.deepEqual(new Set(Object.keys(VEHICLE_FILES)),new Set(ALL_CARS.map(c=>c.id)));assert.equal(specs.length,22);
+ assert.deepEqual(new Set(Object.keys(VEHICLE_FILES)),new Set(ALL_CARS.map(c=>c.id)));assert.equal(specs.length,41);
  for(const rival of CAMPAIGN_STAGES)assert.ok(VEHICLE_FILES[rival.car],rival.id);
  const fingerprints=new Map();
  for(const spec of specs){

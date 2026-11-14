@@ -1,6 +1,7 @@
 // Rebuild the white road centre lines from the user-supplied reference sheets.
 // Input images stay local; this script never downloads map data.
 import sharp from 'sharp';
+import {EXPANSION_TRACKS} from '../js/expansion-courses.mjs';
 import {mkdir,copyFile,writeFile} from 'node:fs/promises';
 const refs=[
  ['manazuru','7663f6da-c8d9-4b06-a332-bf720a499640',3574,true,[473,215]],
@@ -16,17 +17,18 @@ const refs=[
 // Keep the total and allocate the 270m discrepancy to the final sector.
 await mkdir('assets/course-references',{recursive:true});
 await mkdir('data/course-references',{recursive:true});
-const results={};
-for(const [id,file,length,closed,start,end,sectionLengths] of refs){
- const target=`assets/course-references/${id}.png`;
- if(process.argv[2])await copyFile(`${process.argv[2]}/codex-clipboard-${file}.png`,target);
+const expansion=process.argv.includes('--expansion'),results={};
+const inputs=expansion?EXPANSION_TRACKS.map(t=>[t.id,t.referenceSheet,t.length,false,t.start,t.end,t.sectionLengths]):refs;
+for(const [id,file,length,closed,start,end,sectionLengths] of inputs){
+ const target=expansion?file:`assets/course-references/${id}.png`;
+ if(!expansion&&process.argv[2])await copyFile(`${process.argv[2]}/codex-clipboard-${file}.png`,target);
  const {data,info:{width:w,height:h,channels:c}}=await sharp(target).removeAlpha().raw().toBuffer({resolveWithObject:true});
  const white=new Uint8Array(w*h),seen=new Uint8Array(w*h),mask=new Uint8Array(w*h);
- for(let i=0;i<white.length;i++){const r=data[i*c],g=data[i*c+1],b=data[i*c+2];white[i]=Math.min(r,g,b)>(id==='tsukuba'?135:183)&&Math.max(r,g,b)-Math.min(r,g,b)<45?1:0;}
+ for(let i=0;i<white.length;i++){const r=data[i*c],g=data[i*c+1],b=data[i*c+2];white[i]=Math.min(r,g,b)>(id==='enna'?122:expansion?159:id==='tsukuba'?135:183)&&Math.max(r,g,b)-Math.min(r,g,b)<45?1:0;}
  const components=[];
  for(let i=0;i<white.length;i++)if(white[i]&&!seen[i]){
   const q=[i];seen[i]=1;for(let k=0;k<q.length;k++){const p=q[k],x=p%w,y=Math.floor(p/w);for(const n of [x>0?p-1:-1,x<w-1?p+1:-1,y>0?p-w:-1,y<h-1?p+w:-1])if(n>=0&&white[n]&&!seen[n]){seen[n]=1;q.push(n);}}
-  let green=0;for(const p of q)for(const d of [-5,5,-5*w,5*w]){const n=p+d;if(n<0||n>=white.length)continue;const r=data[n*c],g=data[n*c+1],b=data[n*c+2];if(g>r*1.12&&g>b*1.12)green++;}
+  let green=0;for(const p of q)for(const d of [-5,5,-5*w,5*w]){const n=p+d;if(n<0||n>=white.length)continue;const r=data[n*c],g=data[n*c+1],b=data[n*c+2];if(id==='enna'?g>r*.95&&g>b*1.02&&g<225:g>r*1.08&&g>b*1.08)green++;}
   if(q.length>=4&&q.length<w*h*.08&&green/q.length>.12){components.push(q.length);for(const p of q)mask[p]=1;}
  }
  // Zhang-Suen thinning retains both large and small hairpins.
@@ -37,12 +39,13 @@ for(const [id,file,length,closed,start,end,sectionLengths] of refs){
   if(phase===0?(n[0]*n[2]*n[4]||n[2]*n[4]*n[6]):(n[0]*n[2]*n[6]||n[0]*n[4]*n[6]))continue;remove.push(p);
  }if(remove.length)changed=true;for(const p of remove)mask[p]=0;}}
  const pixels=[];for(let p=0;p<mask.length;p++)if(mask[p])pixels.push([p%w,Math.floor(p/w)]);
- results[id]={length,closed,start,end,sectionLengths,pixels,width:w,height:h};
- const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><image href="../../assets/course-references/${id}.png" width="${w}" height="${h}"/>${pixels.map(([x,y])=>`<rect x="${x}" y="${y}" width="1.2" height="1.2" fill="#00aaff"/>`).join('')}</svg>`;
+ results[id]={image:target,length,closed,start,end,sectionLengths,pixels,width:w,height:h};
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><image href="${encodeURI('../../'+target)}" width="${w}" height="${h}"/>${pixels.map(([x,y])=>`<rect x="${x}" y="${y}" width="1.2" height="1.2" fill="#00aaff"/>`).join('')}</svg>`;
  await writeFile(`data/course-references/${id}-trace.svg`,svg);
  console.log(id,components.sort((a,b)=>b-a).slice(0,14),'skeleton',pixels.length);
 }
-await writeFile('data/course-references/traces.json',JSON.stringify(results));
+await writeFile('data/course-references/'+(expansion?'expansion-':'')+'traces.json',JSON.stringify(results));
+if(expansion)process.exit(0);
 const tiles=[];let tileIndex=0;
 for(const [id,d] of Object.entries(results)){
  const s=Math.min(400/d.width,400/d.height),ox=(400-d.width*s)/2,oy=(400-d.height*s)/2;

@@ -1,0 +1,136 @@
+{
+  "id": "na6ce",
+  "rig": {
+    "track": 0.7395,
+    "wheelY": 0.292,
+    "radius": 0.286,
+    "front": 1.1575,
+    "rear": -1.1075000000000002,
+    "popupAngle": 0.65,
+    "id": "na6ce",
+    "size": [
+      3.97,
+      1.675,
+      1.235
+    ],
+    "label": "Eunos NA6CE"
+  },
+  "reference": "Stylized body proportions from the campaign car specification",
+  "parts": [
+    {
+      "part": "body",
+      "lod": 0,
+      "triangles": 5022
+    },
+    {
+      "part": "cabin",
+      "lod": 0,
+      "triangles": 2158
+    },
+    {
+      "part": "hood",
+      "lod": 0,
+      "triangles": 880
+    },
+    {
+      "part": "glass",
+      "lod": 0,
+      "triangles": 896
+    },
+    {
+      "part": "wheel",
+      "lod": 0,
+      "triangles": 1664
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 0,
+      "triangles": 60
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 0,
+      "triangles": 300
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 0,
+      "triangles": 152
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 0,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "popup_r",
+      "lod": 0,
+      "triangles": 148
+    },
+    {
+      "part": "body",
+      "lod": 1,
+      "triangles": 1174
+    },
+    {
+      "part": "cabin",
+      "lod": 1,
+      "triangles": 464
+    },
+    {
+      "part": "hood",
+      "lod": 1,
+      "triangles": 200
+    },
+    {
+      "part": "glass",
+      "lod": 1,
+      "triangles": 96
+    },
+    {
+      "part": "wheel",
+      "lod": 1,
+      "triangles": 424
+    },
+    {
+      "part": "spoiler_stock",
+      "lod": 1,
+      "triangles": 28
+    },
+    {
+      "part": "spoiler_gt",
+      "lod": 1,
+      "triangles": 144
+    },
+    {
+      "part": "vinyl_twin",
+      "lod": 1,
+      "triangles": 60
+    },
+    {
+      "part": "vinyl_apex",
+      "lod": 1,
+      "triangles": 8
+    },
+    {
+      "part": "popup_l",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "popup_r",
+      "lod": 1,
+      "triangles": 30
+    },
+    {
+      "part": "badges",
+      "lod": 0,
+      "triangles": 190
+    }
+  ]
+}

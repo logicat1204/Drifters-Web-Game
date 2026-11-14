@@ -89,16 +89,29 @@ export class AccountClient {
     try{this.backgrounds=(await this.request('/api/license-backgrounds')).backgrounds;}
     catch{this.backgrounds=[];}
   }
-  applyBackground(element,id){
+  async applyBackground(element,id){
     const item=this.backgrounds.find(background=>background.id===id);
-    if(item)element.style.setProperty('--license-background',`url("${item.url}")`);
-    else element.style.removeProperty('--license-background');
+    const image=element.querySelector('.license-image');
+    const request=Symbol();element.backgroundRequest=request;
+    image.hidden=true;
+    if(!item){image.removeAttribute('src');return false;}
+    image.src=item.url;
+    try{await image.decode();}catch{return false;}
+    if(element.backgroundRequest!==request)return false;
+    image.hidden=false;
+    return true;
   }
-  renderBackground(){
+  async renderBackground(){
     const selection=this.backgrounds.find(background=>background.id===this.background);
-    this.applyBackground($('license-portrait-background'),this.background);
+    const request=this.backgroundPreview=Symbol();
+    this.backgroundReady=false;
     $('background-selection').textContent=selection?'Fondo '+selection.id:'Fondo original';
     $('background-prev').disabled=$('background-next').disabled=!this.backgrounds.length;
+    this.preview();
+    const loaded=await this.applyBackground($('license-portrait-background'),this.background);
+    if(request!==this.backgroundPreview)return;
+    this.backgroundReady=loaded;
+    if(selection&&!loaded)$('background-selection').textContent=`Fondo ${selection.id} no disponible`;
     this.preview();
   }
   moveBackground(direction){
@@ -162,7 +175,7 @@ export class AccountClient {
   changeBase(base){this.baseDrafts??={};this.baseDrafts[this.draft.base]={...this.draft};const {skin,hairColor,outfitColor}=this.draft;this.draft=this.baseDrafts[base]?{...this.baseDrafts[base]}:{...defaultAvatar(base),skin,hairColor,outfitColor};this.refreshAvatarOptions();}
   close(force=false){if(!force&&!this.user?.onboarded)return;for(const id of ['profile-focus-dialog','link-email-dialog','cosmetic-dialog'])$(id).close();$('account-panel').classList.add('hidden');$('license-overlay').classList.add('hidden');this.previousFocus?.focus();}
   tab(tab){if(!this.user?.onboarded&&tab==='records')return;document.querySelectorAll('[data-license-tab]').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.licenseTab===tab));b.disabled=!this.user.onboarded&&b.dataset.licenseTab==='records';});$('license-profile').classList.toggle('hidden',tab!=='profile');$('license-records').classList.toggle('hidden',tab!=='records');if(tab==='records')this.loadRecords();}
-  preview(){const photo=$('portrait-mode').value==='photo';$('avatar-options').classList.toggle('hidden',photo);$('photo-options').classList.toggle('hidden',!photo);$('profile-preview').src=photo?(this.user.hasPhoto?'/api/profile/photo?v='+this.user.photoVersion:'/assets/avatars/v2/base-male.png'):this.portraitPreview(this.draft,this.backgrounds.some(item=>item.id===this.background));}
+  preview(){const photo=$('portrait-mode').value==='photo';$('avatar-options').classList.toggle('hidden',photo);$('photo-options').classList.toggle('hidden',!photo);$('profile-preview').src=photo?(this.user.hasPhoto?'/api/profile/photo?v='+this.user.photoVersion:'/assets/avatars/v2/base-male.png'):this.portraitPreview(this.draft,this.backgroundReady);}
   async uploadPhoto(){const file=$('profile-photo').files[0];if(!file)return;$('profile-save').disabled=true;$('profile-status').textContent='Preparando foto…';try{if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8*1024*1024)throw Error('Elige una foto PNG, JPEG o WebP de hasta 8 MB.');const bitmap=await createImageBitmap(file);if(bitmap.width>12000||bitmap.height>12000){bitmap.close();throw Error('La imagen es demasiado grande.');}const canvas=document.createElement('canvas');canvas.width=512;canvas.height=640;const ctx=canvas.getContext('2d');ctx.fillStyle='#273c43';ctx.fillRect(0,0,512,640);const scale=Math.max(512/bitmap.width,640/bitmap.height),w=bitmap.width*scale,h=bitmap.height*scale;ctx.drawImage(bitmap,(512-w)/2,(640-h)/2,w,h);bitmap.close();const data=await this.request('/api/profile/photo',{method:'POST',body:JSON.stringify({image:canvas.toDataURL('image/jpeg',.86)})});this.user=data.user;this.renderIdentity();this.preview();$('profile-status').textContent='Foto cargada. Guarda tu perfil para usarla.';}catch(error){$('profile-status').textContent=error.message;}finally{$('profile-save').disabled=false;$('profile-photo').value='';}}
   async saveProfile(){
     $('profile-save').disabled=true;

@@ -1,9 +1,10 @@
 import {randomBytes,randomUUID,timingSafeEqual} from 'node:crypto';
 import {ALL_CARS,HANDLING_VERSION} from '../js/sim.mjs';
 import {COSMETICS,DEFAULT_AVATAR} from '../js/avatar.mjs';
-import {campaignStage,focusUnlocks} from '../js/campaign.mjs';
+import {campaignStage} from '../js/campaign.mjs';
+import {campaignEvent,campaignFocusUnlocks} from '../js/campaign-events.mjs';
 import {UPGRADES,VEHICLE_PARTS,stockBuild,validateBuild} from '../js/tuning.mjs';
-import {avatarSvg,campaignPayout,checkChapterStory,checkRecordFilters,derivePassword,hashToken,password,profileUpdate,runDocument,username} from './store.mjs';
+import {avatarSvg,campaignPayout,chestReward,checkChapterStory,checkRecordFilters,derivePassword,hashToken,password,profileUpdate,runDocument,username} from './store.mjs';
 import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
 
 const noPhoto={projection:{password_hash:0,salt:0,'profile.photo':0}};
@@ -11,7 +12,7 @@ const finishSort={elapsed:1,created_at:1,_id:1};
 const portraitUrl=(id,version)=>`/api/users/${id}/portrait?v=${version}`;
 const duplicateName=()=>Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});
 const owned=(rows,key,id)=>rows.some(row=>row[key]===id);
-const runCategory=run=>Object.fromEntries(['user_id','track','car','source','manual','wet','night','handling','build_key'].map(key=>[key,run[key]]));
+const runCategory=run=>Object.fromEntries(['user_id','track','car','source','mode','manual','wet','night','handling','build_key','campaign_level'].map(key=>[key,run[key]]));
 
 export function pilotView(pilot){
   if(!pilot)return null;
@@ -24,7 +25,7 @@ export function pilotView(pilot){
     avatar:p.avatar,portraitMode:p.portrait_mode,portraitUrl:portraitUrl(pilot._id,p.photo_version),photoVersion:p.photo_version,
     hasPhoto:p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,garage,coins:pilot.balance,
     cars:pilot.cars.map(row=>row.car_id),cosmetics:pilot.inventory.map(row=>row.item_id),music:pilot.music.map(row=>row.song_id),
-    chapterStories:pilot.stories.map(row=>row.chapter_id+':'+row.phase),focusUnlocked:focusUnlocks(pilot.campaign.map(row=>row.level_id)),
+    chapterStories:pilot.stories.map(row=>row.chapter_id+':'+row.phase),campaignChests:pilot.chests||[],focusUnlocked:campaignFocusUnlocks(pilot.campaign.map(row=>row.level_id),pilot.chests||[]),
     campaign:pilot.campaign.map(row=>({id:row.level_id,bestTime:row.handling===HANDLING_VERSION?row.best_time:null,bestPoints:row.best_points,rewardCoins:row.reward_coins}))
   };
 }
@@ -87,6 +88,18 @@ export class MongoStore {
     const pilot=await this.pilots.findOne({_id:id},{...noPhoto,session});
     if(!pilot)throw Error('Usuario inexistente.');
     return pilot;
+  }
+  async claimCampaignChest(id,chest){
+    return this.transaction(async session=>{
+      const pilot=await this.pilot(id,session);
+      const reward=chestReward(chest,pilot.campaign.map(stage=>stage.level_id),pilot.profile.avatar.base);
+      if(pilot.chests?.includes(chest))return {user:pilotView(pilot),reward,alreadyClaimed:true};
+      const update={chests:chest},now=this.now();
+      if(reward.type==='cosmetic'&&!owned(pilot.inventory,'item_id',reward.id))update.inventory={item_id:reward.id,acquired_at:now};
+      if(reward.type==='music'&&!owned(pilot.music,'song_id',reward.id))update.music={song_id:reward.id,acquired_at:now};
+      await this.pilots.updateOne({_id:id},{$push:update},{session});
+      return {user:pilotView(await this.pilot(id,session)),reward,alreadyClaimed:false};
+    });
   }
   async updateProfile(id,data){
     return this.transaction(async session=>{
@@ -196,13 +209,13 @@ export class MongoStore {
   }
   async addRun(id,userId,r,source='solo',finishTime=r.elapsed){
     const {id:_id,...run}=runDocument(id,userId,r,source,finishTime,this.now());
-    const stage=campaignStage(run.campaign_level);
+    const stage=(r.campaignRules?campaignEvent:campaignStage)(run.campaign_level);
     if(stage&&source==='solo'&&run.mode==='campaign'&&run.completed&&run.won){
       try{
         await this.transaction(async session=>{
           const pilot=await this.pilot(userId,session);
           await this.runs.insertOne({_id,...run},{session});
-          const {entitlement,coins}=campaignPayout(stage,pilot.campaign,run);
+          const {entitlement,coins}=campaignPayout(stage,pilot.campaign,run,r.campaignRules);
           const old=pilot.campaign.find(row=>row.level_id===stage.id);
           const progress={level_id:stage.id,handling:run.handling,best_time:Math.min(run.elapsed,old?.handling===run.handling?old.best_time:Infinity),best_points:Math.max(run.points,old?.best_points??run.points),
             reward_coins:Math.max(entitlement,old?.reward_coins??0),cleared_at:old?.cleared_at??run.created_at};

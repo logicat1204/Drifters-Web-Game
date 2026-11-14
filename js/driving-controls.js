@@ -12,12 +12,13 @@ const keyLabel=code=>code.replace(/^(Digit|Key)/,'').replace(/^Arrow/,'Flecha ')
 const names = {
   left: 'Izquierda', right: 'Derecha', wheel: 'Volante', throttle: 'Acelerador',
   brake: 'Freno', handbrake: 'Freno de mano', down: 'Bajar marcha', up: 'Subir marcha',
-  shifter: 'Palanca en H'
+  shifter: 'Palanca en H',...bindingNames
 };
-const captions = {left:'◀', right:'▶', throttle:'GAS', brake:'FRENO', handbrake:'DRIFT', down:'−', up:'+'};
+const optionalControls={camera:[.11,.36,.11],headlights:[.24,.36,.11],reposition:[.37,.36,.11],pause:[.50,.36,.11],focus:[.63,.36,.11]};
+const captions = {left:'◀', right:'▶', throttle:'GAS', brake:'FRENO', handbrake:'DRIFT', down:'−', up:'+',camera:'CÁM',headlights:'LUZ',reposition:'↺',pause:'Ⅱ',focus:'✦'};
 const defaults = {
-  portrait: {left:[.11,.85,.16],right:[.30,.85,.16],wheel:[.19,.82,.30],handbrake:[.51,.85,.14],brake:[.70,.86,.17],throttle:[.89,.86,.17],down:[.70,.75,.13],up:[.89,.75,.13]},
-  landscape: {left:[.08,.83,.18],right:[.20,.83,.18],wheel:[.14,.81,.32],handbrake:[.68,.85,.16],brake:[.81,.85,.19],throttle:[.93,.85,.19],down:[.81,.68,.14],up:[.93,.68,.14]},
+  portrait: {left:[.11,.85,.16],right:[.30,.85,.16],wheel:[.19,.82,.30],handbrake:[.51,.85,.14],brake:[.70,.86,.17],throttle:[.89,.86,.17],down:[.70,.75,.13],up:[.89,.75,.13],...optionalControls},
+  landscape: {left:[.08,.83,.18],right:[.20,.83,.18],wheel:[.14,.81,.32],handbrake:[.68,.85,.16],brake:[.81,.85,.19],throttle:[.93,.85,.19],down:[.81,.68,.14],up:[.93,.68,.14],...optionalControls},
   shifter: {shifter:[.89,.64,.21]}
 };
 const positions = [[.18,.19],[.18,.81],[.5,.19],[.5,.81],[.82,.19]];
@@ -58,12 +59,14 @@ function control(id, preview = false) {
 }
 
 export class DrivingControls {
-  constructor(settings, {save, shift, race, changeMode}) {
+  constructor(settings, {save, shift, race, changeMode, action}) {
     this.settings = settings;
     this.save = save;
     this.shift = shift;
     this.race = race;
     this.changeMode = changeMode;
+    this.action=action;
+    settings.optionalTouch=Array.isArray(settings.optionalTouch)?settings.optionalTouch.filter(id=>Object.hasOwn(optionalControls,id)):[];
     this.coarsePointer = matchMedia('(pointer: coarse)');
     this.held = new Map();
     this.layer = byId('touch-controls');
@@ -278,6 +281,7 @@ export class DrivingControls {
       button.setPointerCapture(event.pointerId);
       button.classList.add('pressed');
       if (id === 'up' || id === 'down') return this.shift(id === 'up' ? 1 : -1, true);
+      if(Object.hasOwn(optionalControls,id))return this.action?.(id);
       if (id === 'shifter') {
         this.shifterPointer = event.pointerId;
         this.shifterLane = this.shifterY = null;
@@ -386,6 +390,7 @@ export class DrivingControls {
       else if (id === 'up' || id === 'down') button.hidden = !touch || this.mode !== 'sequential';
       else if (id === 'wheel') button.hidden = !touch || !wheel;
       else if (id === 'left' || id === 'right') button.hidden = !touch || wheel;
+      else if(Object.hasOwn(optionalControls,id))button.hidden=!touch||!this.settings.optionalTouch.includes(id);
       else button.hidden = !touch;
     }
     this.positionControls();
@@ -404,8 +409,16 @@ export class DrivingControls {
     this.editor.dataset.layout = layout;
     byId('touch-steering-row').classList.toggle('hidden',layout === 'shifter');
     this.editor.replaceChildren();
+    const optional=byId('touch-optional');optional.replaceChildren();optional.hidden=layout==='shifter';
+    if(!optional.hidden)for(const id of Object.keys(optionalControls)){
+      const label=document.createElement('label'),check=document.createElement('input');
+      check.type='checkbox';check.checked=this.settings.optionalTouch.includes(id);
+      check.onchange=()=>{this.settings.optionalTouch=this.settings.optionalTouch.filter(value=>value!==id);if(check.checked)this.settings.optionalTouch.push(id);this.save();this.showEditor();this.sync();};
+      label.append(check,names[id]);optional.append(label);
+    }
     const ids = Object.keys(defaults[layout]).filter(id =>
-      this.settings.touchSteering === 'wheel' ? id !== 'left' && id !== 'right' : id !== 'wheel');
+      (!Object.hasOwn(optionalControls,id)||this.settings.optionalTouch.includes(id))&&
+      (this.settings.touchSteering === 'wheel' ? id !== 'left' && id !== 'right' : id !== 'wheel'));
     for (const id of ids) {
       const button = control(id,true);
       button.onfocus = () => this.selectControl(id);

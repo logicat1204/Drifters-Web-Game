@@ -7,6 +7,7 @@ import {sameOrigin} from './accounts.mjs';
 import {databaseUnavailable,isMongoError} from './database.mjs';
 import {stockBuild} from '../js/tuning.mjs';
 import {selectRaceHost} from '../js/online-direct.mjs';
+import {RACE_INTRO_SECONDS} from '../js/race-intro.mjs';
 
 const MAX_SOCKET_BACKLOG=256*1024;
 const RACE_LOAD_TIMEOUT=30000;
@@ -30,7 +31,7 @@ export class OnlineRooms {
   }
   send(c,message,replaceable){c.send(message,replaceable);}
   broadcast(room,message,replaceable){for(const p of room.players.values())if(p.connected)this.send(p.client,message,replaceable);}
-  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,transport:room.transport||'server',raceHost:room.raceHost,runId:room.runId,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,loaded:!!p.loaded,connected:p.connected}))};}
+  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,transport:room.transport||'server',raceHost:room.raceHost,runId:room.runId,introSeconds:room.introSeconds||0,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,loaded:!!p.loaded,connected:p.connected}))};}
   publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,players:r.players.size,maxPlayers:4}));}
   details(data,user){if(!this.store)return profile(data);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:buildFor(user,user.defaultCar)};}
   revoke(userId){for(const c of this.clients)if(c.identity?.id===userId){this.disconnect(c);c.close(4001,'Sesión cerrada');}}
@@ -143,6 +144,7 @@ export class OnlineRooms {
       }else if(data.type==='start'){
         this.checkStart(c,room);
         room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
+        room.introSeconds=[...room.players.values()].every(player=>player.loadGate)?RACE_INTRO_SECONDS:0;
         for(const other of room.players.values()){
           other.probe=false;other.loaded=false;
           const user=prepared?prepared.pilots.get(other.userId):this.store?.user(other.userId);

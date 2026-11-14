@@ -106,7 +106,7 @@ function buildRoute(track,car,rival,wet){
   acceleration[i]=(speed2[b]-speed2[a])/(2*Math.max(.01,ds));
   phase[i]=acceleration[i]<-.7?'entry':Math.abs(curve[i])>.002?acceleration[i]>.7?'exit':'apex':'straight';
  }
- return {length:track.length,step,count:n,line,lineSlope:slopes,curve,roadCurve:Float64Array.from(road,p=>p.curve),speed2,acceleration,phase,distance};
+ return {length:track.length,closed:track.closed,step,count:n,line,lineSlope:slopes,curve,roadCurve:Float64Array.from(road,p=>p.curve),speed2,acceleration,phase,distance};
 }
 
 export function rivalRoute(track,car,rival,wet=false){
@@ -117,6 +117,7 @@ export function rivalRoute(track,car,rival,wet=false){
 }
 
 export function routeSample(route,s){
+ if(route.closed)s=((s%route.length)+route.length)%route.length;
  const f=clamp(s/route.step,0,route.count),i=Math.min(route.count-1,Math.floor(f)),t=f-i;
  return {line:mix(route.line[i],route.line[i+1],t),lineSlope:mix(route.lineSlope[i],route.lineSlope[i+1],t),curve:mix(route.curve[i],route.curve[i+1],t),roadCurve:mix(route.roadCurve[i],route.roadCurve[i+1],t),speed:Math.sqrt(Math.max(0,mix(route.speed2[i],route.speed2[i+1],t))),acceleration:mix(route.acceleration[i],route.acceleration[i+1],t),phase:route.phase[t<.5?i:i+1]};
 }

@@ -5,7 +5,7 @@ import {CABIN_PROFILES,buildCabin}from '../js/cabin-geometry.mjs';
 import {DriverCamera}from '../js/driver-camera.mjs';
 import {cabinMirrorBounds,cabinViewMatrix}from '../js/cabin-view.js';
 import {ALL_CARS,CARS,TRACKS,makeTrack,createRace,updateRace,repositionRace}from '../js/sim.mjs';
-test('all 25 cars have explicit original cockpit geometry, readable clusters and correct driving side',()=>{
+test('all cars have explicit cockpit geometry, readable clusters and correct driving side',()=>{
  assert.deepEqual(Object.keys(CABIN_PROFILES).sort(),ALL_CARS.map(c=>c.id).sort());const hashes=new Set();for(const car of ALL_CARS){const p=CABIN_PROFILES[car.id],model=buildCabin(p);assert.ok(p.width>1.6&&p.width<1.9,car.id);assert.ok(p.height>=1&&p.height<1.25);assert.ok(p.height-(1.1075+p.yOffset)>.02,'binnacle stays below the horizon: '+car.id);assert.ok(Math.abs(p.seat)<p.width/2-.3);let triangles=0;for(const [part,data]of Object.entries(model)){if(part==='profile')continue;assert.equal(data.length%42,0,part);assert.ok(data.every(Number.isFinite),car.id+part);for(let i=0;i<data.length;i+=14)assert.ok(Math.abs(Math.hypot(...data.subarray(i+3,i+6))-1)<.001);triangles+=data.length/42;}assert.ok(triangles<10000,car.id+' budget');hashes.add(createHash('sha256').update(model.body).digest('hex'));}assert.ok(hashes.size>=20);assert.ok(CABIN_PROFILES.ae86.seat>0);assert.ok(CABIN_PROFILES.r8.seat<0);assert.equal(CABIN_PROFILES.s2000.instruments,'digital');assert.notEqual(CABIN_PROFILES.ae86.depth,CABIN_PROFILES.rx7.depth);
 });
 test('driver inertia is bounded at uneven frame rates; comfort and reduced motion remove head movement',()=>{
