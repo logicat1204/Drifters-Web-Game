@@ -83,9 +83,13 @@ export class Accounts {
         const user=p==='/api/register'?await this.store.register(data.username,data.password,emailAddress(data.email)):await this.store.login(data.email??data.username,data.password);
         const session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
-      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/campaign/chest','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize','/api/collectibles','/api/collectibles/favorite','/api/shop/card-chest'];if(!routes.includes(p))return false;
-      const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish','/api/collectibles/favorite','/api/shop/card-chest'].includes(p));
+      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/campaign/chest','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize','/api/collectibles','/api/collectibles/favorite','/api/shop/card-chest','/api/ranked'];if(!routes.includes(p))return false;
+      const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish','/api/collectibles/favorite','/api/shop/card-chest','/api/ranked'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
+      if(p==='/api/ranked'&&req.method==='POST'){
+        this.throttle(req,'ranked-status',90,60000);
+        json(res,200,await this.store.rankedStatus(s.user.id));return true;
+      }
       if(p==='/api/logout'&&req.method==='POST'){await this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
       if(p==='/api/profile/email'&&req.method==='POST'){
         this.throttle(req,'link-email',12,3600000);
@@ -138,7 +142,7 @@ export class Accounts {
       }
       if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:await this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
       if(p==='/api/campaign/chest'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,await this.store.claimCampaignChest(s.user.id,data.id));return true;}
-      if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:shopCars,mfGhostOpen:mfGhostDealerOpen(s.user.campaign.map(row=>row.id)),cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
+      if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:shopCars,mfGhostOpen:mfGhostDealerOpen(s.user.campaign.map(row=>row.id)),cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user,goldenKeys:await this.store.goldenKeys(s.user.id)});return true;}
       if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?await this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):await this.store.buy(s.user.id,data.kind,data.id));return true;}
       if(p==='/api/collectibles'&&req.method==='GET'){
         const [catalog,inventory]=await Promise.all([cardCatalog(),this.store.cardInventory(s.user.id)]);

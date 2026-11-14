@@ -24,7 +24,8 @@ export class CosmeticPacks {
      const resource=async(file,png=true)=>{const rel=path.relative(folder,path.join(path.dirname(source),file||'')).split(path.sep).join('/'),absolute=await resolve(rel,png?/\.png$/i:/\.(png|webp)$/i),bytes=await readFile(absolute);if(bytes.length>2500000)throw Error('Imagen demasiado grande');
       if(png&&!validLayerPng(bytes))throw Error('Las capas deben ser PNG RGBA de 8 bits, sin entrelazar, de 512×640');digest.update(bytes);return '/'+path.relative(this.root,absolute).split(path.sep).map(encodeURIComponent).join('/');};
      for(const name of layerNames)layers[name]=await resource(data.layers?.[name]);const preview=data.preview?await resource(data.preview,false):null;
-     batchIds.add(data.id);batch.push({id:data.id,key,slot,name:data.name.trim(),price:data.price,rarity:data.rarity,starter:false,bases:[base],rig:data.rig,pack:pack.name,availableForSale:data.availableForSale!==false,layers,preview,revision:digest.digest('hex').slice(0,16)});
+     if(data.currency!==undefined&&!['coins','golden-keys'].includes(data.currency))throw Error('Moneda desconocida');
+     batchIds.add(data.id);batch.push({id:data.id,key,slot,name:data.name.trim(),price:data.price,rarity:data.rarity,starter:false,bases:[base],rig:data.rig,pack:pack.name,currency:data.currency||'coins',availableForSale:data.availableForSale!==false,layers,preview,revision:digest.digest('hex').slice(0,16)});
     }
     for(const item of batch){ids.add(item.id);items.push(item);}
    }catch(error){warnings.push({pack:pack.name,error:error.message});}

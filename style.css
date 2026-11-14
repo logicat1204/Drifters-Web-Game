@@ -470,3 +470,18 @@ body #touch-controls{display:block;position:absolute;inset:0;pointer-events:none
 #pilot-card-dialog .pilot-records{padding-left:20px;font-size:13px;line-height:1.8}
 .ranking-license{text-align:left;padding:0;text-decoration:underline;text-underline-offset:3px}
 .online-license{padding:0;justify-self:start}
+.online-mode-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.online-mode-picker button{padding:14px;border:1px solid #a5bfd363;background:#101b29;text-align:left;font:15px var(--sans)}
+.online-mode-picker button[aria-pressed=true]{background:#27435c;border-color:#a8d5fa}
+#online-ranked-pane h3{font:20px var(--display);margin-bottom:10px}
+.ranked-actions{display:flex;flex-wrap:wrap;gap:9px;margin:14px 0}
+.ranked-actions button{padding:12px;font-size:11px;min-height:42px}
+#ranked-leaders{list-style:none;max-height:230px;padding:0;overflow:auto}
+#ranked-leaders li{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #a8bbd83e;padding:7px 0;font:11px var(--mono)}
+#ranked-leaders button{text-align:left;padding:3px}
+#online-private-open{margin:0 0 14px;padding:11px}
+#online-private-pane{width:min(455px,calc(100% - 28px));border:1px solid #9ab2cc80;background:#111c29;color:#fff;padding:24px}
+#online-private-pane::backdrop{background:#0b1019b8}
+#online-private-pane label{display:block;margin:16px 0 8px;font:10px var(--mono)}
+#online-code{width:100%;padding:10px}
+#online-private-status,#online-verification{margin-top:10px;font:12px/1.5 var(--sans)}

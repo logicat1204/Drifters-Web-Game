@@ -196,6 +196,7 @@ function navigateBack(){
   if(screen==='shop'||screen==='garage'||screen==='play'||screen==='collection'){showScreen('menu');return;}
   if(screen==='workshop'){showScreen('garage');return;}
   if(screen==='online'&&net.room){net.leave();return;}
+  if(screen==='online'&&(net.waiting||net.pending?.type==='ranked-queue'))net.leave();
   showScreen('play');
 }
 function selectMenuButton(button){if(!button)return;for(const b of $('main-menu-actions').querySelectorAll('button'))b.classList.toggle('selected',b===button);$('menu-description').textContent=button.dataset.description;}
@@ -522,7 +523,7 @@ function finishCampaign(){
 function restoreSoloScene(){track=makeTrack(TRACKS[settings.track]);renderer.setTrack(track);renderer.setCar(ownedCar());updateSceneLabels();}
 function onlineHud(){
   const players=[...(race.netPlayers||[])].sort((a,b)=>(a.dnf?1:0)-(b.dnf?1:0)||(a.place??99)-(b.place??99)||b.state.s-a.state.s),position=players.findIndex(p=>p.id===net.id)+1;
-  $('position').textContent=`${position||1} / ${net.room?.players.length||2}`;$('race-mode-label').textContent='ONLINE / '+(net.room?.code||'');
+  $('position').textContent=`${position||1} / ${net.room?.players.length||2}`;$('race-mode-label').textContent=net.room?.ranked?'RANKED':'ONLINE / '+(net.room?.code||'');
   const leader=players.find(p=>!p.dnf),following=players.find(p=>p.id!==net.id&&!p.dnf),gap=leader?.id===net.id?race.s-(following?.state.s??race.s):(leader?.state.s??race.s)-race.s;
   $('advantage').textContent=race.netDnf?'RETIRADO':race.netFinished?'META / ESPERANDO':leader?`${leader.id===net.id?'+':'−'}${Math.abs(gap).toFixed(1)} m`:'';
   $('online-standings').replaceChildren();const caption=document.createElement('small');caption.textContent=net.room?.transport==='direct'?net.directLabel:`SERVIDOR · ${Math.round(net.latency)} ms`;$('online-standings').append(caption);
@@ -532,7 +533,7 @@ let onlineLoadedRun=null;
 function prepareOnlineScene(room){
   track=makeTrack(TRACKS.find(t=>t.id===room.config.track));
   const me=room.players.find(p=>p.id===net.id),car=CARS.find(c=>c.id===me.car);
-  race=createRace(car,track,{mode:'time',manual:!!me.manual,build:me.build,night:room.config.night,wet:room.config.wet});
+  race=createRace(car,track,{mode:'time',manual:!!me.manual,build:me.build,night:room.config.night,wet:room.config.wet,fog:room.config.fog});
   race.online=true;race.transmissionMode=me.manual?(driving.choice==='auto'?'sequential':driving.choice):'auto';race.netPlayers=[];race.netOpponents=[];net.lights=true;
   const grid=room.players.map((driver,i)=>({id:driver.id,carId:driver.car,s:24-Math.floor(i/2)*7,lateral:i%2?2:-2,yaw:0,headlights:true}));
   const position=grid.find(driver=>driver.id===net.id);
@@ -563,15 +564,34 @@ function startOnline(room){
   if(room.introSeconds>0){race.countdown=3+room.introSeconds;showRaceIntro(rivals,room.introSeconds);}
   hud();
 }
-function onlineResults(results){
+function onlineResults(results,message={}){
   if(!race?.online)return;sealReplay();closeModal();showScreen('results');sound.update(race,false);$('online-result-board').replaceChildren();
+  $('online-results-panel').querySelectorAll('button').forEach(button=>button.disabled=false);
+  const own=results.find(p=>p.id===net.id);
+  $('online-verification').textContent=message.verified===false?'No se pudo verificar la carrera. Puedes volver a buscar.':
+    message.verified?['Resultado verificado',own?.rating?'+'+own.rating+' puntos':'',own?.coins?'◈ +'+own.coins+' monedas':''].filter(Boolean).join(' · '):'';
+  if(message.verified&&own?.coins)account.request('/api/session').then(session=>{if(session.user?.id===account.user?.id)account.accept(session);}).catch(()=>{});
   for(const p of results){const row=document.createElement('div'),place=document.createElement('em'),name=document.createElement('b'),time=document.createElement('span');place.textContent=p.dnf?'—':String(p.place).padStart(2,'0');name.textContent=p.name+(p.id===net.id?' · TÚ':'');time.textContent=p.dnf?'DNF':fmtTime(p.time);row.append(place,name,time);$('online-result-board').append(row);}
   updateRematch();openModal('online-results');
 }
-function updateRematch(){const host=net?.room?.hostId===net?.id;$('online-rematch').classList.toggle('hidden',!host);$('online-rematch-note').textContent=host?'Todos deberán confirmar «listo» de nuevo.':'Espera a que el anfitrión abra la revancha o sal de la sala.';}
+function updateRematch(){
+  const ranked=net?.room?.ranked,host=net?.room?.hostId===net?.id;
+  $('online-rematch').classList.toggle('hidden',ranked||!host);
+  $('online-rematch-note').textContent=ranked?'Vuelve a la cola para buscar otra carrera.':host?'Todos deberán confirmar «listo» de nuevo.':'Espera a que el anfitrión abra la revancha o sal de la sala.';
+}
 net=new OnlineClient({
   manual:()=>driving.choice!=='auto',
   publicLicense:id=>collectibles.publicLicense(id),
+  wallet:coins=>{if(account.user)account.accept({user:{...account.user,coins}});},
+  onVerification:()=>{
+    if(!race?.online)return;
+    sealReplay();showScreen('results');openModal('online-results');
+    $('online-result-board').replaceChildren();
+    $('online-verification').textContent='Verificando la carrera…';
+    $('online-rematch').classList.add('hidden');
+    $('online-rematch-note').textContent='';
+    $('online-results-panel').querySelectorAll('button').forEach(button=>button.disabled=true);
+  },
   getUser:()=>account?.user,requireUser:()=>account?.require(),request:(...args)=>account.request(...args),syncPreferences:()=>account?.preferenceTail,
   onError:message=>{if(race?.online)toast(message);},
   onPreview:id=>{if(screen==='online')renderer.setCar(ownedCar(CARS.find(c=>c.id===id)||CARS[settings.car]));},

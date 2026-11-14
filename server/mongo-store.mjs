@@ -8,6 +8,7 @@ import {avatarSvg,campaignPayout,chestReward,checkChapterStory,checkRecordFilter
 import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
 import {assertShopEra,shopCars} from './shop-cars.mjs';
 import {cardChest,cardReceipt,openCardChest} from './collectibles.mjs';
+import {compressEvidence,seasonAt,settledBefore,seasonBounds,seasonAward,standings} from './ranked.mjs';
 
 const noPhoto={projection:{password_hash:0,salt:0,'profile.photo':0}};
 const finishSort={elapsed:1,created_at:1,_id:1};
@@ -35,7 +36,7 @@ export function pilotView(pilot){
 export class MongoStore {
   constructor(client,db,{now=()=>Date.now()}={}){
     this.client=client;this.pilots=db.collection('pilots');this.sessions=db.collection('sessions');
-    this.runs=db.collection('runs');this.ledger=db.collection('economy_ledger');this.now=now;this.remote=true;
+    this.runs=db.collection('runs');this.ledger=db.collection('economy_ledger');this.matches=db.collection('verified_online_matches');this.now=now;this.remote=true;
     this.dummySalt=randomBytes(16).toString('hex');
   }
   close(){return this.client.close();}
@@ -148,12 +149,13 @@ export class MongoStore {
   async purchase(id,entry,select){
     return this.transaction(async session=>{
       const pilot=await this.pilot(id,session),changes=select(pilot);
-      if(!changes)return {user:pilotView(pilot),alreadyOwned:true};
-      if(pilot.balance<entry.price)throw Object.assign(Error('No tienes suficientes monedas.'),{status:409});
-      const update={...changes,balance:pilot.balance-entry.price};
+      if(!changes)return {user:pilotView(pilot),alreadyOwned:true,goldenKeys:pilot.golden_keys||0};
+      const golden=entry.currency==='golden-keys',keys=pilot.golden_keys||0;
+      if((golden?keys:pilot.balance)<entry.price)throw Object.assign(Error(golden?'No tienes suficientes llaves doradas.':'No tienes suficientes monedas.'),{status:409});
+      const update=golden?{...changes,golden_keys:keys-entry.price}:{...changes,balance:pilot.balance-entry.price};
       await this.pilots.updateOne({_id:id},{$set:update},{session});
-      await this.ledger.insertOne({_id:entry.id,user_id:id,delta:-entry.price,reason:entry.reason,run_id:null,created_at:this.now()},{session});
-      return {user:pilotView({...pilot,...update}),alreadyOwned:false};
+      await this.ledger.insertOne({_id:entry.id,user_id:id,delta:golden?0:-entry.price,reason:entry.reason,run_id:null,created_at:this.now()},{session});
+      return {user:pilotView({...pilot,...update}),alreadyOwned:false,goldenKeys:update.golden_keys??keys};
     });
   }
   buy(id,kind,key){
@@ -166,6 +168,44 @@ export class MongoStore {
     const pilot=await this.pilot(id);
     return {owned:pilot.cards||[],favorite:pilot.favorite_card??null};
   }
+  async saveVerifiedOnline(match){
+    const {_id,...record}={_id:match.id,season:match.season,finishedAt:match.finishedAt,results:match.results,evidence:compressEvidence(match.evidence)};
+    try{await this.transaction(async session=>{
+      await this.matches.insertOne({_id,...record},{session});
+      await this.runs.insertMany(match.results.map(({run:{id,...run}})=>({...run,_id:id})),{session});
+      for(const {run,userId,coins} of match.results){
+        if(!coins)continue;
+        const reason=match.season===null?'online-direct':'ranked';
+        await this.pilots.updateOne({_id:userId},{$inc:{balance:coins}},{session});
+        await this.ledger.insertOne({_id:reason+':'+run.id,user_id:userId,delta:coins,reason,run_id:run.id,created_at:this.now()},{session});
+      }
+    });}catch(error){if(error.code!==11000||!await this.matches.findOne({_id},{projection:{_id:1}}))throw error;}
+  }
+  async rankedStatus(id){
+    const season=seasonAt(this.now());
+    const expired=await this.matches.distinct('season',{season:{$gte:0,$lt:settledBefore(this.now())},'results.userId':id});
+    const rewards=[];
+    for(const period of expired.sort((a,b)=>a-b)){
+      const key='ranked-season:'+period+':'+id;
+      if(await this.ledger.findOne({_id:key},{projection:{_id:1}}))continue;
+      const rows=await this.rankedRows(period),row=rows.find(row=>row.userId===id);
+      if(!row)continue;
+      const reward=seasonAward(row.rank,rows.length);
+      try{
+        await this.transaction(async session=>{
+          await this.ledger.insertOne({_id:key,user_id:id,delta:reward.coins,reason:'ranked-season',run_id:period+':'+id,created_at:this.now()},{session});
+          await this.pilots.updateOne({_id:id},{$inc:{balance:reward.coins,golden_keys:reward.keys}},{session});
+        });
+        rewards.push({season:period,...reward});
+      }catch(error){if(error.code!==11000||!await this.ledger.findOne({_id:key}))throw error;}
+    }
+    const [rows,pilot]=await Promise.all([this.rankedRows(season),this.pilot(id)]);
+    return {season:seasonBounds(season),leaders:rows.slice(0,50),personal:rows.find(row=>row.userId===id)||null,goldenKeys:pilot.golden_keys||0,rewards,coins:pilot.balance};
+  }
+  async rankedRows(season){
+    return standings(await this.matches.find({season},{projection:{finishedAt:1,results:1}}).toArray());
+  }
+  async goldenKeys(id){return (await this.pilot(id)).golden_keys||0;}
   async setFavoriteCard(id,card){
     const result=await this.pilots.updateOne({_id:id,...(card===null?{}:{'cards.id':card})},{$set:{favorite_card:card}});
     if(!result.matchedCount)throw Error('Esta carta todavía no está en tu colección.');
@@ -196,7 +236,8 @@ export class MongoStore {
     return this.buyItem(id,'music',song.id,song.price,'music','song_id');
   }
   buyItem(id,kind,key,price,list,field,item){
-    return this.purchase(id,{id:`buy:${id}:${kind}:${key}`,reason:`${kind}:${key}`,price},pilot=>{
+    const currency=item?.currency;
+    return this.purchase(id,{id:`buy:${id}:${kind}:${key}`,reason:(currency==='golden-keys'?'golden-keys:':'')+`${kind}:${key}`,price,currency},pilot=>{
       if(kind==='car'&&!pilot.profile.onboarded)throw Error('Completa tu licencia y elige tu coche inicial.');
       if(owned(pilot[list],field,key))return null;
       if(kind==='car'&&item.era==='mf-ghost')assertShopEra(item,pilot.campaign.map(row=>row.level_id));

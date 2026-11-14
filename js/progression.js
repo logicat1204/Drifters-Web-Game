@@ -390,7 +390,9 @@ export class ProgressionClient {
     stats.append(node('b','shop-detail-price',owned?'✓ EN TU GARAJE':'◈ '+car.price.toLocaleString()),this.shopButton(car));
     if($('shop').getClientRects().length)this.callbacks.preview(car);
   }
-  items(){return this.category==='music'?(this.shop?.songs||[]):(this.shop?.cosmetics||[]).filter(c=>c.slot===this.category&&c.bases.includes(this.base)&&(c.availableForSale!==false||this.user.cosmetics.includes(c.id))).map(c=>({...c,kind:'cosmetic'}));}
+  items(){return this.category==='music'?(this.shop?.songs||[]):(this.shop?.cosmetics||[]).filter(c=>
+    (this.category==='ranked'?c.currency==='golden-keys':c.currency!=='golden-keys'&&c.slot===this.category)&&
+    c.bases.includes(this.base)&&(c.availableForSale!==false||this.user.cosmetics.includes(c.id))).map(c=>({...c,kind:'cosmetic'}));}
   owns(item){return item.kind==='car'?this.user.cars.includes(item.id):item.kind==='music'?(this.user.music||[]).includes(item.id):this.user.cosmetics.includes(item.id);}
   preview(item){const base=item.bases[0],avatar={...defaultAvatar(base),...(this.user.avatar.base===base?this.user.avatar:{}),[item.slot]:item.key};return '/api/avatar/preview?'+new URLSearchParams(avatar);}
   renderShop(){
@@ -399,14 +401,14 @@ export class ProgressionClient {
     if(this.shopSection==='dealer'){this.renderDealer();return;}
     if(this.shopSection!=='goods')return;
     this.base=this.user.avatar.base;
-    $('shop-base-label').textContent=this.category==='music'?'':this.base==='female'?'COLECCIÓN MUJER':'COLECCIÓN HOMBRE';
+    $('shop-base-label').textContent=this.category==='ranked'?'LLAVES DORADAS · '+(this.shop.goldenKeys||0):this.category==='music'?'':this.base==='female'?'COLECCIÓN MUJER':'COLECCIÓN HOMBRE';
     for(const button of document.querySelectorAll('[data-shop-category]'))button.setAttribute('aria-selected',String(button.dataset.shopCategory===this.category));
     const items=this.items();if(!items.some(item=>item.id===this.item))this.item=items[0]?.id;const grid=$('shop-items');grid.replaceChildren();
     for(const item of items){const button=node('button','shop-item'+(this.item===item.id?' selected':''));button.dataset.item=item.id;button.dataset.slot=item.slot||item.kind;
       const music=item.kind==='music',legendary=item.rarity==='legendary';
       button.append(music?node('div','shop-song-art'):portrait(this.preview(item),item.name));
       const rarity=music?'MÚSICA / '+item.author:legendary?'LEGENDARIO':this.base==='male'?'COLECCIÓN HOMBRE':'COLECCIÓN MUJER';
-      button.append(node('small',legendary?'legendary':'',rarity),node('b','',item.name),node('span','shop-price',this.owns(item)?'✓ EN TU COLECCIÓN':'◈ '+item.price.toLocaleString()));
+      button.append(node('small',legendary?'legendary':'',rarity),node('b','',item.name),node('span','shop-price',this.owns(item)?'✓ EN TU COLECCIÓN':this.shopPrice(item)));
       button.onclick=()=>{
         this.item=item.id;this.renderShop();
         if(window.matchMedia('(max-width:760px)').matches)$('shop-detail').scrollIntoView({block:'start'});
@@ -419,16 +421,19 @@ export class ProgressionClient {
     const description=music?'Disponible en tus carreras de Time Attack y campaña.':'Puedes equipar esta pieza en tu licencia.';
     detail.append(music?node('div','shop-song-art'):portrait(this.preview(item),item.name,'shop-preview'),node('small',legendary?'legendary eyebrow':'eyebrow',label),
       node('h2','',music?item.title:item.name),node('p','',description),
-      node('b','shop-detail-price',this.owns(item)?'✓ EN TU COLECCIÓN':'◈ '+item.price.toLocaleString()),this.shopButton(item));
+      node('b','shop-detail-price',this.owns(item)?'✓ EN TU COLECCIÓN':this.shopPrice(item)),this.shopButton(item));
   }
+  shopPrice(item){return item.currency==='golden-keys'?item.price+(item.price===1?' llave dorada':' llaves doradas'):'◈ '+item.price.toLocaleString();}
   shopButton(item){
-    const owned=this.owns(item);
-    const button=node('button','start-button full',owned?(item.kind==='music'?'SELECCIONAR CANCIÓN':'EQUIPAR'):this.user.coins<item.price?'MONEDAS INSUFICIENTES':'COMPRAR');
+    const owned=this.owns(item),golden=item.currency==='golden-keys';
+    const funds=golden?(this.shop.goldenKeys||0):this.user.coins;
+    const button=node('button','start-button full',owned?(item.kind==='music'?'SELECCIONAR CANCIÓN':'EQUIPAR'):
+      funds<item.price?(golden?'LLAVES INSUFICIENTES':'MONEDAS INSUFICIENTES'):'COMPRAR');
     button.id='shop-buy';
-    button.disabled=!owned&&this.user.coins<item.price;
+    button.disabled=!owned&&funds<item.price;
     button.onclick=()=>owned?this.equip(item):this.buy(item);
     return button;
   }
-  async buy(item){$('shop-buy').disabled=true;try{const result=await this.account.request('/api/shop/buy',{method:'POST',body:JSON.stringify({kind:item.kind,id:item.id})});this.account.accept(result);this.setUser(result.user);if(item.kind==='music')await this.callbacks.refreshSongs?.();$('shop-status').textContent=result.alreadyOwned?'Ya tenías este artículo. No se descontaron monedas.':'Compra guardada. Ya puedes equipar '+item.name+'.';}catch(error){$('shop-status').textContent=error.message;}finally{this.renderShop();}}
+  async buy(item){$('shop-buy').disabled=true;try{const result=await this.account.request('/api/shop/buy',{method:'POST',body:JSON.stringify({kind:item.kind,id:item.id})});if(result.goldenKeys!==undefined)this.shop.goldenKeys=result.goldenKeys;this.account.accept(result);this.setUser(result.user);if(item.kind==='music')await this.callbacks.refreshSongs?.();$('shop-status').textContent=result.alreadyOwned?'Ya tenías este artículo.':'Compra guardada. Ya puedes equipar '+item.name+'.';}catch(error){$('shop-status').textContent=error.message;}finally{this.renderShop();}}
   async equip(item){$('shop-buy').disabled=true;try{if(item.kind==='music'){await this.callbacks.refreshSongs?.();this.callbacks.selectSong?.(item.id);$('shop-status').textContent='Seleccionada para Time Attack: '+item.name+'. También está disponible en los niveles de campaña.';return;}const avatar=item.kind==='cosmetic'?{...defaultAvatar(item.bases[0]),...(this.user.avatar.base===item.bases[0]?this.user.avatar:{}),[item.slot]:item.key}:null;const result=await this.account.request('/api/profile',{method:'PATCH',body:JSON.stringify(avatar?{avatar,portraitMode:'avatar'}:{defaultCar:item.id})});this.account.accept(result);this.setUser(result.user);$('shop-status').textContent='Equipado en tu licencia: '+item.name;}catch(error){$('shop-status').textContent=error.message;}finally{this.renderShop();}}
 }

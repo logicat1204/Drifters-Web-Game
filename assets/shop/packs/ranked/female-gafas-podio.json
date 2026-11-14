@@ -1,0 +1,13 @@
+{
+  "id": "female.accessory.gafas-podio",
+  "base": "female",
+  "slot": "accessory",
+  "name": "Gafas de podio",
+  "rig": "portrait-v2-female",
+  "price": 1,
+  "currency": "golden-keys",
+  "rarity": "legendary",
+  "layers": {
+    "image": "female-gafas-podio.png"
+  }
+}

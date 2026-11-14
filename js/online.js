@@ -17,10 +17,18 @@ export class OnlineClient {
     for(const c of CARS){const option=new Option(`${c.brand} ${c.name} / ${c.code}`,c.id);$('online-car').add(option);}
     for(const t of TRACKS)$('online-track').add(new Option(t.name,t.id));
     $('online-create').onclick=()=>this.enter('create');$('online-join').onclick=()=>this.enter('join');
+    document.querySelectorAll('[data-online-mode]').forEach(button=>button.onclick=()=>this.selectMode(button.dataset.onlineMode));
+    $('online-private-open').onclick=()=>{$('online-private-status').textContent='';$('online-private-pane').showModal();$('online-code').focus();};
+    $('online-code').onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();this.enter('join');}};
+    $('ranked-queue').onclick=()=>{
+      if(this.waiting||this.pending?.type==='ranked-queue')this.leave();
+      else this.enter('ranked-queue');
+    };
+    $('ranked-refresh').onclick=()=>this.refreshRanked();
     document.querySelectorAll('[data-online-tab]').forEach(b=>b.onclick=()=>this.selectTab(b.dataset.onlineTab));$('online-refresh').onclick=()=>this.refreshRooms();
     $('online-profile').onsubmit=e=>{e.preventDefault();if(this.room)this.send({type:'profile',...this.profile()});};
     $('online-car').onchange=()=>{this.callbacks.onPreview?.($('online-car').value);if(this.room)this.send({type:'profile',...this.profile()});};
-    $('online-ready').onclick=()=>{if(this.room)this.send({type:'ready',ready:!this.room.players.find(p=>p.id===this.id)?.ready,manual:this.callbacks.manual?.()===true,direct:typeof RTCPeerConnection==='function',loadGate:true});};
+    $('online-ready').onclick=()=>{if(this.room)this.send({type:'ready',ready:!this.room.players.find(p=>p.id===this.id)?.ready,manual:this.callbacks.manual?.()===true,direct:typeof RTCPeerConnection==='function',loadGate:true,verify:true});};
     $('online-start').onclick=()=>this.send({type:'start'});$('online-leave').onclick=()=>this.leave();$('online-copy').onclick=()=>this.copy();
     $('online-loading-cancel').onclick=()=>this.confirmCancel(true);
     $('online-loading-keep').onclick=()=>this.confirmCancel(false);
@@ -33,9 +41,9 @@ export class OnlineClient {
         event.preventDefault();event.stopPropagation();this.confirmCancel($('online-loading-confirm').classList.contains('hidden'));
       }
     });
-    for(const id of ['online-track','online-night','online-wet'])$(id).onchange=()=>this.send({type:'config',config:this.config()});
+    for(const id of ['online-track','online-night','online-wet','online-fog'])$(id).onchange=()=>this.send({type:'config',config:this.config()});
     this.pingTimer=setInterval(()=>{if(this.ws?.readyState===WebSocket.OPEN)this.send({type:'ping',at:performance.now()});},2500);
-    this.roomsTimer=setInterval(()=>{if(!document.hidden&&!$('online').classList.contains('hidden')&&!this.room&&this.tab==='public')this.refreshRooms();},5000);
+    this.roomsTimer=setInterval(()=>{if(!document.hidden&&!$('online').classList.contains('hidden')&&!this.room&&this.mode==='public'&&this.tab==='public')this.refreshRooms();},5000);
     this.refreshServer();
     this.render();
   }
@@ -55,7 +63,7 @@ export class OnlineClient {
     const searching=room.phase==='preparing';
     const count=room.players.filter(p=>p.loaded).length;
     $('online-loading-track').textContent=TRACKS.find(t=>t.id===room.config.track).name;
-    $('online-loading-conditions').textContent=[room.config.night?'NOCHE':'AMANECER',room.config.wet?'MOJADO':'SECO',searching?'BUSCANDO ENLACE':room.transport==='direct'?'WEBRTC DIRECTO':'SERVIDOR'].join(' · ');
+    $('online-loading-conditions').textContent=[room.config.night?'NOCHE':'AMANECER',room.config.wet?'MOJADO':'SECO',room.config.fog?'NIEBLA':'',searching?'BUSCANDO ENLACE':room.transport==='direct'?'WEBRTC DIRECTO':'SERVIDOR'].filter(Boolean).join(' · ');
     $('online-loading-status').textContent=searching?'Midiendo la conexión entre los pilotos…':`${count} de ${room.players.length} pilotos listos para la salida`;
     const progress=$('online-loading-progress');progress.max=room.players.length;
     if(searching)progress.removeAttribute('value');else progress.value=count;
@@ -69,22 +77,68 @@ export class OnlineClient {
   }
   profile(){const user=this.callbacks.getUser?.();return {name:user?.displayName||'',car:user?.defaultCar||CARS[0].id};}
   refreshIdentity(){const user=this.callbacks.getUser?.();if(!user)return;$('online-name').value=user.displayName;$('online-car').value=user.defaultCar;$('online-driver-name').textContent=user.displayName+' / @'+user.username;$('online-driver-car').textContent=CARS.find(c=>c.id===user.defaultCar)?.code||'';$('online-portrait').src=user.portraitUrl;this.callbacks.onPreview?.(user.defaultCar);if(this.room?.phase==='lobby')this.send({type:'profile'});}
-  selectTab(tab){this.tab=tab;for(const name of ['public','private','create']){$('online-'+name+'-pane').classList.toggle('hidden',name!==tab);document.querySelector(`[data-online-tab=${name}]`).setAttribute('aria-selected',String(name===tab));}this.render();if(tab==='public')this.refreshRooms();}
+  selectMode(mode){
+    if(this.mode!==mode&&(this.waiting||this.pending?.type==='ranked-queue'))this.leave();
+    this.mode=mode;
+    for(const button of document.querySelectorAll('[data-online-mode]'))button.setAttribute('aria-pressed',String(button.dataset.onlineMode===mode));
+    $('online-ranked-pane').classList.toggle('hidden',mode!=='ranked');
+    $('online-public-menu').classList.toggle('hidden',mode!=='public');
+    if(mode==='ranked')this.refreshRanked();
+    else if(mode==='public')this.selectTab('public');
+    this.render();
+  }
+  selectTab(tab){
+    this.mode='public';
+    $('online-public-menu').classList.remove('hidden');
+    $('online-ranked-pane').classList.add('hidden');
+    for(const button of document.querySelectorAll('[data-online-mode]'))button.setAttribute('aria-pressed',String(button.dataset.onlineMode==='public'));
+    this.tab=tab==='private'?'public':tab;
+    for(const name of ['public','create']){
+      $('online-'+name+'-pane').classList.toggle('hidden',name!==this.tab);
+      document.querySelector(`[data-online-tab=${name}]`).setAttribute('aria-selected',String(name===this.tab));
+    }
+    if(tab==='private'&&!$('online-private-pane').open)$('online-private-pane').showModal();
+    this.render();
+    if(this.tab==='public')this.refreshRooms();
+  }
+  async refreshRanked(){
+    if(!this.callbacks.getUser?.()?.onboarded)return;
+    try{
+      const {season,leaders,personal,goldenKeys,rewards,coins}=await this.callbacks.request('/api/ranked',{method:'POST'});
+      $('ranked-season').textContent='La temporada termina el '+new Intl.DateTimeFormat('es',{dateStyle:'long',timeZone:'UTC'}).format(season.endsAt)+' · Llaves doradas '+goldenKeys;
+      $('ranked-personal').textContent=personal?`Puesto ${personal.rank} · ${personal.rating} puntos · ${personal.wins} victorias`:'Completa una carrera verificada para entrar en la clasificación.';
+      if(rewards.length){
+        $('ranked-reward').textContent=rewards.map(reward=>reward.keys?'Recibiste '+reward.keys+' llaves doradas.':'Recibiste '+reward.coins.toLocaleString()+' monedas.').join(' ');
+        this.callbacks.wallet?.(coins);
+      }
+      const list=$('ranked-leaders');
+      list.replaceChildren(...leaders.map(row=>{
+        const li=document.createElement('li'),name=document.createElement('button'),points=document.createElement('span');
+        name.textContent=row.rank+'. '+row.displayName;name.onclick=()=>this.callbacks.publicLicense?.(row.userId);
+        points.textContent=row.rating+' pts';
+        li.append(name,points);return li;
+      }));
+    }catch(error){$('ranked-personal').textContent=error.message;}
+  }
   async refreshRooms(){if(!this.callbacks.getUser?.()?.onboarded)return;const epoch=++this.roomsRequest;try{const data=await this.callbacks.request('/api/rooms');if(epoch!==this.roomsRequest)return;$('online-public-rooms').replaceChildren();for(const room of data.rooms){const row=document.createElement('div'),info=document.createElement('div'),title=document.createElement('b'),meta=document.createElement('small'),join=document.createElement('button');row.className='public-room';title.textContent=room.host;meta.textContent=`${TRACKS.find(t=>t.id===room.track)?.name} · ${room.night?'NOCHE':'AMANECER'} · ${room.wet?'MOJADO':'SECO'} · ${room.players}/4`;info.append(title,meta);join.className='secondary-button';join.textContent='UNIRME ↗';join.disabled=!!this.pending;join.onclick=()=>this.enter('join',room.code);row.append(info,join);$('online-public-rooms').append(row);}$('online-public-status').textContent=data.rooms.length?'La lista se actualiza cada cinco segundos.':'No hay salas públicas disponibles. Crea una para abrir la próxima salida.';}catch(error){$('online-public-status').textContent=error.message;}}
   refreshServer(){fetch('/api/online').then(r=>r.json()).then(info=>{if(info.online){this.serverInfo=info;this.updateInvite();}}).catch(()=>{});}
-  config(){return {track:$('online-track').value,night:$('online-night').value==='night',wet:$('online-wet').value==='wet'};}
-  status(text,error=false){$('online-status').textContent=text;$('online-status').classList.toggle('error',error);}
+  config(){return {track:$('online-track').value,night:$('online-night').value==='night',wet:$('online-wet').value==='wet',fog:$('online-fog').checked};}
+  status(text,error=false){$('online-status').textContent=text;$('online-status').classList.toggle('error',error);if($('online-private-pane').open)$('online-private-status').textContent=text;}
   async enter(type,invitation){
-    if(this.pending||!this.callbacks.requireUser?.())return;this.pending={type};this.render();await this.callbacks.syncPreferences?.();if(!this.callbacks.getUser?.()?.onboarded){this.pending=null;this.render();return;}
+    if(this.pending||!this.callbacks.requireUser?.())return;
+    const opening=this.pending={type};this.render();
+    await this.callbacks.syncPreferences?.();
+    if(this.pending!==opening)return;
+    if(!this.callbacks.getUser?.()?.onboarded){this.pending=null;this.render();return;}
     const code=roomCode(invitation||$('online-code').value);if(type==='join'&&!code){this.pending=null;this.render();this.status('Pega un enlace de invitación o un código de 8 caracteres.',true);return;}
-    this.pending={type,code,config:this.config(),public:$('online-public').checked};this.status('Conectando con el servidor…');this.render();
+    this.pending={type,code,config:this.config(),public:$('online-public').checked,direct:typeof RTCPeerConnection==='function',manual:this.callbacks.manual?.()===true};this.status('Conectando con el servidor…');this.render();
     if(this.ws?.readyState===WebSocket.OPEN){this.send(this.pending);return;}
     const token=++this.connection;const ws=this.ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/online`);
     const timeout=setTimeout(()=>{if(token===this.connection&&ws.readyState!==WebSocket.OPEN){ws.close();this.pending=null;this.status('No se pudo conectar. Revisa que el servidor esté en marcha.',true);this.render();}},8000);
     ws.onopen=()=>{clearTimeout(timeout);if(token!==this.connection)return;this.refreshServer();this.send(this.pending);};
     ws.onmessage=e=>{if(token!==this.connection)return;let message;try{message=JSON.parse(e.data);}catch{return;}this.receive(message);};
     ws.onerror=()=>{if(token===this.connection)this.status('No se pudo conectar al modo online. Reinicia el servidor con JUGAR.bat.',true);};
-    ws.onclose=()=>{clearTimeout(timeout);if(token!==this.connection)return;const was=this.room;this.ws=null;this.room=null;this.pending=null;this.snapshots.clear();this.resetProbe();this.resetDirect();this.render();this.status('Conexión cerrada. Puedes volver a crear una sala o entrar con un enlace.',true);if(was)this.callbacks.onLeft('Se perdió la conexión con el servidor.');};
+    ws.onclose=()=>{clearTimeout(timeout);if(token!==this.connection)return;const was=this.room;this.ws=null;this.room=null;this.pending=null;this.waiting=false;this.snapshots.clear();this.resetProbe();this.resetDirect();this.render();this.status('Conexión cerrada. Puedes volver a intentarlo.',true);if(was)this.callbacks.onLeft('Se perdió la conexión con el servidor.');};
   }
   send(data){if(data&&this.ws?.readyState===WebSocket.OPEN&&(data.type!=='input'||this.ws.bufferedAmount===0))this.ws.send(JSON.stringify(data));}
   receive(message){
@@ -92,12 +146,18 @@ export class OnlineClient {
     if(message.type==='direct-signal'&&message.runId===this.room?.runId){this.direct.handleSignal(message);return;}
     if(message.type==='hello'){this.id=message.id;return;}
     if(message.type==='pong'){if(typeof message.at==='number')this.latency=performance.now()-message.at;return;}
+    if(message.type==='ranked-status'){this.pending=null;this.waiting=message.waiting;this.status(this.waiting?'Buscando pilotos para una parrilla de 2 a 4…':'Búsqueda cancelada.');this.render();return;}
+    if(message.type==='ranked-cancelled'){this.leave();this.status(message.message,true);return;}
+    if(message.type==='verification-start'){if(this.room)this.room.phase='verifying';this.callbacks.onVerification?.();return;}
     if(message.type==='error'){this.pending=null;this.status(message.message,true);this.render();this.callbacks.onError?.(message.message);return;}
     if(message.type==='room'){
-      const previous=this.room;this.room=message;this.pending=null;
+      const previous=this.room;this.room=message;this.pending=null;this.waiting=false;
+      $('online-private-pane').close();
       if(message.phase!=='lobby')this.resetProbe();
       this.render();this.updateInvite();
-      const url=new URL(location.href);url.searchParams.set('room',message.code);history.replaceState(null,'',url);
+      const url=new URL(location.href);
+      if(message.ranked)url.searchParams.delete('room');else url.searchParams.set('room',message.code);
+      history.replaceState(null,'',url);
       this.callbacks.onRoom(message);
       if(message.phase==='preparing'&&previous?.runId!==message.runId){
         this.status('Midiendo enlaces entre pilotos para elegir al anfitrión de carrera…');
@@ -114,6 +174,7 @@ export class OnlineClient {
         this.callbacks.onStart(message);
       }
       if(message.phase==='lobby'||message.phase==='results')this.resetDirect();
+      if(message.ranked&&message.phase==='results')this.refreshRanked();
       if(message.phase==='lobby')this.status(message.hostId===this.id?`Tu sala ${message.public?'pública':'privada'} está abierta. Espera a que todos estén listos.`:'Ya estás en la sala con tu coche predeterminado. Pulsa LISTO.');return;
     }
     if(message.type==='snapshot'){
@@ -125,7 +186,7 @@ export class OnlineClient {
       }
       this.receiveSnapshot(message);return;
     }
-    if(message.type==='results'){this.results=message.results;this.callbacks.onResults(message.results);return;}
+    if(message.type==='results'){this.results=message.results;this.callbacks.onResults(message.results,message);return;}
     if(message.type==='expired'){this.leave();this.status('La sala caducó por inactividad.',true);}
   }
   async loadRace(message){
@@ -153,13 +214,14 @@ export class OnlineClient {
   }
   raceAction(type){
     if(this.room?.transport!=='direct'){this.send({type});return;}
-    if(this.raceHost){this.applyDirectAction(this.id,type);return;}
-    const data={type:'action',action:type,runId:this.room.runId};
+    const data={type:'action',action:type,seq:++this.seq,runId:this.room.runId};
+    if(this.room.verify)this.send({...data,type:'race-control',command:type});
+    if(this.raceHost){this.applyDirectAction(this.id,type,data.seq);return;}
     if(!this.direct.sendRace(this.room.raceHost,JSON.stringify(data),true))this.callbacks.onError?.('Espera a que se restablezca el enlace directo.');
   }
-  applyDirectAction(id,action){
+  applyDirectAction(id,action,seq){
     if(!['focus','reposition'].includes(action))return;
-    try{this.raceHost.action(id,action);}catch(error){
+    try{this.raceHost.action(id,action,seq);}catch(error){
       if(id===this.id)this.callbacks.onError?.(error.message);
       else this.direct.sendRace(id,JSON.stringify({type:'action-error',runId:this.room.runId,message:error.message}),true);
     }
@@ -171,7 +233,7 @@ export class OnlineClient {
     try{message=JSON.parse(raw);}catch{return;}
     if(message?.runId!==room.runId)return;
     if(this.raceHost&&message.type==='input')this.raceHost.input(id,message,performance.now());
-    if(this.raceHost&&message.type==='action')this.applyDirectAction(id,message.action);
+    if(this.raceHost&&message.type==='action')this.applyDirectAction(id,message.action,message.seq);
     if(id===room.raceHost&&message.type==='action-error'&&typeof message.message==='string')this.callbacks.onError?.(message.message.slice(0,200));
     if(this.raceHost||id!==room.raceHost||message.type!=='snapshot'||!Number.isSafeInteger(message.tick)||message.tick<=this.directTick)return;
     if(!Array.isArray(message.players)||message.players.length!==room.players.length||!Number.isFinite(message.elapsed)||message.elapsed<this.directElapsed)return;
@@ -204,6 +266,11 @@ export class OnlineClient {
     const raw=JSON.stringify({...state,runId});
     for(const p of this.room.players)if(p.id!==this.id)this.direct.sendRace(p.id,raw);
     this.receiveSnapshot(state);
+    if(this.room.verify&&(state.phase==='results'||now-(this.lastTraceAt??0)>160)){
+      this.lastTraceAt=now;
+      const trace=this.raceHost.trace();
+      this.send({type:'race-trace',runId,...trace});
+    }
     if(state.phase==='results'){
       const results=this.raceHost.room.results.map(({id,place,time})=>({id,place,time}));
       this.send({type:'direct-finish',runId,results});
@@ -227,7 +294,7 @@ export class OnlineClient {
     list.replaceChildren(...rows.map(text=>{const item=document.createElement('li');item.textContent=text;return item;}));
   }
   leave(){
-    const was=this.room;this.send({type:'leave'});this.connection++;this.ws?.close();this.ws=null;this.pending=null;this.room=null;this.snapshots.clear();this.resetProbe();this.resetDirect();this.results=null;
+    const was=this.room;this.send({type:'leave'});this.connection++;this.ws?.close();this.ws=null;this.pending=null;this.waiting=false;this.room=null;this.snapshots.clear();this.resetProbe();this.resetDirect();this.results=null;
     const url=new URL(location.href);url.searchParams.delete('room');history.replaceState(null,'',url);this.render();this.status('Crea una sala o entra con un enlace de invitación.');if(was)this.callbacks.onLeft();
   }
   updateInvite(){
@@ -242,11 +309,12 @@ export class OnlineClient {
     this.renderLoading(room);
     $('online-entry').classList.toggle('hidden',inRoom);$('online-room').classList.toggle('hidden',!inRoom);$('online-profile-save').classList.toggle('hidden',!inRoom);
     $('online-create').disabled=$('online-join').disabled=!!this.pending;$('online-name').disabled=$('online-car').disabled=true;
-    $('online-course').classList.toggle('hidden',inRoom?!host||!lobby:this.tab!=='create');
-    for(const id of ['online-track','online-night','online-wet'])$(id).disabled=inRoom&&(!host||!lobby);
+    $('ranked-queue').textContent=this.waiting||this.pending?.type==='ranked-queue'?'CANCELAR BÚSQUEDA':'BUSCAR CARRERA';
+    $('online-course').classList.toggle('hidden',inRoom?room.ranked||!host||!lobby:this.mode!=='public'||this.tab!=='create');
+    for(const id of ['online-track','online-night','online-wet','online-fog'])$(id).disabled=inRoom&&(!host||!lobby);
     if(!room)return;
     $('online-code-label').textContent=room.code;$('online-count').textContent=`${room.players.filter(p=>p.connected).length} / 4`;
-    $('online-track').value=room.config.track;$('online-night').value=room.config.night?'night':'day';$('online-wet').value=room.config.wet?'wet':'dry';
+    $('online-track').value=room.config.track;$('online-night').value=room.config.night?'night':'day';$('online-wet').value=room.config.wet?'wet':'dry';$('online-fog').checked=!!room.config.fog;
     $('online-roster').replaceChildren();
     for(let i=0;i<4;i++){
       const p=room.players[i],row=document.createElement('li');row.className='online-player'+(p?.id===this.id?' is-you':'');
@@ -272,8 +340,11 @@ export class OnlineClient {
       this.lastSend=now;
       const controls={type:'input',seq:++this.seq,...this.input,headlights:this.lights,gear:active&&race.manual?race.requestedGear??race.gear:undefined,gearEpoch:race.resetId};
       if(!direct)this.send(controls);
-      else if(this.raceHost)this.raceHost.input(this.id,controls,now);
-      else this.direct.sendRace(this.room.raceHost,JSON.stringify({...controls,runId:this.room.runId}));
+      else{
+        if(this.room.verify)this.send({...controls,type:'race-control',command:'input',runId:this.room.runId});
+        if(this.raceHost)this.raceHost.input(this.id,controls,now);
+        else this.direct.sendRace(this.room.raceHost,JSON.stringify({...controls,runId:this.room.runId}));
+      }
     }
     if(direct)this.directFrame(now);
   }

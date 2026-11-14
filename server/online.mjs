@@ -1,13 +1,16 @@
-import {randomBytes,randomUUID} from 'node:crypto';
+import {randomBytes,randomInt,randomUUID} from 'node:crypto';
 import {performance} from 'node:perf_hooks';
 import {WebSocketServer,WebSocket} from 'ws';
-import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,makeTrack} from '../js/sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,HANDLING_VERSION,makeTrack} from '../js/sim.mjs';
 import {IDLE_INPUT,placeOnlineCar,onlineAction,onlineInput,onlineSnapshot,stepOnlineRace} from '../js/online-race.mjs';
 import {sameOrigin} from './accounts.mjs';
 import {databaseUnavailable,isMongoError} from './database.mjs';
 import {stockBuild} from '../js/tuning.mjs';
 import {selectRaceHost} from '../js/online-direct.mjs';
 import {RACE_INTRO_SECONDS} from '../js/race-intro.mjs';
+import {RaceVerification} from './race-verification.mjs';
+import {rankedAward,seasonAt} from './ranked.mjs';
+import {nonCampaignPayout,runDocument} from './store.mjs';
 
 const MAX_SOCKET_BACKLOG=256*1024;
 const RACE_LOAD_TIMEOUT=30000;
@@ -21,18 +24,18 @@ export function sendOnlineFrame(ws,message,replaceable=false){
 
 const cleanName=value=>typeof value==='string'?value.normalize('NFKC').replace(/[\p{Cc}\p{Cf}<>]/gu,'').trim().slice(0,20):'';
 const profile=data=>{const name=cleanName(data.name),car=CARS.find(c=>c.id===data.car);if(!name||!car)throw Error('Escribe tu nombre y elige un coche válido.');return {name,car:car.id};};
-const config=data=>({track:TRACKS.some(t=>t.id===data.track)?data.track:TRACKS[0].id,night:data.night!==false,wet:data.wet===true});
+const config=data=>({track:TRACKS.some(t=>t.id===data.track)?data.track:TRACKS[0].id,night:data.night!==false,wet:data.wet===true,...(data.fog===true?{fog:true}:{})});
 const buildFor=(user,car)=>user?.garage[car]?.build||stockBuild();
 const lobbyState=room=>JSON.stringify([room.config,[...room.players.values()].map(p=>[p.client.id,p.car,p.ready,p.manual])]);
 export class OnlineRooms {
-  constructor({now=()=>performance.now(),store=null}={}){this.now=now;this.store=store;this.rooms=new Map();this.clients=new Set();this.tickId=0;}
+  constructor({now=()=>performance.now(),wallNow=()=>Date.now(),store=null}={}){this.now=now;this.wallNow=wallNow;this.store=store;this.rooms=new Map();this.clients=new Set();this.queue=new Map();this.tickId=0;this.verifying=0;}
   connect(send,close=()=>{},identity=null){
     const c={id:randomUUID(),send,close,identity,room:null,messages:0,window:this.now(),joined:this.now()};this.clients.add(c);this.send(c,{type:'hello',id:c.id});return c;
   }
   send(c,message,replaceable){c.send(message,replaceable);}
   broadcast(room,message,replaceable){for(const p of room.players.values())if(p.connected)this.send(p.client,message,replaceable);}
-  lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,transport:room.transport||'server',raceHost:room.raceHost,runId:room.runId,introSeconds:room.introSeconds||0,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,loaded:!!p.loaded,connected:p.connected}))};}
-  publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,players:r.players.size,maxPlayers:4}));}
+  lobby(room){return {type:'room',code:room.code,public:room.public,ranked:!!room.ranked,verify:!!room.verification,hostId:room.hostId,phase:room.phase,config:room.config,transport:room.transport||'server',raceHost:room.raceHost,runId:room.runId,introSeconds:room.introSeconds||0,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,loaded:!!p.loaded,connected:p.connected}))};}
+  publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,...(r.config.fog?{fog:true}:{}),players:r.players.size,maxPlayers:4}));}
   details(data,user){if(!this.store)return profile(data);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:buildFor(user,user.defaultCar)};}
   revoke(userId){for(const c of this.clients)if(c.identity?.id===userId){this.disconnect(c);c.close(4001,'Sesión cerrada');}}
   publish(room){this.broadcast(room,this.lobby(room));}
@@ -44,7 +47,7 @@ export class OnlineRooms {
     try{
       const now=this.now();if(now-c.window>1000){c.window=now;c.messages=0;}if(++c.messages>100){c.close(1008,'Demasiados mensajes');return;}
       if(!data||typeof data!=='object'||Array.isArray(data))throw Error('Mensaje inválido.');
-      if(this.store?.remote&&['create','join','profile','start'].includes(data.type))return this.receiveWithPilot(c,data).catch(error=>this.sendError(c,error));
+      if(this.store?.remote&&['create','join','profile','start','ranked-queue'].includes(data.type))return this.receiveWithPilot(c,data).catch(error=>this.sendError(c,error));
       this.receiveAction(c,data);
     }catch(error){this.sendError(c,error);}
   }
@@ -58,6 +61,7 @@ export class OnlineRooms {
   }
   async receiveWithPilot(c,data){
     if(c.loadingLobby)throw Error('Espera a que termine la acción anterior.');
+    if(data.type==='ranked-queue')c.cancelQueue=false;
     c.loadingLobby=true;
     try{
       const room=c.room;
@@ -70,25 +74,31 @@ export class OnlineRooms {
         this.receiveAction(c,data,{pilots:new Map(pilots.map(p=>[p.id,p]))});
       }else{
         const user=await this.store.user(c.identity?.id);
-        if(this.clients.has(c)&&c.room===room)this.receiveAction(c,data,{user});
+        if(this.clients.has(c)&&c.room===room&&(data.type!=='ranked-queue'||!c.cancelQueue))this.receiveAction(c,data,{user});
       }
     }finally{c.loadingLobby=false;}
   }
   receiveAction(c,data,prepared=null){
       const now=this.now();
       if(data.type==='ping'){this.send(c,{type:'pong',at:data.at});return;}
+      if(data.type==='ranked-cancel'){this.leaveQueue(c);this.send(c,{type:'ranked-status',waiting:false});return;}
+      if(data.type==='ranked-queue'){
+        const user=prepared?prepared.user:this.store?.user(c.identity?.id);
+        this.enterQueue(c,user,data,now);return;
+      }
       if(data.type==='leave'){this.leave(c);this.send(c,{type:'left'});return;}
       if(data.type==='create'||data.type==='join'){
         if(c.room)throw Error('Ya estás en una sala. Sal antes de crear o entrar en otra.');
+        this.leaveQueue(c);
         const details=this.details(data,prepared?prepared.user:this.store?.user(c.identity?.id));let room;
-        if(details.userId&&[...this.clients].some(other=>other!==c&&other.identity?.id===details.userId&&other.room))throw Error('Tu piloto ya está en otra sala.');
+        if(details.userId&&[...this.clients].some(other=>other!==c&&other.identity?.id===details.userId&&(other.room||this.queue.has(other.id))))throw Error('Tu piloto ya está en otra sala o en la cola.');
         if(data.type==='create'){
           if(this.rooms.size>=64)throw Error('Servidor lleno. Intenta nuevamente en unos minutos.');
           let code;do{code=randomBytes(4).toString('hex').toUpperCase();}while(this.rooms.has(code));
           room={code,public:data.public===true,hostId:c.id,players:new Map(),phase:'lobby',config:config(data.config||{}),created:now,lastActive:now,elapsed:0,finishOrder:[],firstFinish:null};this.rooms.set(code,room);
         }else{
           room=this.rooms.get(typeof data.code==='string'?data.code.toUpperCase():'');
-          if(!room)throw Error('La sala no existe o ha caducado.');
+          if(!room||room.ranked)throw Error('La sala no existe o ha caducado.');
           if(room.phase!=='lobby')throw Error('La carrera ya comenzó. La sala está cerrada.');
           if(room.players.size>=4)throw Error('Sala llena: el máximo es de 4 jugadores.');
         }
@@ -115,7 +125,7 @@ export class OnlineRooms {
         if(room.phase!=='preparing'||data.runId!==room.runId||room.directReports.has(c.id)||!Array.isArray(data.peers))return;
         const links=data.peers.slice(0,3).filter(link=>link&&room.players.has(link.id)&&link.id!==c.id&&Number.isFinite(link.p95)&&link.p95>=0&&Number.isInteger(link.sent)&&link.sent>=16&&link.sent<=30&&Number.isInteger(link.received)&&link.received>=0&&link.received<=link.sent);
         room.directReports.set(c.id,links);
-        if(room.directReports.size===room.players.size)this.beginLoading(room,selectRaceHost([...room.players.keys()],room.directReports));
+        if(room.directReports.size===room.players.size)this.beginLoading(room,selectRaceHost([...room.players.keys()],room.directReports,room.ranked?350:Infinity));
       }else if(data.type==='cancel-start'){
         if((room.phase==='preparing'||room.phase==='loading')&&data.runId===room.runId){
           this.abortDirect(room,`${p.name} canceló la salida. Vuelvan a marcar «Listo» para intentarlo otra vez.`);
@@ -132,30 +142,23 @@ export class OnlineRooms {
         else if(c.id===room.raceHost)room.hostHeartbeat=now;
       }else if(data.type==='direct-finish'){
         if(room.transport!=='direct'||room.phase!=='racing'||data.runId!==room.runId||c.id!==room.raceHost)return;
-        this.finishDirect(room,data.results);
+        if(room.verification)this.verifyFinish(room,data.results,now);
+        else this.finishDirect(room,data.results);
+      }else if(data.type==='race-control'){
+        if(['racing','verifying'].includes(room.phase)&&data.runId===room.runId)room.verification?.input(c.id,data,now);
+      }else if(data.type==='race-trace'){
+        if(room.phase==='racing'&&data.runId===room.runId&&c.id===room.raceHost)room.verification?.trace(data.from,data.frames,now);
       }else if(data.type==='profile'){
         if(room.phase!=='lobby')throw Error('El coche queda bloqueado al comenzar.');Object.assign(p,this.details(data,prepared?prepared.user:this.store?.user(c.identity?.id)),{ready:false});this.publish(room);
       }else if(data.type==='ready'){
         if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');p.ready=data.ready===true;
-        if(p.ready){p.manual=data.manual===true;p.direct=data.direct===true;p.loadGate=data.loadGate===true;}
+        if(p.ready){p.manual=data.manual===true;p.direct=data.direct===true;p.loadGate=data.loadGate===true;p.verify=data.verify===true;}
         this.publish(room);
       }else if(data.type==='config'){
         if(room.hostId!==c.id)throw Error('Solo el anfitrión puede elegir el circuito.');if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');room.config=config(data.config||{});for(const other of room.players.values())other.ready=false;this.publish(room);
       }else if(data.type==='start'){
         this.checkStart(c,room);
-        room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
-        room.introSeconds=[...room.players.values()].every(player=>player.loadGate)?RACE_INTRO_SECONDS:0;
-        for(const other of room.players.values()){
-          other.probe=false;other.loaded=false;
-          const user=prepared?prepared.pilots.get(other.userId):this.store?.user(other.userId);
-          if(user)other.build=buildFor(user,other.car);
-          const focus=user?{focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)}:{};
-          placeOnlineCar(room,other,i++,now,focus);
-        }
-        if([...room.players.values()].every(p=>p.direct)){
-          room.phase='preparing';room.transport='server';room.directReports=new Map();room.preparationEnds=now+13000;
-          this.publish(room);
-        }else this.beginLoading(room);
+        this.prepareRace(room,now,prepared?.pilots);
         return;
       }else if(data.type==='reposition'||data.type==='focus'){
         if(room.phase!=='racing'||p.dnf||p.race.finished)throw Error('La acción solo está disponible durante tu carrera.');
@@ -166,11 +169,51 @@ export class OnlineRooms {
         if(room.phase!=='racing'||room.transport==='direct'||p.dnf||p.race.finished)return;
         onlineInput(p,data,now);
       }else if(data.type==='rematch'){
-        if(room.hostId!==c.id)throw Error('Solo el anfitrión puede abrir la revancha.');if(room.phase!=='results')throw Error('La carrera todavía no terminó.');
+        if(room.ranked||room.hostId!==c.id)throw Error('Solo el anfitrión puede abrir la revancha.');if(room.phase!=='results')throw Error('La carrera todavía no terminó.');
         this.resetLobby(room);
       }else throw Error('Acción desconocida.');
   }
+  leaveQueue(c){this.queue.delete(c.id);c.cancelQueue=true;}
+  enterQueue(c,user,data,now){
+    if(!this.store?.saveVerifiedOnline||!user?.onboarded)throw Error('Completa tu licencia para entrar a Ranked.');
+    if(data.direct!==true)throw Error('Ranked requiere un navegador con WebRTC.');
+    if(c.room||[...this.clients].some(other=>other!==c&&other.identity?.id===user.id&&(other.room||this.queue.has(other.id))))throw Error('Tu piloto ya está en una sala o en la cola.');
+    c.cancelQueue=false;
+    this.queue.set(c.id,{client:c,user,manual:data.manual===true,at:now});
+    this.send(c,{type:'ranked-status',waiting:true});
+  }
+  matchRanked(now){
+    const entries=[...this.queue.values()];
+    if(entries.length<2||entries.length<4&&now-entries[0].at<3500||this.rooms.size>=64)return;
+    const group=entries.slice(0,4);
+    const tracks=TRACKS.filter(track=>track.length>=3000&&track.length<=6500);
+    let code;do{code=randomBytes(4).toString('hex').toUpperCase();}while(this.rooms.has(code));
+    const room={code,ranked:true,public:false,hostId:group[0].client.id,players:new Map(),phase:'lobby',
+      config:{track:tracks[randomInt(tracks.length)].id,night:randomInt(2)===0,wet:randomInt(5)===0},lastActive:now};
+    this.rooms.set(code,room);
+    for(const {client,user,manual} of group){
+      this.leaveQueue(client);client.room=room;
+      room.players.set(client.id,{...this.details({},user),client,manual,ready:true,connected:true,direct:true,loadGate:true,verify:true});
+    }
+    this.prepareRace(room,now,new Map(group.map(({user})=>[user.id,user])));
+  }
+  prepareRace(room,now,pilots){
+    room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.elapsed=0;room.firstFinish=null;room.finishOrder=[];
+    room.verification=null;
+    room.introSeconds=[...room.players.values()].every(player=>player.loadGate)?RACE_INTRO_SECONDS:0;
+    for(const [i,other] of [...room.players.values()].entries()){
+      other.probe=false;other.loaded=false;
+      const user=pilots?pilots.get(other.userId):this.store?.user(other.userId);
+      if(user)other.build=buildFor(user,other.car);
+      placeOnlineCar(room,other,i,now,user?{focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)}:{});
+    }
+    if([...room.players.values()].every(p=>p.direct)){
+      room.phase='preparing';room.transport='server';room.directReports=new Map();room.preparationEnds=now+13000;
+      this.publish(room);
+    }else this.beginLoading(room);
+  }
   beginLoading(room,raceHost=null){
+    if(room.ranked&&!raceHost){this.abortDirect(room,'No se encontró un enlace WebRTC estable. Puedes volver a buscar.');return;}
     room.directReports=null;
     room.transport=raceHost?'direct':'server';room.raceHost=raceHost;
     // Pre-1.0 WebSocket clients did not send a load confirmation.
@@ -181,10 +224,12 @@ export class OnlineRooms {
   startPrepared(room){
     room.phase='racing';
     room.hostHeartbeat=this.now();
+    if(room.transport==='direct'&&this.store?.saveVerifiedOnline&&[...room.players.values()].every(p=>p.verify))
+      room.verification=new RaceVerification(room,room.hostHeartbeat);
     this.publish(room);this.snapshot(room);
   }
   resetLobby(room){
-    room.phase='lobby';room.transport='server';room.raceHost=null;room.runId=null;room.directReports=null;
+    room.phase='lobby';room.transport='server';room.raceHost=null;room.runId=null;room.directReports=null;room.verification=null;
     for(const [id,p] of room.players){
       if(!p.connected){room.players.delete(id);continue;}
       p.race=null;p.ready=false;p.loaded=false;p.dnf=false;p.place=null;
@@ -192,8 +237,53 @@ export class OnlineRooms {
     this.publish(room);
   }
   abortDirect(room,message='Se perdió el enlace directo. Vuelvan a marcar «Listo» para iniciar por servidor o probar de nuevo.'){
+    if(room.ranked){
+      this.rooms.delete(room.code);
+      for(const p of room.players.values()){p.client.room=null;this.send(p.client,{type:'ranked-cancelled',message});}
+      return;
+    }
     this.resetLobby(room);
     this.broadcast(room,{type:'error',message});
+  }
+  async verifyFinish(room,reported,now){
+    const verification=room.verification;
+    if(this.verifying>=2){
+      if(!room.verificationRetry)room.verificationRetry=setTimeout(()=>{
+        room.verificationRetry=null;
+        if(room.phase==='racing'&&room.verification===verification)this.verifyFinish(room,reported,now);
+      },500);
+      return;
+    }
+    const acceptedAt=this.wallNow();
+    room.phase='verifying';this.verifying++;
+    this.broadcast(room,{type:'verification-start'});
+    try{
+      // The final reliable control packets may arrive after the host's finish.
+      await new Promise(resolve=>setTimeout(resolve,350));
+      const {results,players,evidence}=await verification.replay(reported,now);
+      if(room.ranked&&results.every(result=>result.dnf))throw Error('Ningún piloto completó el recorrido.');
+      const saved=results.map(result=>{
+        const player=players.find(p=>p.client.id===result.id);
+        player.race.netPlace=result.place;
+        const run=runDocument(room.runId+':'+result.userId,result.userId,player.race,'online',result.time??player.race.elapsed,acceptedAt);
+        return {...result,run,...(room.ranked?rankedAward(result.place,result.points):{rating:0,coins:result.dnf?0:nonCampaignPayout(run,player.race)})};
+      });
+      const config={...room.config,introSeconds:room.introSeconds,handling:HANDLING_VERSION,players:players.map(p=>({slot:p.slot,id:p.client.id,userId:p.userId,car:p.car,build:p.build,manual:p.manual,focus:p.race.focus.type,focusEnabled:p.race.focus.enabled}))};
+      const match={id:room.runId,season:room.ranked?seasonAt(this.wallNow()):null,finishedAt:acceptedAt,results:saved,evidence:{config,...evidence}};
+      for(let attempt=0;;attempt++){
+        try{await this.store.saveVerifiedOnline(match);break;}
+        catch(error){if(attempt>=2||!isMongoError(error))throw error;await new Promise(resolve=>setTimeout(resolve,800));}
+      }
+      room.results=saved.map(({run,...result})=>result);
+    }catch{
+      room.results=[];
+    }finally{
+      this.verifying--;
+      room.verification=null;
+      room.phase='results';
+      this.broadcast(room,{type:'results',results:room.results,verified:!!room.results.length,ranked:room.ranked===true});
+      this.publish(room);
+    }
   }
   finishDirect(room,values){
     if(!Array.isArray(values)||values.length!==room.players.size)return;
@@ -228,9 +318,15 @@ export class OnlineRooms {
     save(2);
   }
   leave(c){
+    this.leaveQueue(c);
     const room=c.room;if(!room)return;c.room=null;const p=room.players.get(c.id);
+    if(room.phase==='results'&&room.ranked){
+      room.players.delete(c.id);
+      if(!room.players.size)this.rooms.delete(room.code);
+      return;
+    }
     const beforeStart=room.phase==='preparing'||room.phase==='loading';
-    const interrupted=beforeStart||(room.phase==='racing'&&room.transport==='direct');
+    const interrupted=beforeStart||(room.phase==='racing'&&room.transport==='direct'&&!room.verificationRetry);
     if(room.phase==='lobby'||interrupted)room.players.delete(c.id);else if(p){p.connected=false;p.dnf=!p.place;p.race.finished=true;p.input={...IDLE_INPUT};this.saveRun(room,p);}
     const connected=[...room.players.values()].filter(v=>v.connected);
     if(!connected.length){this.rooms.delete(room.code);return;}
@@ -243,12 +339,14 @@ export class OnlineRooms {
   snapshot(room,replaceable=false){this.broadcast(room,onlineSnapshot(room,this.tickId),replaceable);}
   step(dt=1/120){
     this.tickId++;const now=this.now();
+    if(this.queue.size>1)this.matchRanked(now);
     for(const room of this.rooms.values()){
       if(room.phase==='preparing'&&now>=room.preparationEnds){this.beginLoading(room);continue;}
       if(room.phase==='loading'&&now>=room.loadingEnds){this.abortDirect(room,'Se agotó el tiempo de carga. Vuelvan a marcar «Listo» para intentarlo otra vez.');continue;}
       if(room.phase!=='racing')continue;
       if(room.transport==='direct'){
-        if(now-room.hostHeartbeat>6000)this.abortDirect(room);
+        if(!room.verificationRetry&&(now-room.hostHeartbeat>6000||
+          room.verification&&now-room.verification.started>(room.track.length/15+180)*1000))this.abortDirect(room);
         continue;
       }
       if(stepOnlineRace(room,dt,now,p=>this.saveRun(room,p))){

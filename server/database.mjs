@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 
 export const importMarker='sqlite-v6';
 export const schemaMarker='mongo-schema-v1';
-export const dataCollections=['pilots','sessions','runs','economy_ledger','cosmetics'];
+export const dataCollections=['pilots','sessions','runs','economy_ledger','cosmetics','verified_online_matches'];
 export function loadDatabaseEnv(){
   try{loadEnvFile(fileURLToPath(new URL('../.env',import.meta.url)));}catch(error){if(error.code!=='ENOENT')throw error;}
 }
@@ -47,6 +47,11 @@ export async function prepareMongo(db){
   await runs.createIndex({handling:1,track:1,source:1,wet:1,night:1,manual:1,completed:1,elapsed:1,created_at:1,_id:1});
   await runs.createIndex({user_id:1,handling:1,track:1,car:1,build_key:1,completed:1,elapsed:1});
   await db.collection('economy_ledger').createIndex({user_id:1,run_id:1});
+  await ensureRankedIndexes(db);
+}
+export function ensureRankedIndexes(db){
+  const matches=db.collection('verified_online_matches');
+  return Promise.all([matches.createIndex({season:1}),matches.createIndex({'results.userId':1,season:1})]);
 }
 export function ensureEmailIndex(db){
   return db.collection('pilots').createIndex({email:1},{unique:true,partialFilterExpression:{email:{$type:'string'}}});
@@ -84,7 +89,7 @@ export async function openStore(){
   const {client,db}=await connectMongo();
   try{
     await ensureMongoSchema(client,db);
-    await ensureEmailIndex(db);
+    await Promise.all([ensureEmailIndex(db),ensureRankedIndexes(db)]);
     const {MongoStore}=await import('./mongo-store.mjs');
     return new MongoStore(client,db);
   }catch(error){

@@ -1,5 +1,5 @@
 // Pick the pilot whose slowest usable direct link has the lowest tail latency.
-export function selectRaceHost(ids,reports){
+export function selectRaceHost(ids,reports,maxTail=Infinity){
   const links=(from,to)=>reports.get(from)?.find(link=>link.id===to);
   const candidates=[];
   for(const id of ids){
@@ -13,7 +13,7 @@ export function selectRaceHost(ids,reports){
       }
       worst=Math.max(worst,outgoing.p95,incoming.p95);
     }
-    if(Number.isFinite(worst))candidates.push({id,worst});
+    if(Number.isFinite(worst)&&worst<=maxTail)candidates.push({id,worst});
   }
   return candidates.sort((a,b)=>a.worst-b.worst||a.id.localeCompare(b.id))[0]?.id??null;
 }

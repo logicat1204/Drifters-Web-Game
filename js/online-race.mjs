@@ -6,7 +6,7 @@ export const IDLE_INPUT={steer:0,throttle:false,brake:true,handbrake:false};
 export const compactOnlineState=r=>Object.fromEntries(['s','lateral','speed','yaw','yawRate','travelYaw','lateralV','steer','gripUsage','understeer','cornerSpeed','handbrakeDown','handbrakeTime','driftAssist','slipAngle','gear','rpm','elapsed','countdown','headlights','braking','drift','driftPoints','combo','bestCombo','collision','checkpoints','timeLeft','finished','won','blindPasses','blindAward','skill','focus','draft','contactCooldown','resetId','resetHold','resetCooldown','wallTouch','wallContact','wallCooldown','wallSlow'].map(k=>[k,r[k]]));
 
 export function placeOnlineCar(room,other,i,now,focus){
-  const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',manual:!!other.manual,build:other.build,night:room.config.night,wet:room.config.wet,...focus});
+  const r=other.race=createRace(CARS.find(car=>car.id===other.car),room.track,{mode:'time',manual:!!other.manual,build:other.build,night:room.config.night,wet:room.config.wet,fog:room.config.fog,...focus});
   r.s=24-Math.floor(i/2)*7;
   r.lateral=i%2?2:-2;
   r.countdown=3+(room.introSeconds||0);
@@ -28,22 +28,24 @@ export function onlineAction(p,type){
 }
 
 export function onlineInput(p,data,now){
-  if(!Number.isSafeInteger(data.seq)||data.seq<=p.sequence||typeof data.steer!=='number'||!Number.isFinite(data.steer))return;
+  if(!Number.isSafeInteger(data.seq)||data.seq<=p.sequence||typeof data.steer!=='number'||!Number.isFinite(data.steer))return false;
   p.sequence=data.seq;p.inputAt=now;p.input={steer:clamp(data.steer,-1,1),throttle:data.throttle===true,brake:data.brake===true,handbrake:data.handbrake===true,gear:Number.isInteger(data.gear)&&data.gear>=1&&data.gear<=5?data.gear:undefined,gearEpoch:data.gearEpoch};
   p.race.headlights=data.headlights!==false;
+  return true;
 }
 
 export function onlineSnapshot(room,tick){
   return {type:'snapshot',tick,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,build:p.build,connected:p.connected,dnf:p.dnf,place:p.place,state:compactOnlineState(p.race)}))};
 }
 
-export function stepOnlineRace(room,dt,now,onFinish=()=>{}){
+export function stepOnlineRace(room,dt,now,onFinish=()=>{},idleMask=null){
   room.elapsed+=dt;
   const active=[...room.players.values()].filter(p=>!p.dnf&&!p.race.finished);
   const poses=new Map(active.map(p=>[p,vehiclePose(p.race)]));
   for(const p of active){
     const traffic=active.filter(other=>other!==p).map(other=>poses.get(other));
-    updateRace(p.race,now-p.inputAt>300?IDLE_INPUT:p.input,dt,traffic);
+    const idle=idleMask===null?now-p.inputAt>300:(idleMask&(1<<p.slot))!==0;
+    updateRace(p.race,idle?IDLE_INPUT:p.input,dt,traffic);
   }
   // One shared contact model for campaign and multiplayer, including recovery.
   for(let pass=0;pass<3;pass++)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++)resolveVehicleContact(active[i].race,active[j].race,poses.get(active[i]),poses.get(active[j]));

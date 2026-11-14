@@ -1,0 +1,13 @@
+{
+  "id": "male.accessory.gafas-podio",
+  "base": "male",
+  "slot": "accessory",
+  "name": "Gafas de podio",
+  "rig": "portrait-v2-male",
+  "price": 1,
+  "currency": "golden-keys",
+  "rarity": "legendary",
+  "layers": {
+    "image": "male-gafas-podio.png"
+  }
+}

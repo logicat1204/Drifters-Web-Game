@@ -13,6 +13,7 @@ import {FOCUS_TYPES} from '../js/focus.mjs';
 import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
 import {assertShopEra,shopCars} from './shop-cars.mjs';
 import {cardChest,cardReceipt,openCardChest} from './collectibles.mjs';
+import {compressEvidence,seasonAt,settledBefore,seasonBounds,seasonAward,standings} from './ranked.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const hashToken=value=>createHash('sha256').update(value).digest('hex');
 export const derivePassword=(value,salt)=>scrypt(value,salt,64,{N:16384,r:8,p:1});
@@ -89,7 +90,7 @@ export class Store {
   constructor(filename=process.env.NODE_TEST_CONTEXT&&!process.env.DB_PATH?':memory:':sqlitePath(),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>9){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>10){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -125,6 +126,7 @@ export class Store {
         this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email); PRAGMA user_version=8');
       }
       if(version<9)this.db.exec(readFileSync(new URL('./migrations/009-collectibles.sql',import.meta.url),'utf8'));
+      if(version<10)this.db.exec(readFileSync(new URL('./migrations/010-ranked.sql',import.meta.url),'utf8'));
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
@@ -241,6 +243,46 @@ export class Store {
     const owned=this.db.prepare('SELECT card_id AS id,quantity FROM owned_cards WHERE user_id=? ORDER BY card_id').all(id);
     return {owned,favorite:this.db.prepare('SELECT card_id FROM favorite_cards WHERE user_id=?').get(id)?.card_id??null};
   }
+  saveVerifiedOnline(match){
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const created=this.db.prepare('INSERT OR IGNORE INTO verified_online_matches VALUES(?,?,?,?,?)')
+        .run(match.id,match.season,match.finishedAt,JSON.stringify(match.results),compressEvidence(match.evidence));
+      if(created.changes)for(const result of match.results){
+        const run=result.run;
+        const fields=Object.keys(run);
+        this.db.prepare(`INSERT INTO runs(${fields.join(',')}) VALUES(${fields.map(()=>'?').join(',')})`).run(...Object.values(run));
+        if(result.coins)this.creditOnline(result.userId,result.coins,match.season===null?'online-direct':'ranked',run.id);
+      }
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  creditOnline(id,coins,reason,runId){
+    this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(coins,id);
+    this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run(reason+':'+runId,id,coins,reason,runId,this.now());
+  }
+  rankedRows(season){
+    return standings(this.db.prepare('SELECT finished_at,results FROM verified_online_matches WHERE season=?').all(season)
+      .map(row=>({finishedAt:row.finished_at,results:JSON.parse(row.results)})));
+  }
+  rankedStatus(id){
+    const season=seasonAt(this.now());
+    this.db.exec('BEGIN IMMEDIATE');try{
+      let rewards=[];
+      const expired=this.db.prepare('SELECT DISTINCT season FROM verified_online_matches WHERE season<? ORDER BY season').all(settledBefore(this.now()));
+      for(const entry of expired){
+        const rows=this.rankedRows(entry.season),row=rows.find(row=>row.userId===id);
+        if(!row||!this.db.prepare('INSERT OR IGNORE INTO ranked_claims VALUES(?,?)').run(entry.season,id).changes)continue;
+        const reward=seasonAward(row.rank,rows.length);
+        if(reward.keys)this.db.prepare('INSERT INTO ranked_wallets VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET golden_keys=golden_keys+excluded.golden_keys').run(id,reward.keys);
+        this.creditOnline(id,reward.coins,'ranked-season',entry.season+':'+id);
+        rewards.push({season:entry.season,...reward});
+      }
+      const rows=this.rankedRows(season),goldenKeys=this.goldenKeys(id);
+      this.db.exec('COMMIT');
+      return {season:seasonBounds(season),leaders:rows.slice(0,50),personal:rows.find(row=>row.userId===id)||null,goldenKeys,rewards,coins:this.user(id).coins};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
+  goldenKeys(id){return this.db.prepare('SELECT golden_keys FROM ranked_wallets WHERE user_id=?').get(id)?.golden_keys||0;}
   setFavoriteCard(id,card){
     if(card===null)this.db.prepare('DELETE FROM favorite_cards WHERE user_id=?').run(id);
     else{
@@ -272,11 +314,15 @@ export class Store {
       const owns=kind==='car'?this.db.prepare('SELECT 1 FROM owned_cars WHERE user_id=? AND car_id=?').get(id,key):this.db.prepare('SELECT 1 FROM inventory WHERE user_id=? AND item_id=?').get(id,key);
       if(!owns){
         if(kind==='car'&&item.era==='mf-ghost')assertShopEra(item,this.db.prepare('SELECT level_id FROM campaign_progress WHERE user_id=?').all(id).map(row=>row.level_id));
-        if(!this.db.prepare('UPDATE wallets SET balance=balance-? WHERE user_id=? AND balance>=?').run(item.price,id,item.price).changes)throw Object.assign(Error('No tienes suficientes monedas.'),{status:409});
+        const golden=item.currency==='golden-keys';
+        if(golden){
+          if(!this.db.prepare('UPDATE ranked_wallets SET golden_keys=golden_keys-? WHERE user_id=? AND golden_keys>=?').run(item.price,id,item.price).changes)
+            throw Object.assign(Error('No tienes suficientes llaves doradas.'),{status:409});
+        }else this.spend(id,item.price);
         this.db.prepare(kind==='car'?'INSERT INTO owned_cars VALUES(?,?,?)':'INSERT INTO inventory VALUES(?,?,?)').run(id,key,this.now());
-        this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('buy:'+id+':'+kind+':'+key,id,-item.price,kind+':'+key,null,this.now());
+        this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('buy:'+id+':'+kind+':'+key,id,golden?0:-item.price,(golden?'golden-keys:':'')+kind+':'+key,null,this.now());
       }
-      this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned:!!owns};
+      this.db.exec('COMMIT');return {user:this.user(id),alreadyOwned:!!owns,goldenKeys:this.goldenKeys(id)};
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   buyMusic(id,song){

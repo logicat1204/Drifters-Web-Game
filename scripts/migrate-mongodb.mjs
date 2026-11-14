@@ -13,7 +13,7 @@ export function readSqlite(filename){
   try{
     sql.exec('BEGIN');
     const version=sql.prepare('PRAGMA user_version').get().user_version;
-    if(![6,7,8,9].includes(version))throw Error('La copia SQLite debe tener un esquema entre v6 y v9. Ábrela primero con la versión actual del servidor.');
+    if(![6,7,8,9,10].includes(version))throw Error('La copia SQLite debe tener un esquema entre v6 y v10. Ábrela primero con la versión actual del servidor.');
     if(sql.prepare('PRAGMA quick_check').get().quick_check!=='ok'||sql.prepare('PRAGMA foreign_key_check').get())throw Error('SQLite tiene errores de integridad. Usa una copia consistente.');
     const users=rows('users'),profiles=new Map(rows('profiles').map(({user_id,...row})=>[user_id,row]));
     const balances=new Map(rows('wallets').map(row=>[row.user_id,row.balance]));
@@ -36,11 +36,13 @@ export function readSqlite(filename){
       const receipts=new Map(rows('card_chests').map(row=>['card-chest:'+row.user_id+':'+row.receipt,JSON.parse(row.cards)]));
       for(const row of ledger)if(receipts.has(row.id))row.cards=receipts.get(row.id);
     }
+    if(version>=10)for(const {user_id,golden_keys} of rows('ranked_wallets'))byId.get(user_id).golden_keys=golden_keys;
     return {
       pilots,sessions:rows('sessions').map(({token_hash,expires_at,...row})=>({_id:token_hash,...row,expires_at:new Date(expires_at)})),
       runs:rows('runs').map(({id,...row})=>({_id:id,...row})),
       economy_ledger:ledger.map(({id,...row})=>({_id:id,...row})),
-      cosmetics:rows('cosmetics').map(({id,...row})=>({_id:id,...row}))
+      cosmetics:rows('cosmetics').map(({id,...row})=>({_id:id,...row})),
+      verified_online_matches:version>=10?rows('verified_online_matches').map(row=>({_id:row.id,season:row.season,finishedAt:row.finished_at,results:JSON.parse(row.results),evidence:Buffer.from(row.evidence)})):[]
     };
   }finally{sql.close();}
 }
