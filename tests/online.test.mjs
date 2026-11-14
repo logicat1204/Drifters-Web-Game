@@ -33,6 +33,27 @@ test('congested sockets skip replaceable poses and still send race events',()=>{
 test('a room has a unique invite code, maximum four slots and rejects the fifth',()=>{
   const f=fixture();assert.match(f.room.code,/^[A-F\d]{8}$/);f.join();f.join('Tercero','r32');f.join('Cuarto','ae86');const fifth=f.join('Quinto');assert.equal(f.room.players.size,4);assert.equal(fifth.room,null);assert.match(fifth.out.at(-1).message,/llena/);assert.equal(f.host.out.at(-1).players.length,4);
 });
+test('WebRTC probes only relay signals between opted-in pilots in the same lobby',()=>{
+  const f=fixture(),guest=f.join(),outsider=f.client();
+  f.send(outsider,'create',{name:'Otro piloto',car:'ae86'});
+  f.send(f.host,'probe-ready',{ready:true});
+  f.send(f.host,'probe-signal',{to:guest.id,kind:'offer',value:'sdp'});
+  assert.equal(guest.out.at(-1).type,'room');
+
+  for(const pilot of [guest,outsider])f.send(pilot,'probe-ready',{ready:true});
+  assert.deepEqual(guest.out.at(-1).peers,[f.host.id,guest.id]);
+  f.send(f.host,'probe-signal',{to:outsider.id,kind:'offer',value:'sdp'});
+  assert.deepEqual(outsider.out.at(-1).peers,[outsider.id]);
+  f.send(f.host,'probe-signal',{to:guest.id,kind:'offer',value:'sdp',from:outsider.id});
+  assert.deepEqual(guest.out.at(-1),{type:'probe-signal',from:f.host.id,kind:'offer',value:'sdp'});
+  f.send(guest,'probe-ping',{id:12});
+  assert.deepEqual(guest.out.at(-1),{type:'probe-pong',id:12});
+
+  for(const pilot of [f.host,guest])f.send(pilot,'ready',{ready:true});
+  f.send(f.host,'start');
+  f.send(f.host,'probe-signal',{to:guest.id,kind:'offer',value:'sdp'});
+  assert.equal(guest.out.at(-1).type,'snapshot');
+});
 test('all seven garage cars can join and use their own authoritative physics',()=>{
   for(const car of CARS){const f=fixture(),guest=f.join('Nuevo coche',car.id);assert.equal(f.room.players.get(guest.id)?.car,car.id);
     for(const c of [f.host,guest])f.send(c,'ready',{ready:true});f.send(f.host,'start');f.step(7);

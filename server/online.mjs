@@ -36,6 +36,10 @@ export class OnlineRooms {
   details(data,user){if(!this.store)return profile(data);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:buildFor(user,user.defaultCar)};}
   revoke(userId){for(const c of this.clients)if(c.identity?.id===userId){this.disconnect(c);c.close(4001,'Sesión cerrada');}}
   publish(room){this.broadcast(room,this.lobby(room));}
+  publishProbe(room){
+    const peers=[...room.players.values()].filter(p=>p.probe).map(p=>p.client.id);
+    for(const id of peers)this.send(room.players.get(id).client,{type:'probe-peers',peers});
+  }
   receive(c,data){
     try{
       const now=this.now();if(now-c.window>1000){c.window=now;c.messages=0;}if(++c.messages>100){c.close(1008,'Demasiados mensajes');return;}
@@ -91,7 +95,18 @@ export class OnlineRooms {
         room.players.set(c.id,{client:c,...details,ready:false,connected:true,input:{...IDLE_INPUT},inputAt:now,sequence:-1,race:null,place:null,dnf:false});c.room=room;room.lastActive=now;this.publish(room);return;
       }
       const room=c.room,p=room?.players.get(c.id);if(!room||!p)throw Error('Entra en una sala primero.');room.lastActive=now;
-      if(data.type==='profile'){
+      if(data.type==='probe-ready'){
+        if(room.phase!=='lobby')return;
+        p.probe=data.ready===true;this.publishProbe(room);
+      }else if(data.type==='probe-ping'){
+        if(room.phase==='lobby'&&p.probe&&Number.isSafeInteger(data.id))this.send(c,{type:'probe-pong',id:data.id});
+      }else if(data.type==='probe-signal'){
+        const peer=room.players.get(data.to);
+        if(room.phase!=='lobby'||!p.probe||!peer?.probe||peer===p)return;
+        const {kind,value}=data;
+        if(!['offer','answer','ice'].includes(kind)||typeof value!=='string'||value.length>1600)return;
+        this.send(peer.client,{type:'probe-signal',from:c.id,kind,value});
+      }else if(data.type==='profile'){
         if(room.phase!=='lobby')throw Error('El coche queda bloqueado al comenzar.');Object.assign(p,this.details(data,prepared?prepared.user:this.store?.user(c.identity?.id)),{ready:false});this.publish(room);
       }else if(data.type==='ready'){
         if(room.phase!=='lobby')throw Error('La carrera ya comenzó.');p.ready=data.ready===true;
@@ -103,6 +118,7 @@ export class OnlineRooms {
         this.checkStart(c,room);
         room.track=makeTrack(TRACKS.find(t=>t.id===room.config.track));room.runId=randomUUID();room.phase='racing';room.elapsed=0;room.firstFinish=null;room.finishOrder=[];let i=0;
         for(const other of room.players.values()){
+          other.probe=false;
           const user=prepared?prepared.pilots.get(other.userId):this.store?.user(other.userId);
           if(user)other.build=buildFor(user,other.car);
           const focus=user?{focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)}:{};
@@ -150,6 +166,7 @@ export class OnlineRooms {
     const connected=[...room.players.values()].filter(v=>v.connected);
     if(!connected.length){this.rooms.delete(room.code);return;}
     if(room.hostId===c.id)room.hostId=connected[0].client.id;this.publish(room);
+    if(room.phase==='lobby'&&p?.probe)this.publishProbe(room);
   }
   disconnect(c){this.leave(c);this.clients.delete(c);}
   snapshot(room,replaceable=false){this.broadcast(room,{type:'snapshot',tick:this.tickId,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,build:p.build,connected:p.connected,dnf:p.dnf,place:p.place,state:compact(p.race)}))},replaceable);}
