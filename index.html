@@ -184,7 +184,7 @@
   <div id="modal-backdrop" class="modal-backdrop hidden"></div>
   <section id="music-panel" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="music-title"><div class="drawer-header"><span class="eyebrow">04 / SOUND SYSTEM</span><button class="close-button" data-action="close" aria-label="Cerrar">×</button></div><h2 id="music-title">TU NOCHE.<br><em>TU BANDA SONORA.</em></h2><p>Hay curvas que se toman mejor con la canción correcta.</p><div class="music-toolbar"><button class="secondary-button" id="import-music">＋ AGREGAR ARCHIVOS</button><button class="text-button" id="refresh-music">↻ ACTUALIZAR</button></div><input type="file" id="music-files" accept="audio/*,.flac,.opus,.m4a" multiple hidden><div class="folder-note"><span>↳</span><div><b>Tu carpeta <code>songs/</code> está conectada</b><small id="folder-status">Buscando canciones…</small></div><span class="live-dot"></span></div><div id="song-list" class="song-list"></div><div class="volume-control"><label for="music-volume">VOLUMEN DE MÚSICA</label><input type="range" id="music-volume" min="0" max="100" value="50"><span id="volume-label">50%</span></div><p class="drawer-footnote">Motores: domasx2 (CC0) y qubodup (CC BY 3.0). <a href="/assets/audio/credits.html" target="_blank" rel="noopener">Créditos de audio</a>.</p><p class="drawer-footnote">Copia tus archivos a <code>songs/</code> y aparecerán aquí automáticamente. MP3, OGG, WAV, M4A y más. Los archivos agregados desde el botón duran esta sesión.</p></section>
   <section id="control-layout-panel" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="layout-title">
-    <div class="drawer-header"><span class="eyebrow">AJUSTES / CONTROLES</span><button class="close-button" data-action="settings" aria-label="Volver a ajustes">×</button></div>
+    <div class="drawer-header"><span class="eyebrow">AJUSTES / CONTROLES</span><button type="button" class="close-button" data-action="close" aria-label="Volver a ajustes">×</button></div>
     <h2 id="layout-title">Tu <em>posición.</em></h2>
     <label class="setting-row">Distribución<select id="control-layout"><option value="portrait">Móvil · vertical</option><option value="landscape">Móvil · horizontal</option><option value="shifter">Escritorio · palanca en H</option></select></label>
     <label id="touch-steering-row" class="setting-row">Dirección<select id="touch-steering"><option value="buttons">Botones ◀ ▶</option><option value="wheel">Volante táctil</option></select></label>
@@ -193,7 +193,7 @@
     <p class="layout-help">Arrastra los controles o muévelos con las flechas. Elige uno para ajustar su tamaño.</p>
     <label class="setting-row"><span id="control-size-name">Tamaño</span><input id="control-size" type="range" min="9" max="36" value="16"></label>
     <button id="control-reset" type="button" class="secondary-button full">RESTAURAR ESTA DISTRIBUCIÓN</button>
-    <button class="start-button full" data-action="settings">VOLVER A AJUSTES ↗</button>
+    <button type="button" class="start-button full" data-action="close">VOLVER A AJUSTES ↗</button>
   </section>
   <section id="settings-panel" class="settings-screen hidden" aria-labelledby="settings-title">
     <header class="settings-header"><h1 id="settings-title">Opciones</h1><div><button class="secondary-button" data-action="close">Volver</button><button class="secondary-button" data-action="home">Menú principal</button></div></header>
