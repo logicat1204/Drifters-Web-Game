@@ -1,5 +1,11 @@
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 export function createSkillState(){return {intensity:0,points:0,chain:0,level:0,corner:false,quiet:0,peak:0,clean:true,cornerPoints:0,award:null,awardId:0,flash:0};}
+export function penalizeImpact(race){
+  if(!race.skill)return;
+  race.skill.points=Math.max(0,race.skill.points-220);
+  race.skill.chain=0;
+  race.skill.clean=false;
+}
 export function cornerQuality({curve,speed,grip,lateral,slipAngle=0,travelYaw=0,collision=0}){
   const bend=Math.abs(curve);if(bend<.0012||speed<15||collision>0||Math.abs(lateral)>3.8||Math.abs(slipAngle)>.52||Math.abs(travelYaw)>.4)return 0;
   const limit=Math.sqrt(grip/Math.max(.00001,bend)),ratio=speed/limit;

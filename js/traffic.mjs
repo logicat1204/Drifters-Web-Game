@@ -1,4 +1,5 @@
 import {cancelFocus} from './focus.mjs';
+import {penalizeImpact} from './skill.mjs';
 
 export const SLIPSTREAM=Object.freeze({minGap:5,maxGap:48,minSpeed:20,width:1.65,build:2.2,fade:1.6,dragReduction:.65,topSpeed:.05});
 export const CONTACT=Object.freeze({length:4.2,width:1.78,cooldown:.65});
@@ -49,7 +50,7 @@ export function resolveVehicleContact(a,b,previousA=vehiclePose(a),previousB=veh
   a.lateral=clamp(a.lateral+direction*(overlap-moveB),-edge,edge);b.lateral=clamp(b.lateral-direction*moveB,-edge,edge);
   if(fresh){a.speed*=.96;b.speed*=.96;}
  }
- if(fresh){a.contactCooldown=b.contactCooldown=CONTACT.cooldown;a.collision=b.collision=.55;cancelFocus(a);cancelFocus(b);}
+ if(fresh){a.contactCooldown=b.contactCooldown=CONTACT.cooldown;a.collision=b.collision=.55;cancelFocus(a);cancelFocus(b);penalizeImpact(a);penalizeImpact(b);}
  clearDraft(a);clearDraft(b);
  for(const r of [a,b])if(r.finished&&r.s<(r.finishDistance||r.track.length)&&r.timeLeft>0){r.finished=false;r.won=false;}
  return true;

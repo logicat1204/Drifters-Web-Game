@@ -61,7 +61,8 @@ test('SQLite export preserves account identity, progress, purchases, photos, cre
   assert.equal(data.sessions[0]._id,hashToken(session.token));
   assert.equal(data.sessions[0].csrf,session.csrf);
   assert.deepEqual(data.runs.map(r=>r._id).sort(),['original-race','original-stage']);
-  assert.equal(data.economy_ledger.length,4);
+  assert.equal(data.economy_ledger.length,5);
+  assert.ok(data.economy_ledger.some(row=>row.reason==='time-attack'&&row.run_id==='original-race'));
 });
 
 test('connection diagnostics distinguish DNS, authorization and TLS without printing driver details',()=>{

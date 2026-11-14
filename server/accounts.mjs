@@ -15,6 +15,8 @@ import {EXPANSION_TRACKS,COURSE_REFERENCE_ROOT} from '../js/expansion-courses.mj
 import {ALL_CARS,ALL_TRACKS} from '../js/sim.mjs';
 import {CAMPAIGN_WORLDS} from '../js/campaign-worlds.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
+import {mfGhostDealerOpen,shopCars} from './shop-cars.mjs';
+import {cardCatalog,cardChest} from './collectibles.mjs';
 const campaignMedia=JSON.parse(readFileSync(new URL('../assets/campaign-media.json',import.meta.url),'utf8'));
 const campaignMap=JSON.parse(readFileSync(new URL('../assets/campaign-map/map.json',import.meta.url),'utf8'));
 const assetUrl=relative=>'/'+relative.split('/').map(encodeURIComponent).join('/');
@@ -64,6 +66,14 @@ export class Accounts {
       }
       const portrait=/^\/api\/users\/([a-f\d-]{36})\/portrait$/.exec(p);
       if(portrait&&['GET','HEAD'].includes(req.method)){const image=await this.store.portrait(portrait[1],url.searchParams.get('transparent')==='1');if(!image)throw fail('Piloto inexistente.',404);res.writeHead(200,{'Content-Type':image.mime,'Content-Length':image.bytes.length,'Cache-Control':'private, max-age=60','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(req.method==='HEAD'?undefined:image.bytes);return true;}
+      const publicLicense=/^\/api\/users\/([a-f\d-]{36})\/license$/.exec(p);
+      if(publicLicense&&req.method==='GET'){
+        this.throttle(req,'public-license',90,60000);
+        const id=publicLicense[1],pilot=await this.store.user(id);
+        if(!pilot?.onboarded)throw fail('Piloto inexistente.',404);
+        const [{favorite},{records},cards]=await Promise.all([this.store.cardInventory(id),this.store.personal(id),cardCatalog()]);
+        json(res,200,{displayName:pilot.displayName,records,favorite:cards.find(card=>card.id===favorite)??null});return true;
+      }
       if(p==='/api/username'&&req.method==='GET'){this.throttle(req,'available',90,60000);json(res,200,{available:await this.store.available(url.searchParams.get('name'))});return true;}
       if(p==='/api/session'&&req.method==='GET'){const s=await this.session(req);json(res,200,{user:s?.user||null,csrf:s?.csrf||null});return true;}
       if(p==='/api/songs'&&req.method==='GET'){const user=(await this.session(req))?.user,shop=await this.media.shopSongs();json(res,200,{songs:[...await this.media.freeSongs(),...shop.filter(song=>user?.music.includes(song.id)).map(({absolute,...song})=>({...song,detail:'TU COLECCIÓN · '+song.author}))]});return true;}
@@ -73,8 +83,8 @@ export class Accounts {
         const user=p==='/api/register'?await this.store.register(data.username,data.password,emailAddress(data.email)):await this.store.login(data.email??data.username,data.password);
         const session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
-      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/campaign/chest','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
-      const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
+      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/campaign/chest','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize','/api/collectibles','/api/collectibles/favorite','/api/shop/card-chest'];if(!routes.includes(p))return false;
+      const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish','/api/collectibles/favorite','/api/shop/card-chest'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
       if(p==='/api/logout'&&req.method==='POST'){await this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
       if(p==='/api/profile/email'&&req.method==='POST'){
@@ -128,8 +138,23 @@ export class Accounts {
       }
       if(p==='/api/campaign/story'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,{user:await this.store.markChapterStory(s.user.id,data.chapter,data.phase)});return true;}
       if(p==='/api/campaign/chest'&&req.method==='POST'){const data=await jsonBody(req);json(res,200,await this.store.claimCampaignChest(s.user.id,data.id));return true;}
-      if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:ALL_CARS,cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
+      if(p==='/api/shop'&&req.method==='GET'){await this.refreshCosmetics();const songs=(await this.media.shopSongs()).map(({absolute,url,...song})=>({...song,url:s.user.music.includes(song.id)?url:null}));json(res,200,{cars:shopCars,mfGhostOpen:mfGhostDealerOpen(s.user.campaign.map(row=>row.id)),cosmetics:COSMETICS.filter(c=>!c.starter),songs,user:s.user});return true;}
       if(p==='/api/shop/buy'&&req.method==='POST'){this.throttle(req,'buy',60,60000);await this.refreshCosmetics();const data=await jsonBody(req);json(res,200,data.kind==='music'?await this.store.buyMusic(s.user.id,(await this.media.shopSongs()).find(song=>song.id===data.id)):await this.store.buy(s.user.id,data.kind,data.id));return true;}
+      if(p==='/api/collectibles'&&req.method==='GET'){
+        const [catalog,inventory]=await Promise.all([cardCatalog(),this.store.cardInventory(s.user.id)]);
+        json(res,200,{catalog,...inventory,chest:cardChest});return true;
+      }
+      if(p==='/api/collectibles/favorite'&&req.method==='PATCH'){
+        const {id}=await jsonBody(req);
+        if(id!==null&&!(await cardCatalog()).some(card=>card.id===id))throw fail('Esa carta ya no está disponible.');
+        json(res,200,await this.store.setFavoriteCard(s.user.id,id));return true;
+      }
+      if(p==='/api/shop/card-chest'&&req.method==='POST'){
+        this.throttle(req,'card-chest',30,60000);
+        const {receipt}=await jsonBody(req),catalog=await cardCatalog();
+        const result=await this.store.buyCardChest(s.user.id,receipt,catalog);
+        json(res,200,{user:result.user,cards:result.cards.map(id=>catalog.find(card=>card.id===id)).filter(Boolean)});return true;
+      }
       if(p==='/api/garage'&&req.method==='GET'){json(res,200,{upgrades:UPGRADES,parts:VEHICLE_PARTS,paints:PAINTS,user:s.user});return true;}
       if(['/api/garage/upgrade','/api/garage/buy','/api/garage/customize'].includes(p)&&req.method==='POST'){
         this.throttle(req,'garage',90,60000);const data=await jsonBody(req);

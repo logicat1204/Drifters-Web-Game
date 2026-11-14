@@ -1,5 +1,5 @@
 import { COURSE_LAYOUTS, TRACKS, RIVALS } from './courses.mjs';
-import {createSkillState,updateCornerSkill} from './skill.mjs';
+import {createSkillState,penalizeImpact,updateCornerSkill} from './skill.mjs';
 import {FOCUS,focusType,createFocus,cancelFocus,updateFocus} from './focus.mjs';
 import {EXTRA_CARS} from './vehicles.mjs';
 import {CAMPAIGN_TRACKS} from './campaign.mjs';
@@ -197,7 +197,7 @@ export function updateRace(r, input, dt, traffic=null) {
   if (Math.abs(r.lateral)>=edge || scraping) {
     const fresh=r.wallContact!==wallSide||r.wallTouch===0;
     r.lateral=wallSide*Math.min(Math.abs(r.lateral),edge);
-    if(fresh&&r.wallCooldown<=0){r.speed*=.69;r.collision=1;r.wallCooldown=.85;r.wallSlow=2.5;}
+    if(fresh&&r.wallCooldown<=0){r.speed*=.69;r.collision=1;r.wallCooldown=.85;r.wallSlow=2.5;penalizeImpact(r);}
     r.wallContact=wallSide;r.wallTouch=.18;
     // Scraping remains slower than a clean corner, without reducing progress to
     // zero. This also prevents using the barrier as a full-throttle turn assist.

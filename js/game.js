@@ -7,6 +7,7 @@ import {PlayMenu} from './play-menu.js';
 import {Ranking} from './ranking.js';
 import {applyBuild} from './tuning.mjs';
 import {Workshop} from './workshop.js';
+import {Collectibles} from './collectibles.js';
 import { ALL_CARS as CARS, CAR_PROFILES, ALL_TRACKS as TRACKS, RIVALS, makeTrack, createRace, updateRace, toggleHeadlights, repositionRace, clamp } from './sim.mjs';
 import { Renderer } from './renderer.js';
 import { Cockpit } from './cockpit.js';
@@ -191,7 +192,8 @@ function navigateBack(){
   if(screen==='results'&&race?.awaitingRecord)return;
   closeModal();
   if(screen==='campaign'){progression.backCampaign();return;}
-  if(screen==='shop'||screen==='garage'||screen==='play'){showScreen('menu');return;}
+  if(screen==='shop'&&progression.backShop())return;
+  if(screen==='shop'||screen==='garage'||screen==='play'||screen==='collection'){showScreen('menu');return;}
   if(screen==='workshop'){showScreen('garage');return;}
   if(screen==='online'&&net.room){net.leave();return;}
   showScreen('play');
@@ -206,7 +208,7 @@ window.addEventListener('keydown',e=>{if(screen==='title'&&!e.repeat&&!['Shift',
 $('title-screen').addEventListener('click',enterGame);
 for(const button of $('main-menu-actions').querySelectorAll('button')){button.addEventListener('pointerenter',()=>selectMenuButton(button));button.addEventListener('focus',()=>selectMenuButton(button));}
 
-function showScreen(name){if(name!=='replay')replayPlayer=null;$('replay-controls').classList.toggle('hidden',name!=='replay');playMenu?.cancelHover();racePresentation.reset(race);accumulator=0;frameMonitor.reset();adaptiveResolution.reset();renderer.resolutionScale=1;performanceSnapshot={};screen=name;document.body.dataset.screen=name;document.body.classList.toggle('title-screen',name==='title');document.body.classList.toggle('menu-screen',name==='menu');$('title-screen').classList.toggle('hidden',name!=='title');$('app').inert=['title','online-loading','settings'].includes(name);$('settings-panel').classList.toggle('hidden',name!=='settings');$('auth-gate').inert=name==='title';if(name==='menu')selectMenuButton($('main-menu-actions').querySelector('.selected')||$('main-menu-actions').querySelector('button'));if(name==='online'){net?.refreshIdentity();if(net?.tab==='public')net.refreshRooms();renderer.setCar(ownedCar(CARS.find(c=>c.id===$('online-car').value)||CARS[settings.car]));}else if(['menu','play','home','garage','title','campaign','shop'].includes(name))renderer.setCar(ownedCar());for(const id of ['main-menu','play-screen','home','garage','workshop','online','race','campaign','shop'])$(id).classList.toggle('hidden',(id==='main-menu'?name!=='menu':id==='play-screen'?name!=='play':name!==id)&&!(id==='race'&&['paused','results'].includes(name)));document.body.classList.toggle('racing',['race','paused','results','replay'].includes(name));driving.clear();driving.sync();document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.action===name));renderer.resetCamera=true;}
+function showScreen(name){if(name!=='replay')replayPlayer=null;$('replay-controls').classList.toggle('hidden',name!=='replay');playMenu?.cancelHover();racePresentation.reset(race);accumulator=0;frameMonitor.reset();adaptiveResolution.reset();renderer.resolutionScale=1;performanceSnapshot={};screen=name;document.body.dataset.screen=name;document.body.classList.toggle('title-screen',name==='title');document.body.classList.toggle('menu-screen',name==='menu');$('title-screen').classList.toggle('hidden',name!=='title');$('app').inert=['title','online-loading','settings'].includes(name);$('settings-panel').classList.toggle('hidden',name!=='settings');$('auth-gate').inert=name==='title';if(name==='menu')selectMenuButton($('main-menu-actions').querySelector('.selected')||$('main-menu-actions').querySelector('button'));if(name==='online'){net?.refreshIdentity();if(net?.tab==='public')net.refreshRooms();renderer.setCar(ownedCar(CARS.find(c=>c.id===$('online-car').value)||CARS[settings.car]));}else if(['menu','play','home','garage','title','campaign','shop','collection'].includes(name))renderer.setCar(ownedCar());for(const id of ['main-menu','play-screen','home','garage','workshop','online','race','campaign','shop','collection'])$(id).classList.toggle('hidden',(id==='main-menu'?name!=='menu':id==='play-screen'?name!=='play':name!==id)&&!(id==='race'&&['paused','results'].includes(name)));document.body.classList.toggle('racing',['race','paused','results','replay'].includes(name));driving.clear();driving.sync();document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.action===name));renderer.resetCamera=true;}
 const gameDialogs=['music','controls','control-layout','gamepad-config','pause','results','online-results','exit','mode','ranking'];
 function openModal(name,opener=document.activeElement){
   if(name==='settings'){openOptions();return;}
@@ -320,7 +322,7 @@ async function startRace(){
   }catch(error){toast(error.message);if(screen==='campaign')$('campaign-status').textContent=error.message;if(error.status===401){await account.init();}}finally{startRace.busy=false;document.body.classList.remove('starting-race');$('start').disabled=false;}
 }
 function nextArcade(){if(race?.campaignStage){const next=progression.nextStage(race.campaignStage);if(next)progression.begin(next);else{quit();showScreen('campaign');progression.backCampaign();}return;}if(!race?.won||race.mode!=='arcade')return;settings.arcadeStage=settings.track===TRACKS.length-1?0:settings.track+1;save();account.preferences({arcadeStage:settings.arcadeStage});updateModeDescription();if(settings.track===TRACKS.length-1){quit();return;}startRace();}
-const actions={replay:startReplay,'replay-exit':stopReplay,'replay-pause':toggleReplay,'replay-restart':()=>{seekReplay(0);if(replayPlayer?.paused)toggleReplay();},'replay-camera':cycleReplayCamera,play:()=>{currentCampaign=null;closeModal();showScreen('play');document.querySelector('[data-play-mode]')?.focus();},ranking:()=>ranking.open(),home:()=>{closeModal();showScreen('menu');},back:navigateBack,campaign:()=>{closeModal();progression.openCampaign();},shop:()=>{account.close();closeModal();progression.openShop();},offline:()=>openRaceSetup('offline'),profile:()=>{if(account?.require())account.open();},exit:()=>openModal('exit'),'exit-confirm':leaveToTitle,garage:()=>{closeModal();showScreen('garage');},workshop:()=>{closeModal();workshop.open(CARS[settings.car]);},music:()=>openModal('music'),settings:openOptions,'gamepad-config':()=>{if(driving.gamepad)openModal('gamepad-config');},controls:()=>openModal('controls'),'control-layout':opener=>{driving.openEditor();openModal('control-layout',opener);},online:()=>{closeModal();showScreen('online');},'online-rematch':()=>net.send({type:'rematch'}),'online-exit':()=>net.leave(),camera:cycleCamera,headlights:switchLights,reposition:repositionPlayer,focus:useFocus,next:nextArcade,close:()=>screen==='settings'&&!modal?closeOptions():closeModal(),pause,resume,restart:()=>{if(race?.awaitingRecord)return;if(race?.campaignStage)progression.begin(progression.catalog.stages.find(s=>s.id===race.campaignStage));else startRace();},quit,fullscreen:()=>requestFullscreen(),mute:()=>{sound.muted=!sound.muted;sound.volume();toast(sound.muted?'Música silenciada. Pulsa M para activarla.':'Música activada.');}};
+const actions={collection:()=>{closeModal();collectibles.open();},replay:startReplay,'replay-exit':stopReplay,'replay-pause':toggleReplay,'replay-restart':()=>{seekReplay(0);if(replayPlayer?.paused)toggleReplay();},'replay-camera':cycleReplayCamera,play:()=>{currentCampaign=null;closeModal();showScreen('play');document.querySelector('[data-play-mode]')?.focus();},ranking:()=>ranking.open(),home:()=>{closeModal();showScreen('menu');},back:navigateBack,campaign:()=>{closeModal();progression.openCampaign();},shop:()=>{account.close();closeModal();progression.openShop();},offline:()=>openRaceSetup('offline'),profile:()=>{if(account?.require())account.open();},exit:()=>openModal('exit'),'exit-confirm':leaveToTitle,garage:()=>{closeModal();showScreen('garage');},workshop:()=>{closeModal();workshop.open(CARS[settings.car]);},music:()=>openModal('music'),settings:openOptions,'gamepad-config':()=>{if(driving.gamepad)openModal('gamepad-config');},controls:()=>openModal('controls'),'control-layout':opener=>{driving.openEditor();openModal('control-layout',opener);},online:()=>{closeModal();showScreen('online');},'online-rematch':()=>net.send({type:'rematch'}),'online-exit':()=>net.leave(),camera:cycleCamera,headlights:switchLights,reposition:repositionPlayer,focus:useFocus,next:nextArcade,close:()=>screen==='settings'&&!modal?closeOptions():closeModal(),pause,resume,restart:()=>{if(race?.awaitingRecord)return;if(race?.campaignStage)progression.begin(progression.catalog.stages.find(s=>s.id===race.campaignStage));else startRace();},quit,fullscreen:()=>requestFullscreen(),mute:()=>{sound.muted=!sound.muted;sound.volume();toast(sound.muted?'Música silenciada. Pulsa M para activarla.':'Música activada.');}};
 document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>actions[b.dataset.action]?.(b)));$('start').addEventListener('click',startRace);$('modal-backdrop').addEventListener('click',()=>{if(!['pause','results','online-results'].includes(modal))closeModal();});
 for(const [id,key] of [['camera','camera'],['daytime','daytime'],['quality','quality']]){$(id).value=settings[key];$(id).addEventListener('change',()=>{settings[key]=$(id).value;save();if(id==='quality'){adaptiveResolution.reset();renderer.resolutionScale=1;frameMonitor.reset();}renderer.quality=Number(settings.quality);renderer.cameraMode=Number(settings.camera);renderer.resetCamera=true;});}
 for(const [id,key]of [['cabin-motion','cabinMotion'],['cabin-fov','cabinFov']]){$(id).value=settings[key];$(id).addEventListener('input',e=>{settings[key]=Number(e.target.value);save();});}for(const [id,key]of [['cabin-hands','cabinHands'],['stable-horizon','stableHorizon']]){$(id).checked=settings[key];$(id).addEventListener('change',e=>{settings[key]=e.target.checked;save();});}
@@ -348,7 +350,7 @@ window.addEventListener('keydown',e=>{
   if(screen==='settings'&&!modal&&driving.captureKey(e))return;
   if((screen==='settings'&&!modal&&driving.binding!=null||screen==='race'&&!modal&&!form)&&driving.handleKey(e))return;
   if(screen==='settings'&&!modal&&e.code==='Escape'){e.preventDefault();closeOptions();return;}
-  if(e.code==='Escape'&&(screen!=='race'||driving.keyMatches('pause',e.code))){e.preventDefault();if(screen==='replay')stopReplay();else if(screen==='race')pause();else if(screen==='paused')resume();else if(modal&&!['results','online-results'].includes(modal))closeModal();else if(['garage','home','online','campaign','workshop','shop','play'].includes(screen))navigateBack();return;}
+  if(e.code==='Escape'&&(screen!=='race'||driving.keyMatches('pause',e.code))){e.preventDefault();if(screen==='replay')stopReplay();else if(screen==='race')pause();else if(screen==='paused')resume();else if(modal&&!['results','online-results'].includes(modal))closeModal();else if(['garage','home','online','campaign','workshop','shop','play','collection'].includes(screen))navigateBack();return;}
   if(screen==='replay'&&!modal&&document.activeElement?.tagName!=='SELECT'){if(['Space','ArrowLeft','ArrowRight','KeyC'].includes(e.code))e.preventDefault();if(e.code==='Space'&&!e.repeat)toggleReplay();if(e.code==='KeyC'&&!e.repeat)cycleReplayCamera();if(e.code==='ArrowLeft')seekReplay(replayPlayer.at-5);if(e.code==='ArrowRight')seekReplay(replayPlayer.at+5);return;}
   if(form||modal)return;
   if(screen==='menu'&&['ArrowUp','ArrowDown','Home','End'].includes(e.code)){e.preventDefault();moveMenu(e.code);return;}
@@ -486,8 +488,8 @@ async function saveRun(r){
     const saved=await account.request('/api/runs/finish',{method:'POST',body:JSON.stringify({id:r.attempt,frames:r.recorder.frames})});
     r.savedRecord=saved;account.accept({user:saved.user});
     if(race!==r)return;
-    $('result-reward').textContent=r.campaignStage?(saved.completed&&saved.won?
-      '◈ +'+saved.reward.coins+' MONEDAS':'Supera el objetivo para desbloquear el siguiente evento.'):'';
+    $('result-reward').textContent=saved.reward.coins?'◈ +'+saved.reward.coins+' MONEDAS':
+      r.campaignStage&&!saved.won?'Supera el objetivo para desbloquear el siguiente evento.':'';
     $('result-time').textContent=fmtTime(saved.time);$('result-best').textContent=saved.personalBest?fmtTime(saved.personalBest):'—';
     $('record-save-status').textContent=saved.completed?'Marca verificada y guardada en tu licencia.':'Puntuación verificada y guardada. Completa el recorrido para registrar un tiempo.';
     lockResult(r,false);
@@ -569,6 +571,7 @@ function onlineResults(results){
 function updateRematch(){const host=net?.room?.hostId===net?.id;$('online-rematch').classList.toggle('hidden',!host);$('online-rematch-note').textContent=host?'Todos deberán confirmar «listo» de nuevo.':'Espera a que el anfitrión abra la revancha o sal de la sala.';}
 net=new OnlineClient({
   manual:()=>driving.choice!=='auto',
+  publicLicense:id=>collectibles.publicLicense(id),
   getUser:()=>account?.user,requireUser:()=>account?.require(),request:(...args)=>account.request(...args),syncPreferences:()=>account?.preferenceTail,
   onError:message=>{if(race?.online)toast(message);},
   onPreview:id=>{if(screen==='online')renderer.setCar(ownedCar(CARS.find(c=>c.id===id)||CARS[settings.car]));},
@@ -601,8 +604,10 @@ account=new AccountClient({
 });
 $('welcome-dialog').addEventListener('close',event=>{if(event.currentTarget.returnValue==='options')openModal('settings');});
 progression=new ProgressionClient(account,{screen:showScreen,car:ownedCar,garage:()=>workshop.open(CARS[settings.car]),prepare:prepareCampaign,start:()=>startRace(),preview:car=>renderer.setCar(car),songs:allSongs,refreshSongs,selectSong:id=>{const song=allSongs().find(s=>s.id===id);if(song)selectSong(song);},storyPage:file=>{sound.pageAudio.setVolume(sound.muted?0:settings.engineVolume/100);sound.pageAudio.play(file);},storyAudio:song=>{sound.stop();if(song)sound.play(song);},storyStop:()=>sound.stop()});
+progression.callbacks.shopScene=section=>{renderer.shopSection=section;};
 playMenu=new PlayMenu({openModal,closeModal,active:()=>screen==='play'&&!modal,enter:mode=>mode==='campaign'?progression.openCampaign():mode==='time'?openRaceSetup():showScreen('online')});
-ranking=new Ranking(account,{openModal,cars:CARS,config:()=>({track:track.id,name:track.name,night:settings.daytime==='night',wet:settings.weather==='wet',manual:driving.choice!=='auto'})});
+const collectibles=new Collectibles(account,{screen:showScreen,cars:CARS,tracks:TRACKS,preview:car=>renderer.setCar(ownedCar(car)),view:(angle,zoom)=>{renderer.collectionAngle=angle;renderer.collectionZoom=zoom;}});
+ranking=new Ranking(account,{openModal,cars:CARS,publicLicense:id=>collectibles.publicLicense(id),config:()=>({track:track.id,name:track.name,night:settings.daytime==='night',wet:settings.weather==='wet',manual:driving.choice!=='auto'})});
 workshop=new Workshop(account,{screen:showScreen,active:()=>screen==='workshop',preview:car=>renderer.setCar(car)});
 function frame(now){
   const workStart=performance.now();
@@ -629,7 +634,9 @@ function frame(now){
   const replayActive=screen==='replay'&&!replayPlayer?.paused&&!document.hidden;
   sound.update(visualRace,replayActive||screen==='race'&&race?.countdown===0&&!race.finished&&!document.hidden,replayActive?{throttle:!visualRace.braking&&visualRace.speed>0,brake:visualRace.braking}:input);
   const introCamera=screen==='race'&&race?.introActive?raceIntroCamera(race,race.introDuration-race.introRemaining):null;
-  if(screen!=='campaign'&&screen!=='online-loading')renderer.render(visualRace,screen,renderDt,{day:race?!race.night:settings.daytime==='day',shake:settings.shake,cabinMotion:settings.cabinMotion,cabinFov:settings.cabinFov,cabinHands:settings.cabinHands,stableHorizon:settings.stableHorizon,song:raceSong().name,replayCamera,introCamera});
+  const showWorld=!['campaign','online-loading'].includes(screen)&&
+    (screen!=='collection'||collectibles.tab==='cars')&&(screen!=='shop'||progression.shopSection==='dealer');
+  if(showWorld)renderer.render(visualRace,screen,renderDt,{day:race?!race.night:settings.daytime==='day',shake:settings.shake,cabinMotion:settings.cabinMotion,cabinFov:settings.cabinFov,cabinHands:settings.cabinHands,stableHorizon:settings.stableHorizon,song:raceSong().name,replayCamera,introCamera});
   else{renderer.cabinActive=false;document.body.classList.remove('cabin-3d');renderer.stats={...renderer.stats,drawCalls:0,vertices:0,mirrorPasses:0};}
   cockpit.draw(visualRace,['race','paused','results'].includes(screen)&&!race?.introRemaining&&renderer.cameraMode===3,Math.min(dt,.05),{song:raceSong().name,gpuMirror:renderer.mirrorReady,time:renderer.time});
   cornerEffects.draw(visualRace,['race','paused','results'].includes(screen),screen==='race'?Math.min(dt,.05):0,settings.shake,renderer.cameraMode===3,renderer.time,renderer.cabinActive?renderer.cabin.mirrorBounds:null);

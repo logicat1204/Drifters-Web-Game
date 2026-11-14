@@ -14,7 +14,13 @@ export class ProgressionClient {
   constructor(account,callbacks){
     this.account=account;this.callbacks=callbacks;this.user=account.user;this.season='dry';this.chapter=null;this.selected=null;this.category='car';this.base='male';this.comicOpen=false;this.musicSelections={};
     document.querySelectorAll('[data-shop-category]').forEach(button=>button.onclick=()=>{this.category=button.dataset.shopCategory;this.item=null;this.renderShop();});
-    $('shop-base').onchange=()=>{this.base=$('shop-base').value;this.item=null;this.renderShop();};
+    for(const button of document.querySelectorAll('[data-shop-section]'))button.onclick=()=>this.selectShopSection(button.dataset.shopSection);
+    for(const button of document.querySelectorAll('[data-dealer-era]'))button.onclick=()=>{
+      this.dealerEra=button.dataset.dealerEra;this.dealerItem=null;this.renderDealer();
+    };
+    $('shop-back')?.addEventListener('click',()=>this.backShop());
+    $('dealer-prev')?.addEventListener('click',()=>this.stepDealer(-1));
+    $('dealer-next')?.addEventListener('click',()=>this.stepDealer(1));
     $('campaign-ngplus-dialog')?.addEventListener('close',event=>{if(event.currentTarget.returnValue==='start')this.setCampaignCycle('ngplus');});
     $('comic-cancel').onclick=()=>this.closeComic();$('comic-next').onclick=()=>this.nextComic();
     $('comic-prev').onclick=()=>{if(this.page>0){this.page--;this.renderComic();}};
@@ -325,27 +331,103 @@ export class ProgressionClient {
     return index>=0&&stages[index+1]?.chapter===stages[index].chapter?stages[index+1]:null;
   }
   async openShop(category){
-    if(category&&category!==this.category){this.category=category;this.item=null;}
-    this.callbacks.screen('shop');this.base=this.user?.avatar.base||this.base;$('shop-base').value=this.base;$('shop-status').textContent='Abriendo la tienda…';try{await this.load();this.renderShop();$('shop-status').textContent='Las compras son permanentes. Los cosméticos no modifican el rendimiento.';}catch(error){$('shop-status').textContent=error.message;}
+    if(!this.account.require())return;
+    this.callbacks.screen('shop');
+    this.selectShopSection(category==='car'?'dealer':null);
+    $('shop-status').textContent='Abriendo la tienda…';
+    try{await this.load();$('shop-status').textContent='';this.renderShop();}
+    catch(error){$('shop-status').textContent=error.message;}
   }
-  items(){return this.category==='car'?(this.shop?.cars||[]).map(c=>({...c,kind:'car'})):this.category==='music'?(this.shop?.songs||[]):(this.shop?.cosmetics||[]).filter(c=>c.slot===this.category&&c.bases.includes(this.base)&&(c.availableForSale!==false||this.user.cosmetics.includes(c.id))).map(c=>({...c,kind:'cosmetic'}));}
+  selectShopSection(section){
+    this.shopSection=section;
+    if(section==='goods'&&this.category==='car')this.category='music';
+    $('shop').dataset.section=section||'entry';
+    $('shop-title').textContent=section==='dealer'?'Concesionaria':section==='goods'?'Miscelánea':'Tienda';
+    for(const [id,visible] of [['shop-sections',!section],['shop-dealer',section==='dealer'],['shop-goods',section==='goods'],['shop-back',!!section]])$(id).classList.toggle('hidden',!visible);
+    $('shop-status').textContent='';
+    this.callbacks.shopScene?.(section);
+    this.renderShop();
+  }
+  backShop(){if(!this.shopSection)return false;this.selectShopSection(null);$('shop-sections').querySelector('button').focus();return true;}
+  dealerCars(){return (this.shop?.cars||[]).filter(car=>car.era===(this.dealerEra||'initial-d'));}
+  stepDealer(delta){
+    const cars=this.dealerCars();
+    if(!cars.length)return;
+    this.dealerItem=cars[(cars.findIndex(car=>car.id===this.dealerItem)+delta+cars.length)%cars.length].id;
+    this.renderDealer();
+  }
+  renderDealer(){
+    if(!this.shop||!this.user||this.shopSection!=='dealer')return;
+    if(!this.shop.mfGhostOpen)this.dealerEra='initial-d';
+    for(const button of document.querySelectorAll('[data-dealer-era]')){
+      button.disabled=button.dataset.dealerEra==='mf-ghost'&&!this.shop.mfGhostOpen;
+      button.setAttribute('aria-pressed',String(button.dataset.dealerEra===(this.dealerEra||'initial-d')));
+    }
+    $('dealer-era-note').textContent=this.shop.mfGhostOpen?'':'MF Ghost se habilita al acceder a su mundo en campaña.';
+    const cars=this.dealerCars(),car=cars.find(candidate=>candidate.id===this.dealerItem)||cars[0];
+    if(!car)return;
+    this.dealerItem=car.id;
+    const grid=$('dealer-items'),focused=grid.contains(document.activeElement);
+    grid.replaceChildren(...cars.map(item=>{
+      const button=node('button','dealer-car');
+      button.dataset.item=item.id;
+      button.setAttribute('aria-pressed',String(item.id===car.id));
+      button.append(node('b','',item.code),node('small','',this.owns(item)?'EN TU GARAJE':'◈ '+item.price.toLocaleString()));
+      button.onclick=()=>{this.dealerItem=item.id;this.renderDealer();};
+      return button;
+    }));
+    const selected=grid.querySelector('[aria-pressed=true]');
+    if(focused)selected.focus({preventScroll:true});
+    if(selected.getClientRects().length)grid.scrollLeft=selected.offsetLeft-(grid.clientWidth-selected.offsetWidth)/2;
+    const style=car.profile==='agile'?'Skiller':car.profile==='power'?'Grip':'Balance';
+    $('dealer-name').replaceChildren(node('small','eyebrow',car.brand+' / '+car.year),node('h2','',car.code),node('p','',car.name),node('p','dealer-description',style+' · '+car.label));
+    const stats=$('dealer-stats'),owned=this.owns(car);
+    stats.replaceChildren(node('small','eyebrow','PRESTACIONES DE SERIE'));
+    for(const [label,value] of [['Potencia',car.power+' CV'],['Peso',car.weight+' kg'],['Tracción',car.drive],['Velocidad máxima',Math.round(car.max*3.6)+' km/h'],['Categoría',car.competitionTier||1]]){
+      const row=node('div','dealer-stat');row.append(node('span','',label),node('b','',value));stats.append(row);
+    }
+    if(car.competitionTier===3)stats.append(node('p','dealer-description','Apto para NG+ con motor, chasis y frenos al máximo.'));
+    stats.append(node('b','shop-detail-price',owned?'✓ EN TU GARAJE':'◈ '+car.price.toLocaleString()),this.shopButton(car));
+    if($('shop').getClientRects().length)this.callbacks.preview(car);
+  }
+  items(){return this.category==='music'?(this.shop?.songs||[]):(this.shop?.cosmetics||[]).filter(c=>c.slot===this.category&&c.bases.includes(this.base)&&(c.availableForSale!==false||this.user.cosmetics.includes(c.id))).map(c=>({...c,kind:'cosmetic'}));}
   owns(item){return item.kind==='car'?this.user.cars.includes(item.id):item.kind==='music'?(this.user.music||[]).includes(item.id):this.user.cosmetics.includes(item.id);}
   preview(item){const base=item.bases[0],avatar={...defaultAvatar(base),...(this.user.avatar.base===base?this.user.avatar:{}),[item.slot]:item.key};return '/api/avatar/preview?'+new URLSearchParams(avatar);}
   renderShop(){
-    if(!this.shop||!this.user)return;$('shop-coins').textContent='◈ '+this.user.coins.toLocaleString();$('shop-base-label').classList.toggle('hidden',['car','music'].includes(this.category));
+    if(!this.shop||!this.user)return;
+    $('shop-coins').textContent='◈ '+this.user.coins.toLocaleString();
+    if(this.shopSection==='dealer'){this.renderDealer();return;}
+    if(this.shopSection!=='goods')return;
+    this.base=this.user.avatar.base;
+    $('shop-base-label').textContent=this.category==='music'?'':this.base==='female'?'COLECCIÓN MUJER':'COLECCIÓN HOMBRE';
     for(const button of document.querySelectorAll('[data-shop-category]'))button.setAttribute('aria-selected',String(button.dataset.shopCategory===this.category));
     const items=this.items();if(!items.some(item=>item.id===this.item))this.item=items[0]?.id;const grid=$('shop-items');grid.replaceChildren();
     for(const item of items){const button=node('button','shop-item'+(this.item===item.id?' selected':''));button.dataset.item=item.id;button.dataset.slot=item.slot||item.kind;
-      if(item.kind==='cosmetic')button.append(portrait(this.preview(item),item.name));else if(item.kind==='music')button.append(node('div','shop-song-art'));else{const car=node('div','shop-car-art');car.style.setProperty('--car-color',item.color);car.append(node('span','',item.code),node('i'));button.append(car);}
-      const carBadge=item.competitionTier===3?`${item.brand} · CATEGORÍA 3`:item.brand;
-      const rarity=item.kind==='music'?'MÚSICA / '+item.author:item.rarity==='legendary'?'LEGENDARIO':item.kind==='car'?carBadge:'COLECCIÓN '+(this.base==='male'?'HOMBRE':'MUJER');button.append(node('small',item.rarity==='legendary'?'legendary':'',rarity),node('b','',item.name),node('span','shop-price',this.owns(item)?'✓ EN TU COLECCIÓN':'◈ '+item.price.toLocaleString()));button.onclick=()=>{this.item=item.id;this.renderShop();if(item.kind==='car')this.callbacks.preview(item);if(window.matchMedia('(max-width:760px)').matches)$('shop-detail').scrollIntoView({block:'start'});};grid.append(button);
+      const music=item.kind==='music',legendary=item.rarity==='legendary';
+      button.append(music?node('div','shop-song-art'):portrait(this.preview(item),item.name));
+      const rarity=music?'MÚSICA / '+item.author:legendary?'LEGENDARIO':this.base==='male'?'COLECCIÓN HOMBRE':'COLECCIÓN MUJER';
+      button.append(node('small',legendary?'legendary':'',rarity),node('b','',item.name),node('span','shop-price',this.owns(item)?'✓ EN TU COLECCIÓN':'◈ '+item.price.toLocaleString()));
+      button.onclick=()=>{
+        this.item=item.id;this.renderShop();
+        if(window.matchMedia('(max-width:760px)').matches)$('shop-detail').scrollIntoView({block:'start'});
+      };
+      grid.append(button);
     }
     const item=items.find(c=>c.id===this.item),detail=$('shop-detail');detail.replaceChildren();if(!item){detail.append(node('p','','No hay artículos en esta colección.'));return;}
-    if(item.kind==='cosmetic')detail.append(portrait(this.preview(item),item.name,'shop-preview'));else if(item.kind==='music')detail.append(node('div','shop-song-art'));else detail.append(node('div','shop-car-name',item.code));
-    detail.append(node('small',item.rarity==='legendary'?'legendary eyebrow':'eyebrow',item.kind==='car'?item.brand:item.rarity==='legendary'?'EDICIÓN LEGENDARIA':'COSMÉTICO / '+(this.base==='male'?'HOMBRE':'MUJER')),node('h2','',item.name),node('p','',item.kind==='car'?`${item.drive} · ${item.power} CV · ${item.weight} KG · ${item.profile==='agile'?'Skiller':item.profile==='power'?'Grip':'Complete'}`:'Pieza exclusiva de su base. Puedes equiparla en tu licencia.'),node('b','shop-detail-price',item.kind==='car'&&this.owns(item)?'✓ EN TU GARAJE':'◈ '+item.price.toLocaleString()));
-    if(item.kind==='music'){detail.replaceChildren(node('div','shop-song-art'),node('small','eyebrow','BANDA SONORA / '+item.author),node('h2','',item.title),node('p','','Desbloquea esta canción para seleccionarla en las carreras y en campaña.'),node('b','shop-detail-price',item.kind==='car'&&this.owns(item)?'✓ EN TU GARAJE':'◈ '+item.price.toLocaleString()));}
-    if(item.kind==='car'&&item.competitionTier===3)detail.append(node('p','','CATEGORÍA 3 · Apto para NG+ con motor, chasis y frenos al máximo.'));
-    const owned=this.owns(item),button=node('button','start-button full',owned?(item.kind==='music'?'SELECCIONAR CANCIÓN →':'EQUIPAR →'):this.user.coins<item.price?'MONEDAS INSUFICIENTES':'COMPRAR →');button.id='shop-buy';button.disabled=!owned&&this.user.coins<item.price;button.onclick=()=>owned?this.equip(item):this.buy(item);detail.append(button);
+    const music=item.kind==='music',legendary=item.rarity==='legendary';
+    const label=music?'BANDA SONORA / '+item.author:legendary?'EDICIÓN LEGENDARIA':'COSMÉTICO';
+    const description=music?'Disponible en tus carreras de Time Attack y campaña.':'Puedes equipar esta pieza en tu licencia.';
+    detail.append(music?node('div','shop-song-art'):portrait(this.preview(item),item.name,'shop-preview'),node('small',legendary?'legendary eyebrow':'eyebrow',label),
+      node('h2','',music?item.title:item.name),node('p','',description),
+      node('b','shop-detail-price',this.owns(item)?'✓ EN TU COLECCIÓN':'◈ '+item.price.toLocaleString()),this.shopButton(item));
+  }
+  shopButton(item){
+    const owned=this.owns(item);
+    const button=node('button','start-button full',owned?(item.kind==='music'?'SELECCIONAR CANCIÓN':'EQUIPAR'):this.user.coins<item.price?'MONEDAS INSUFICIENTES':'COMPRAR');
+    button.id='shop-buy';
+    button.disabled=!owned&&this.user.coins<item.price;
+    button.onclick=()=>owned?this.equip(item):this.buy(item);
+    return button;
   }
   async buy(item){$('shop-buy').disabled=true;try{const result=await this.account.request('/api/shop/buy',{method:'POST',body:JSON.stringify({kind:item.kind,id:item.id})});this.account.accept(result);this.setUser(result.user);if(item.kind==='music')await this.callbacks.refreshSongs?.();$('shop-status').textContent=result.alreadyOwned?'Ya tenías este artículo. No se descontaron monedas.':'Compra guardada. Ya puedes equipar '+item.name+'.';}catch(error){$('shop-status').textContent=error.message;}finally{this.renderShop();}}
   async equip(item){$('shop-buy').disabled=true;try{if(item.kind==='music'){await this.callbacks.refreshSongs?.();this.callbacks.selectSong?.(item.id);$('shop-status').textContent='Seleccionada para Time Attack: '+item.name+'. También está disponible en los niveles de campaña.';return;}const avatar=item.kind==='cosmetic'?{...defaultAvatar(item.bases[0]),...(this.user.avatar.base===item.bases[0]?this.user.avatar:{}),[item.slot]:item.key}:null;const result=await this.account.request('/api/profile',{method:'PATCH',body:JSON.stringify(avatar?{avatar,portraitMode:'avatar'}:{defaultCar:item.id})});this.account.accept(result);this.setUser(result.user);$('shop-status').textContent='Equipado en tu licencia: '+item.name;}catch(error){$('shop-status').textContent=error.message;}finally{this.renderShop();}}

@@ -11,6 +11,8 @@ import {CAMPAIGN_CHAPTERS,campaignStage,stageAvailable,campaignReward,campaignRe
 import {campaignChest,campaignEvent,campaignFocusUnlocks,canViewStory,chestAvailable,eventAvailable} from '../js/campaign-events.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
 import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
+import {assertShopEra,shopCars} from './shop-cars.mjs';
+import {cardChest,cardReceipt,openCardChest} from './collectibles.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const hashToken=value=>createHash('sha256').update(value).digest('hex');
 export const derivePassword=(value,salt)=>scrypt(value,salt,64,{N:16384,r:8,p:1});
@@ -57,9 +59,18 @@ export function checkRecordFilters({track,source,mode,car}){
 export function campaignPayout(stage,cleared,run,eventRules=false){
   if(stage.track!==run.track||!(eventRules?eventAvailable:stageAvailable)(stage,cleared.map(s=>s.level_id)))throw Error('Nivel de campaña bloqueado.');
   const old=cleared.find(s=>s.level_id===stage.id)||cleared.find(s=>stage.legacyId&&s.level_id===stage.legacyId);
-  const entitlement=campaignReward(stage,Math.max(run.points,old?.best_points||0));
-  const coins=Math.max(0,entitlement-(old?.reward_coins||0))+(old?campaignReplayReward(stage,run.points):0);
+  const points=Math.max(run.points,old?.best_points||0);
+  const base=campaignReward(stage,0),replay=campaignReplayReward(stage,0);
+  const entitlement=eventRules?base+drivingBonus(base,points):campaignReward(stage,points);
+  const coins=Math.max(0,entitlement-(old?.reward_coins||0))+(old?(eventRules?replay+drivingBonus(replay,run.points):campaignReplayReward(stage,run.points)):0);
   return {entitlement,coins};
+}
+const drivingBonus=(base,points)=>Math.round(base*.06*Math.min(1,Math.max(0,points)/12000));
+export function nonCampaignPayout(run,race){
+  if(!run.completed||run.elapsed<25||race.track.length<1000)return 0;
+  const base=run.source==='online'&&run.mode!=='campaign'?(run.won?480:190):
+    run.source==='solo'&&run.mode==='time'?Math.min(230,75+Math.round(race.track.length/55)):0;
+  return base+drivingBonus(base,run.points);
 }
 export function runDocument(id,userId,r,source,finishTime,now){
   return {id,user_id:userId,track:r.track.id,car:r.car.id,source,mode:r.mode,manual:Number(r.manual),wet:Number(r.wet),night:Number(r.night),
@@ -78,7 +89,7 @@ export class Store {
   constructor(filename=process.env.NODE_TEST_CONTEXT&&!process.env.DB_PATH?':memory:':sqlitePath(),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>8){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>9){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -113,6 +124,7 @@ export class Store {
         if(!this.db.prepare('PRAGMA table_info(profiles)').all().some(column=>column.name==='license_background'))this.db.exec('ALTER TABLE profiles ADD COLUMN license_background TEXT');
         this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email); PRAGMA user_version=8');
       }
+      if(version<9)this.db.exec(readFileSync(new URL('./migrations/009-collectibles.sql',import.meta.url),'utf8'));
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
@@ -225,13 +237,41 @@ export class Store {
     return {user:this.user(id)};
   }
   loadout(id){const user=this.user(id);return {focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType)};}
+  cardInventory(id){
+    const owned=this.db.prepare('SELECT card_id AS id,quantity FROM owned_cards WHERE user_id=? ORDER BY card_id').all(id);
+    return {owned,favorite:this.db.prepare('SELECT card_id FROM favorite_cards WHERE user_id=?').get(id)?.card_id??null};
+  }
+  setFavoriteCard(id,card){
+    if(card===null)this.db.prepare('DELETE FROM favorite_cards WHERE user_id=?').run(id);
+    else{
+      const result=this.db.prepare('INSERT INTO favorite_cards SELECT user_id,card_id FROM owned_cards WHERE user_id=? AND card_id=? ON CONFLICT(user_id) DO UPDATE SET card_id=excluded.card_id').run(id,card);
+      if(!result.changes)throw Error('Esta carta todavía no está en tu colección.');
+    }
+    return this.cardInventory(id);
+  }
+  buyCardChest(id,key,catalog){
+    const receipt=cardReceipt(key);
+    this.db.exec('BEGIN IMMEDIATE');try{
+      const prior=this.db.prepare('SELECT cards FROM card_chests WHERE user_id=? AND receipt=?').get(id,receipt);
+      const cards=prior?JSON.parse(prior.cards):openCardChest(catalog);
+      if(!prior){
+        this.spend(id,cardChest.price);
+        const grant=this.db.prepare('INSERT INTO owned_cards VALUES(?,?,1) ON CONFLICT(user_id,card_id) DO UPDATE SET quantity=quantity+1');
+        for(const card of cards)grant.run(id,card);
+        this.db.prepare('INSERT INTO card_chests VALUES(?,?,?)').run(id,receipt,JSON.stringify(cards));
+        this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('card-chest:'+id+':'+receipt,id,-cardChest.price,'card-chest',null,this.now());
+      }
+      this.db.exec('COMMIT');return {user:this.user(id),cards};
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
+  }
   buy(id,kind,key){
     if(kind==='car'&&!this.db.prepare('SELECT onboarded FROM profiles WHERE user_id=?').get(id)?.onboarded)throw Error('Completa tu licencia y elige tu coche inicial.');
-    const item=kind==='car'?ALL_CARS.find(c=>c.id===key):kind==='cosmetic'?COSMETICS.find(c=>c.id===key):null;
+    const item=kind==='car'?shopCars.find(c=>c.id===key):kind==='cosmetic'?COSMETICS.find(c=>c.id===key):null;
     if(!item||item.availableForSale===false||!Number.isInteger(item.price)||item.price<=0)throw Error('Artículo de tienda inválido.');
     this.db.exec('BEGIN IMMEDIATE');try{
       const owns=kind==='car'?this.db.prepare('SELECT 1 FROM owned_cars WHERE user_id=? AND car_id=?').get(id,key):this.db.prepare('SELECT 1 FROM inventory WHERE user_id=? AND item_id=?').get(id,key);
       if(!owns){
+        if(kind==='car'&&item.era==='mf-ghost')assertShopEra(item,this.db.prepare('SELECT level_id FROM campaign_progress WHERE user_id=?').all(id).map(row=>row.level_id));
         if(!this.db.prepare('UPDATE wallets SET balance=balance-? WHERE user_id=? AND balance>=?').run(item.price,id,item.price).changes)throw Object.assign(Error('No tienes suficientes monedas.'),{status:409});
         this.db.prepare(kind==='car'?'INSERT INTO owned_cars VALUES(?,?,?)':'INSERT INTO inventory VALUES(?,?,?)').run(id,key,this.now());
         this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('buy:'+id+':'+kind+':'+key,id,-item.price,kind+':'+key,null,this.now());
@@ -257,6 +297,12 @@ export class Store {
         const {entitlement,coins}=campaignPayout(stage,cleared,run,r.campaignRules);
         this.db.prepare('INSERT INTO campaign_progress(user_id,level_id,best_time,best_points,reward_coins,cleared_at,handling) VALUES(?,?,?,?,?,?,?) ON CONFLICT(user_id,level_id) DO UPDATE SET best_time=CASE WHEN campaign_progress.handling=excluded.handling THEN MIN(best_time,excluded.best_time) ELSE excluded.best_time END,best_points=MAX(best_points,excluded.best_points),reward_coins=MAX(reward_coins,excluded.reward_coins),handling=excluded.handling').run(userId,stage.id,finishTime,run.points,entitlement,this.now(),HANDLING_VERSION);
         if(coins){this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(coins,userId);this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('reward:'+id,userId,coins,'campaign:'+stage.id,id,this.now());}
+      }else if(inserted.changes){
+        const coins=nonCampaignPayout(run,r);
+        if(coins){
+          this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(coins,userId);
+          this.db.prepare('INSERT INTO economy_ledger VALUES(?,?,?,?,?,?)').run('reward:'+id,userId,coins,source==='online'?'online':'time-attack',id,this.now());
+        }
       }
       this.db.exec('COMMIT');return this.runResult(id,userId);
     }catch(error){this.db.exec('ROLLBACK');throw error;}

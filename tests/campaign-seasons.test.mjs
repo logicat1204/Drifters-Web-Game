@@ -6,9 +6,10 @@ import {campaignStages,campaignStage,stageAvailable,seasonUnlocked,campaignRewar
 import {ALL_CARS,ALL_TRACKS,CARS,makeTrack,createRace,updateRace} from '../js/sim.mjs';
 import {RunRecorder} from '../js/replay.mjs';
 import {UPGRADES} from '../js/tuning.mjs';
+import {shopCars} from '../server/shop-cars.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 const stages=campaignStages();
-const competitionCar=ALL_CARS.find(car=>car.id==='gt3rs');
+const competitionCar=shopCars.find(car=>car.id==='rx7amemiya');
 const maxBuild={engine:3,chassis:3,brakes:3};
 function prepare(store,id,car,target=maxBuild){
  for(const [system,level] of Object.entries(target)){

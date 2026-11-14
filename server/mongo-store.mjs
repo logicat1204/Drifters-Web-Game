@@ -4,8 +4,10 @@ import {COSMETICS,DEFAULT_AVATAR} from '../js/avatar.mjs';
 import {campaignStage} from '../js/campaign.mjs';
 import {campaignEvent,campaignFocusUnlocks} from '../js/campaign-events.mjs';
 import {UPGRADES,VEHICLE_PARTS,stockBuild,validateBuild} from '../js/tuning.mjs';
-import {avatarSvg,campaignPayout,chestReward,checkChapterStory,checkRecordFilters,derivePassword,hashToken,password,profileUpdate,runDocument,username} from './store.mjs';
+import {avatarSvg,campaignPayout,chestReward,checkChapterStory,checkRecordFilters,derivePassword,hashToken,nonCampaignPayout,password,profileUpdate,runDocument,username} from './store.mjs';
 import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
+import {assertShopEra,shopCars} from './shop-cars.mjs';
+import {cardChest,cardReceipt,openCardChest} from './collectibles.mjs';
 
 const noPhoto={projection:{password_hash:0,salt:0,'profile.photo':0}};
 const finishSort={elapsed:1,created_at:1,_id:1};
@@ -155,19 +157,50 @@ export class MongoStore {
     });
   }
   buy(id,kind,key){
-    const item=kind==='car'?ALL_CARS.find(c=>c.id===key):kind==='cosmetic'?COSMETICS.find(c=>c.id===key):null;
+    const item=kind==='car'?shopCars.find(c=>c.id===key):kind==='cosmetic'?COSMETICS.find(c=>c.id===key):null;
     if(!item||item.availableForSale===false||!Number.isInteger(item.price)||item.price<=0)throw Error('Artículo de tienda inválido.');
     const [list,field]=kind==='car'?['cars','car_id']:['inventory','item_id'];
-    return this.buyItem(id,kind,key,item.price,list,field);
+    return this.buyItem(id,kind,key,item.price,list,field,item);
+  }
+  async cardInventory(id){
+    const pilot=await this.pilot(id);
+    return {owned:pilot.cards||[],favorite:pilot.favorite_card??null};
+  }
+  async setFavoriteCard(id,card){
+    const result=await this.pilots.updateOne({_id:id,...(card===null?{}:{'cards.id':card})},{$set:{favorite_card:card}});
+    if(!result.matchedCount)throw Error('Esta carta todavía no está en tu colección.');
+    return this.cardInventory(id);
+  }
+  async buyCardChest(id,key,catalog){
+    const receipt=cardReceipt(key),_id='card-chest:'+id+':'+receipt;
+    try{
+      return await this.transaction(async session=>{
+        const pilot=await this.pilot(id,session),prior=await this.ledger.findOne({_id},{session});
+        if(prior)return {user:pilotView(pilot),cards:prior.cards};
+        if(pilot.balance<cardChest.price)throw Object.assign(Error('No tienes suficientes monedas.'),{status:409});
+        const cards=openCardChest(catalog),owned=new Map((pilot.cards||[]).map(card=>[card.id,card.quantity]));
+        for(const card of cards)owned.set(card,(owned.get(card)||0)+1);
+        const changes={balance:pilot.balance-cardChest.price,cards:[...owned].map(([id,quantity])=>({id,quantity}))};
+        await this.pilots.updateOne({_id:id},{$set:changes},{session});
+        await this.ledger.insertOne({_id,user_id:id,delta:-cardChest.price,reason:'card-chest',cards,run_id:null,created_at:this.now()},{session});
+        return {user:pilotView({...pilot,...changes}),cards};
+      });
+    }catch(error){
+      if(error.code!==11000)throw error;
+      const prior=await this.ledger.findOne({_id});if(!prior)throw error;
+      return {user:await this.user(id),cards:prior.cards};
+    }
   }
   buyMusic(id,song){
     if(!song||!/^song-[a-f0-9]{24}$/.test(song.id)||!Number.isSafeInteger(song.price)||song.price<1||song.price>1000000)throw Error('Canción de tienda inválida.');
     return this.buyItem(id,'music',song.id,song.price,'music','song_id');
   }
-  buyItem(id,kind,key,price,list,field){
+  buyItem(id,kind,key,price,list,field,item){
     return this.purchase(id,{id:`buy:${id}:${kind}:${key}`,reason:`${kind}:${key}`,price},pilot=>{
       if(kind==='car'&&!pilot.profile.onboarded)throw Error('Completa tu licencia y elige tu coche inicial.');
-      return owned(pilot[list],field,key)?null:{[list]:[...pilot[list],{[field]:key,acquired_at:this.now()}]};
+      if(owned(pilot[list],field,key))return null;
+      if(kind==='car'&&item.era==='mf-ghost')assertShopEra(item,pilot.campaign.map(row=>row.level_id));
+      return {[list]:[...pilot[list],{[field]:key,acquired_at:this.now()}]};
     });
   }
   requireBuild(pilot,car){
@@ -225,7 +258,15 @@ export class MongoStore {
         });
       }catch(error){if(error.code!==11000||!await this.runs.findOne({_id,user_id:userId},{projection:{_id:1}}))throw error;}
     }else{
-      try{await this.runs.insertOne({_id,...run});}catch(error){if(error.code!==11000)throw error;}
+      const coins=nonCampaignPayout(run,r);
+      try{
+        if(coins)await this.transaction(async session=>{
+          await this.runs.insertOne({_id,...run},{session});
+          await this.pilots.updateOne({_id:userId},{$inc:{balance:coins}},{session});
+          await this.ledger.insertOne({_id:'reward:'+id,user_id:userId,delta:coins,reason:source==='online'?'online':'time-attack',run_id:id,created_at:this.now()},{session});
+        });
+        else await this.runs.insertOne({_id,...run});
+      }catch(error){if(error.code!==11000||!await this.runs.findOne({_id,user_id:userId},{projection:{_id:1}}))throw error;}
     }
     return source==='online'?undefined:this.runResult(id,userId);
   }

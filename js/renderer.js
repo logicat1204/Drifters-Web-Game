@@ -30,6 +30,11 @@ const sub = (a,b) => a.map((v,i)=>v-b[i]);
 const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const norm = a => { const l = Math.hypot(...a)||1; return a.map(v=>v/l); };
 const dot = (a,b) => a.reduce((s,v,i)=>s+v*b[i],0);
+export function courseSky(trackId,day,wet){
+  if(wet)return day?'rain':'nightrain';
+  if(!day)return 'night';
+  return ['tsubaki','manazuru'].includes(trackId)?'sunset':'day';
+}
 export function raceVisibility(race,day){
   // Ashinoko is a short-range navigation challenge. Measure from the car so
   // chase, bonnet, cockpit and mirrors all share the same world visibility.
@@ -53,16 +58,16 @@ function lookAt(eye,target,up=[0,1,0]) { const z=norm(sub(eye,target)),x=norm(cr
 class Geometry {
   constructor() { this.data=[]; }
   triangle(a,b,c,color,uv=null,tiles=[-1,-1]) { const n=norm(cross(sub(b,a),sub(c,a))),col=rgb(color);let i=0;for(const p of [a,b,c])this.data.push(...p,...n,...col,...(uv?.[i++]||[0,0]),...tiles); }
-  quad(a,b,c,d,color) { this.triangle(a,b,c,color); this.triangle(a,c,d,color); }
+  quad(a,b,c,d,color,tiles) { this.triangle(a,b,c,color,null,tiles); this.triangle(a,c,d,color,null,tiles); }
   surface(a,b,c,d,texture,uv=[[0,0],[1,0],[1,1],[0,1]],tint=[1,1,1,0],night=texture){this.triangle(a,b,c,tint,[uv[0],uv[1],uv[2]],[texture,night]);this.triangle(a,c,d,tint,[uv[0],uv[2],uv[3]],[texture,night]);}
-  box(x,y,z,w,h,d,c) {
+  box(x,y,z,w,h,d,c,tiles) {
     const x0=x-w/2,x1=x+w/2,y0=y-h/2,y1=y+h/2,z0=z-d/2,z1=z+d/2;
-    this.quad(V(x0,y1,z0),V(x0,y1,z1),V(x1,y1,z1),V(x1,y1,z0),c);
-    this.quad(V(x0,y0,z1),V(x0,y1,z1),V(x0,y1,z0),V(x0,y0,z0),c);
-    this.quad(V(x1,y0,z0),V(x1,y1,z0),V(x1,y1,z1),V(x1,y0,z1),c);
-    this.quad(V(x0,y0,z1),V(x1,y0,z1),V(x1,y1,z1),V(x0,y1,z1),c);
-    this.quad(V(x1,y0,z0),V(x0,y0,z0),V(x0,y1,z0),V(x1,y1,z0),c);
-    this.quad(V(x0,y0,z0),V(x1,y0,z0),V(x1,y0,z1),V(x0,y0,z1),c);
+    this.quad(V(x0,y1,z0),V(x0,y1,z1),V(x1,y1,z1),V(x1,y1,z0),c,tiles);
+    this.quad(V(x0,y0,z1),V(x0,y1,z1),V(x0,y1,z0),V(x0,y0,z0),c,tiles);
+    this.quad(V(x1,y0,z0),V(x1,y1,z0),V(x1,y1,z1),V(x1,y0,z1),c,tiles);
+    this.quad(V(x0,y0,z1),V(x1,y0,z1),V(x1,y1,z1),V(x0,y1,z1),c,tiles);
+    this.quad(V(x1,y0,z0),V(x0,y0,z0),V(x0,y1,z0),V(x1,y1,z0),c,tiles);
+    this.quad(V(x0,y0,z0),V(x1,y0,z0),V(x1,y0,z1),V(x0,y0,z1),c,tiles);
   }
   cone(x,y,z,r,h,c,sides=7) { for(let i=0;i<sides;i++) {const a=i/sides*Math.PI*2,b=(i+1)/sides*Math.PI*2; this.triangle(V(x+Math.cos(a)*r,y,z+Math.sin(a)*r),V(x,y+h,z),V(x+Math.cos(b)*r,y,z+Math.sin(b)*r),c); } }
   cylinderX(x,y,z,r,w,c,sides=12) {
@@ -180,7 +185,7 @@ export class Renderer {
       precision mediump float;
       #endif
       varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;
-      uniform sampler2D uAtlas;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain;
+      uniform sampler2D uAtlas,uCourseSky;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain,uCourseSkyReady;
       uniform vec4 uStreetLights[3];
       uniform vec3 uFog,uEye,uCar,uRivalCar;uniform vec2 uForward,uRivalForward;
       uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];uniform vec3 uNetSlopes;
@@ -190,7 +195,7 @@ export class Renderer {
       float beam(vec3 car,vec2 forward,float slope){
         vec2 delta=vWorld.xz-car.xz;float ahead=dot(delta,forward);
         float across=abs(delta.x*forward.y-delta.y*forward.x);
-        float cone=smoothstep(1.,4.,ahead)*(1.-smoothstep(48.,140.,ahead))*(1.-smoothstep(1.3+ahead*.035,2.+ahead*.19,across));
+        float cone=smoothstep(1.,4.,ahead)*(1.-smoothstep(48.,140.,ahead))*(1.-smoothstep(1.7+ahead*.055,2.5+ahead*.24,across));
         float height=1.-smoothstep(1.5,6.,abs(vWorld.y-car.y-ahead*slope));
         return cone*height;
       }
@@ -201,7 +206,17 @@ export class Renderer {
         float streak=1.-smoothstep(.11,.40+max(0.,depth)*.011,abs(offset-.64));
         return streak*smoothstep(1.,3.,depth)*(1.-smoothstep(7.,27.,depth))*(1.-smoothstep(1.1,4.,abs(vWorld.y-car.y)));
       }
-      void main(){float f=smoothstep(uFogStart,uFogEnd,distance(vWorld,mix(uEye,uCar,uFogFromCar)));
+      void main(){
+        if(uBackdrop>.5&&uBackdrop<1.5&&vSurface.z<-29.5){
+          vec3 dir=normalize(vWorld-uEye);
+          float elevation=asin(clamp(dir.y,-1.,1.));
+          vec2 uv=vec2(atan(dir.z,dir.x)/6.2831853+.5,.5-elevation/3.1415927);
+          vec3 fallback=mix(uFog,uFog*mix(1.6,.80,uDay),smoothstep(0.,.5,dir.y));
+          vec3 sky=mix(fallback,texture2D(uCourseSky,uv).rgb*mix(1.22,1.,uDay),uCourseSkyReady);
+          float haze=(1.-smoothstep(.02,.5,dir.y))*mix(.32,1.,1.-smoothstep(60.,250.,uFogEnd));
+          gl_FragColor=vec4(mix(sky,uFog,haze),1.);return;
+        }
+        float f=smoothstep(uFogStart,uFogEnd,distance(vWorld,mix(uEye,uCar,uFogFromCar)));
         vec4 texel=vec4(1.);float tile=-1.;if(vSurface.z>=0.){tile=floor((uDay>.5?vSurface.z:vSurface.w)+.5);if(uAtlasReady<.5){if(tile>=29.&&tile<=32.)discard;texel=vec4(.6,.65,.55,1.);}else {vec2 cell=vec2(mod(tile,8.),floor(tile/8.)),uv=(cell*256.+8.+vec2(fract(vSurface.x),1.-fract(vSurface.y))*240.)/2048.;
         ${this.textureGrad?'vec2 dx=dFdx(vSurface.xy)*vec2(240./2048.,-240./2048.),dy=dFdy(vSurface.xy)*vec2(240./2048.,-240./2048.);dx*=min(1.,.0078125/max(length(dx),.000001));dy*=min(1.,.0078125/max(length(dy),.000001));texel=texture2DGradEXT(uAtlas,uv,dx,dy);':'texel=texture2D(uAtlas,uv);'}
         if(texel.a<.45)discard;}}
@@ -280,9 +295,19 @@ export class Renderer {
     if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));gl.useProgram(this.program);
     this.attrs={};for(const name of ['aPos','aNormal','aColor','aSurface'])this.attrs[name]=gl.getAttribLocation(this.program,name);
     this.uniforms={};for(const name of ['uCarSlope','uRivalSlope','uNetSlopes','uTerrain','uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
-    for(const name of ['uAtlas','uAtlasReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    for(const name of ['uAtlas','uAtlasReady','uCourseSky','uCourseSkyReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor','uWet','uWeatherTime'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     this.initAtlas();
+    this.courseSkyTexture=gl.createTexture();
+    gl.uniform1i(this.uniforms.uCourseSky,4);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D,this.courseSkyTexture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
     gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     this.cars={};this.vehicleModels=new VehicleModels(gl);this.cabin=new CabinView(gl);this.driverCamera=new DriverCamera();this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
     this.resolutionScale=1;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
@@ -303,6 +328,26 @@ export class Renderer {
   initAtlas(){
     const gl=this.gl;this.atlas=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.activeTexture(gl.TEXTURE0);
     this.atlasReady=new Promise(resolve=>{const img=new Image();img.onload=()=>{gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,this.textureGrad?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);const anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');if(anisotropy)gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(4,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));gl.activeTexture(gl.TEXTURE0);this.atlasLoaded=true;resolve(true);};img.onerror=()=>{this.atlasError=true;resolve(false);};img.src=new URL('../assets/environment/atlas.png',import.meta.url).href;});
+  }
+  selectCourseSky(profile){
+    if(this.courseSkyProfile===profile)return;
+    this.courseSkyProfile=profile;
+    this.courseSkyLoaded=false;
+    const img=new Image();
+    img.onload=()=>{
+      if(this.courseSkyProfile!==profile)return;
+      const gl=this.gl;
+      gl.activeTexture(gl.TEXTURE4);
+      gl.bindTexture(gl.TEXTURE_2D,this.courseSkyTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,img);
+      if((img.width&(img.width-1))===0&&(img.height&(img.height-1))===0)gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+      else gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.activeTexture(gl.TEXTURE0);
+      this.courseSkyLoaded=true;
+    };
+    const pack=profile==='nightrain'?4:3;
+    img.src=new URL(`../assets/touge_city_assets_part${pack}/textures/sky/sky_${profile}_equirect.jpg`,import.meta.url).href;
   }
   buildBossMeshes(){
     const light=hex=>[...rgb(hex).slice(0,3),1],ring=(g,color,vertical=false,y=.1)=>{
@@ -397,15 +442,27 @@ export class Renderer {
   }
   renderMenu(mode,w,h){
     const gl=this.gl,u=this.uniforms,mobile=w/h<.85,garage=mode==='garage',workshop=mode==='workshop',exhibition=mode==='menu';
+    const dealership=mode==='shop'&&this.shopSection==='dealer',collection=mode==='collection',showroom=dealership||collection,indoors=garage||workshop||showroom;
     if(exhibition&&!this.menuModel){this.menuModel=new MenuModel(gl);this.menuModel.load().then(()=>{this.boundBuffer=null;});}
     const drift=this.reducedMotion?.matches?0:Math.sin(this.time*.08)*.24;
-    const eye=mobile?(workshop?[8.5,3.4,12.3]:exhibition?[8.5,3.5,15]:[9.5,3.8,13.8]):exhibition?[8.5+drift,2.9,11.7-drift]:[8.4+drift,2.65,10.8-drift],target=mobile?(workshop?[0,.4,.3]:exhibition?[.4,1.6,1]:[-.2,1.8,.3]):exhibition?[-2,.85,1.35]:[workshop?2.5:garage?0:-3.1,.95,1.35];
+    const zoom=collection?this.collectionZoom||1:1;
+    const eye=showroom?(mobile?[10.8,3.3,14]:[7.5,2.6,9.4]).map(value=>value/zoom):mobile?(workshop?[8.5,3.4,12.3]:exhibition?[8.5,3.5,15]:[9.5,3.8,13.8]):exhibition?[8.5+drift,2.9,11.7-drift]:[8.4+drift,2.65,10.8-drift];
+    const target=showroom?[0,.65,0]:mobile?(workshop?[0,.4,.3]:exhibition?[.4,1.6,1]:[-.2,1.8,.3]):exhibition?[-2,.85,1.35]:[workshop?2.5:garage?0:-3.1,.95,1.35];
     this.eye=eye;this.target=target;
     const view=lookAt(eye,target),projection=perspective((mobile?49:38)*Math.PI/180,w/h,.15,4000);
     gl.uniformMatrix4fv(u.uView,false,view);gl.uniformMatrix4fv(u.uProjection,false,projection);
     gl.uniform1f(u.uWet,0);gl.uniform3fv(u.uFog,[.39,.48,.58]);gl.uniform3fv(u.uEye,eye);gl.uniform1f(u.uDay,.9);gl.uniform1f(u.uTunnel,0);gl.uniform4fv(u['uStreetLights[0]'],new Float32Array(12));gl.uniform1f(u.uFogStart,240);gl.uniform1f(u.uFogEnd,1800);gl.uniform1f(u.uFogFromCar,0);
     gl.uniform3fv(u.uCar,[0,0,0]);gl.uniform2fv(u.uForward,[0,1]);gl.uniform1f(u.uHeadlights,1);gl.uniform1f(u.uRivalLights,0);
     gl.uniform4fv(u['uNetCars[0]'],new Float32Array(12));gl.uniform2fv(u['uNetForward[0]'],new Float32Array(6));gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,0);
+    if(indoors){
+      const key=showroom?'dealerRoom':'garageRoom';
+      this[key]??=this.buildCarRoom(showroom);
+      this.draw(this[key]);
+      const angle=collection?this.collectionAngle||0:dealership?.23:0;
+      this.draw(this.shadow,transform(0,0,0,angle),.4);
+      this.drawCar(this.car.id,transform(0,.035,0,angle),{headlights:false});
+      return;
+    }
     gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.uniform1f(u.uBackdrop,2);this.draw(this.menuSky);this.draw(this.moon,transform(-900,180,-1000,.73,1.65),.025);this.draw(this.moon,transform(-900,180,-1000,.73,1.25),.055);this.draw(this.moon,transform(-900,180,-1000,.73,.85));gl.uniform1f(u.uBackdrop,0);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
     this.draw(this.menuHills);this.draw(this.menuGround);
     if(exhibition){for(const [size,alpha]of [[1.1,.06],[.97,.1],[.84,.14]])this.draw(this.shadow,transform(0,0,0,0,size),alpha);}else this.draw(this.shadow,transform(0,0,0),.4);
@@ -416,6 +473,38 @@ export class Renderer {
       this.drawCar(this.car.id,transform(3.15,.035,2.7,.18),{headlights:true});
     }else this.drawCar(this.car.id,transform(0,.035,0),{headlights:true});
     gl.depthMask(false);this.draw(this.menuLightPools,identity(),.12);gl.depthMask(true);
+  }
+  buildCarRoom(dealership){
+    const g=new Geometry();
+    g.box(0,-.12,0,50,.24,46,dealership?'#454c57':'#41464d');
+    g.box(0,4,-11,50,8,.32,dealership?'#abb4c4':'#606975');
+    g.box(-15,4,0,.30,8,36,'#717987');
+    g.box(0,8,0,50,.3,46,'#353c47');
+    for(let x=-12;x<=15;x+=5){
+      g.box(x,3,-10.73,.25,6,.35,'#242a32');
+      g.box(x,5.2,-10.72,.10,3.0,.10,[.76,.83,.98,1]);
+      g.box(x,7.77,-1,2.3,.07,.18,[.8,.87,1,1]);
+    }
+    if(dealership){
+      for(const side of [-1,1])g.box(side*3.85,.012,0,.045,.02,10,'#81909f');
+      g.box(0,.012,-5,7.7,.018,.045,'#81909f');
+      g.box(0,1.35,-10.69,36,.075,.08,'#496180');
+    }else{
+      g.box(-4,.96,-9.6,6.5,.20,1.15,'#bcb8ad');
+      for(const x of [-7,-1])g.box(x,.47,-9.6,.22,.94,1.1,'#252c32');
+      g.box(-4,2.25,-10.75,5.1,1.8,.13,'#424951');
+      for(let i=0;i<13;i++){
+        const x=-6.2+i*.36,y=1.83+(i%3)*.23;
+        g.box(x,y,-10.64,.07,.53,.065,'#d0d1ce');
+        g.box(x,y+.26,-10.61,.17,.10,.085,i%3?'#9ea7ac':'#d08348');
+      }
+      g.box(2,.65,-9.8,2.8,1.3,.95,'#a23e31');
+      for(let y=.25;y<1.25;y+=.23)g.box(2,y,-9.29,2.55,.03,.07,'#d1c8bd');
+      for(const x of [7,8.7])for(const z of [-9.1,-7.95])g.cylinderX(x,.56,z,.54,.38,'#202429',12);
+      for(const x of [-4.2,4.2])g.box(x,.012,.5,.09,.02,8.4,'#b29150');
+    }
+    this.boundBuffer=null;
+    return g.upload(this.gl);
   }
   setCar(car) {this.car=car;this.meshLooks??={};const key=car.id,look=appearanceKey(car);if(!this.cars[key]||this.meshLooks[key]!==look){if(this.cars[key])this.gl.deleteBuffer?.(this.cars[key].buffer);this.cars[key]=meshCar(this.gl,car.color,car.id,car.build);this.meshLooks[key]=look;}}
   drawCar(key,model,pose={},alpha=1){const mesh=this.cars[key];if(!mesh)return;const assets=this.vehicleModels;if(assets&&ORIGINAL_CARS.has(mesh.vehicle.id)){const status=assets.statusFor(mesh.vehicle.id);if(status==='idle')assets.load(mesh.vehicle.id).then(()=>{this.boundBuffer=null;});if(status==='ready'){assets.draw(this,key,mesh.vehicle,model,pose,alpha);return;}}this.draw(mesh,model,alpha);}
@@ -467,7 +556,7 @@ export class Renderer {
     }
     endChunk();const chunks=packScene(g.data,spans);this.scene=g.upload(gl);this.scene.chunks=chunks;
     const bg=new Geometry();
-    for(let i=0;i<8;i++){const a=i/8*Math.PI*2,b=(i+1)/8*Math.PI*2,p=(angle,y,r)=>V(Math.sin(angle)*r,y,Math.cos(angle)*r);bg.surface(p(a,-900,1400),p(b,-900,1400),p(b,1100,1400),p(a,1100,1400),TEXTURES.sky_day,[[i/4,0],[(i+1)/4,0],[(i+1)/4,1],[i/4,1]],undefined,TEXTURES.sky_night);}
+    bg.box(0,100,0,2000,2000,2000,'#ffffff',[-30,-30]);
     for(let layer=0;layer<2;layer++)for(let i=0;i<12;i++){const a=i/12*Math.PI*2,b=(i+1)/12*Math.PI*2,r=1000-layer*150,y=-100-layer*30,p=(angle,height)=>V(Math.sin(angle)*r,height,Math.cos(angle)*r);bg.surface(p(a,y),p(b,y),p(b,y+260-layer*20),p(a,y+260-layer*20),TEXTURES[layer?'mountains_mid':'mountains_far'],[[i%3/3,0],[(i%3+1)/3,0],[(i%3+1)/3,1],[i%3/3,1]],[.8,.88,.89,0]);}
     const horizon=(name,x,y,z,sx,sy,sz)=>{const model=PART2_MODELS[name];for(let i=0;i<model.data.length;i+=14){const d=model.data;bg.data.push(x+d[i]*sx,y+d[i+1]*sy,z+d[i+2]*sz,...d.slice(i+3,i+14));}};
     horizon('bg_hills_ring_low',0,65,0,2.4,2.5,2.4);
@@ -514,8 +603,9 @@ export class Renderer {
     const ra=rival?rival.heading+race.rivalYaw:0;gl.uniform3fv(u.uRivalCar,rival?[rival.x,rival.y,rival.z]:[0,0,0]);gl.uniform2fv(u.uRivalForward,[Math.sin(ra),Math.cos(ra)]);
     gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,0);
     gl.depthMask(false);gl.disable(gl.DEPTH_TEST);
+    this.selectCourseSky(courseSky(this.track.id,day,racing&&race?.wet));
+    gl.uniform1f(u.uCourseSkyReady,this.courseSkyLoaded?1:0);
     gl.uniform1f(u.uBackdrop,1);this.draw(this.backdrop,transform(eye[0],eye[1]-100,eye[2]));gl.uniform1f(u.uBackdrop,0);
-    if(!day)this.draw(this.moon,transform(eye[0]+310,eye[1]+245,eye[2]+850));
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2);
     if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.drawCar(this.car.id,transform(p.x,p.y+.04,p.z,angle),{s:race?.s||0,steer:race?.steer,headlights:!racing||race.headlights});if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
     gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,race?.rivalBraking?1:0);

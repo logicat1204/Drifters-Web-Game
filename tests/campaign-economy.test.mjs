@@ -59,7 +59,7 @@ test('defeats, ordinary duels and online results cannot mint campaign rewards',a
 });
 test('purchases are permanent, gender-scoped, atomic and idempotent',async()=>{
   const {store,user}=await fixture();try{
-    assert.throws(()=>store.buy(user.id,'car','gt86'),/suficientes/);assert.equal(store.user(user.id).coins,0);
+    assert.throws(()=>store.buy(user.id,'car','gt86'),/MF Ghost/);assert.throws(()=>store.buy(user.id,'car','r34'),/suficientes/);assert.equal(store.user(user.id).coins,0);
     for(const stage of CAMPAIGN_STAGES.slice(0,7))win(store,user,stage);
     const before=store.user(user.id).coins,bought=store.buy(user.id,'car','180sx');assert.equal(bought.user.coins,before-900);assert.equal(store.buy(user.id,'car','180sx').user.coins,before-900);assert.equal(store.updateProfile(user.id,{defaultCar:'180sx'}).defaultCar,'180sx');
     assert.throws(()=>store.updateProfile(user.id,{avatar:{...defaultAvatar('female'),outfit:'bikini'}}),/inventario/);

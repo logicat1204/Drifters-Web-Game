@@ -12,7 +12,8 @@ export function readSqlite(filename){
   const rows=table=>sql.prepare('SELECT * FROM '+table).all();
   try{
     sql.exec('BEGIN');
-    if(![6,7,8].includes(sql.prepare('PRAGMA user_version').get().user_version))throw Error('La copia SQLite debe tener el esquema v6, v7 o v8. Ábrela primero con la versión actual del servidor.');
+    const version=sql.prepare('PRAGMA user_version').get().user_version;
+    if(![6,7,8,9].includes(version))throw Error('La copia SQLite debe tener un esquema entre v6 y v9. Ábrela primero con la versión actual del servidor.');
     if(sql.prepare('PRAGMA quick_check').get().quick_check!=='ok'||sql.prepare('PRAGMA foreign_key_check').get())throw Error('SQLite tiene errores de integridad. Usa una copia consistente.');
     const users=rows('users'),profiles=new Map(rows('profiles').map(({user_id,...row})=>[user_id,row]));
     const balances=new Map(rows('wallets').map(row=>[row.user_id,row.balance]));
@@ -29,6 +30,12 @@ export function readSqlite(filename){
     }
     const ledger=rows('economy_ledger');
     for(const row of ledger)if(row.reason.startsWith('chest:'))(byId.get(row.user_id).chests??=[]).push(row.reason.slice(6));
+    if(version>=9){
+      for(const {user_id,card_id,quantity} of rows('owned_cards'))(byId.get(user_id).cards??=[]).push({id:card_id,quantity});
+      for(const {user_id,card_id} of rows('favorite_cards'))byId.get(user_id).favorite_card=card_id;
+      const receipts=new Map(rows('card_chests').map(row=>['card-chest:'+row.user_id+':'+row.receipt,JSON.parse(row.cards)]));
+      for(const row of ledger)if(receipts.has(row.id))row.cards=receipts.get(row.id);
+    }
     return {
       pilots,sessions:rows('sessions').map(({token_hash,expires_at,...row})=>({_id:token_hash,...row,expires_at:new Date(expires_at)})),
       runs:rows('runs').map(({id,...row})=>({_id:id,...row})),

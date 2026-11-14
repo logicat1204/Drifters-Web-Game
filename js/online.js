@@ -251,7 +251,13 @@ export class OnlineClient {
     for(let i=0;i<4;i++){
       const p=room.players[i],row=document.createElement('li');row.className='online-player'+(p?.id===this.id?' is-you':'');
       const number=document.createElement('span');number.className='online-slot';number.textContent=String(i+1).padStart(2,'0');row.append(number);
-      if(p?.portraitUrl){const image=document.createElement('img');image.src=p.portraitUrl;image.alt='';image.className='online-player-portrait';row.append(image);}
+      if(p?.portraitUrl){
+        const image=document.createElement('img');image.src=p.portraitUrl;image.alt='';image.className='online-player-portrait';
+        if(p.userId&&this.callbacks.publicLicense){
+          const license=document.createElement('button');license.className='online-license';license.setAttribute('aria-label','Ver licencia de '+p.name);
+          license.onclick=()=>this.callbacks.publicLicense(p.userId);license.append(image);row.append(license);
+        }else row.append(image);
+      }
       const details=document.createElement('div'),name=document.createElement('b'),car=document.createElement('small');name.textContent=p?p.name+(p.id===this.id?' · TÚ':''):'ESPERANDO CONDUCTOR';car.textContent=p?`${CARS.find(c=>c.id===p.car)?.code||''}${room.hostId===p.id?' / ANFITRIÓN':''}`:'Comparte la invitación';details.append(name,car);row.append(details);
       const state=document.createElement('span');state.className='online-player-state'+(p?.ready?' ready':'');state.textContent=p?!p.connected?'DESCONECTADO':lobby?p.ready?'LISTO':'PREPARANDO':'EN PISTA':'—';row.append(state);$('online-roster').append(row);
     }

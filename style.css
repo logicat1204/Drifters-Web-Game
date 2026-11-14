@@ -404,3 +404,69 @@ body #touch-controls{display:block;position:absolute;inset:0;pointer-events:none
 }
 @media(prefers-reduced-motion:reduce){.focus-ring[data-active=true]{animation:none;box-shadow:0 0 9px 3px var(--focus-color)}}
 @media(max-width:760px){#campaign .campaign-map-layout{grid-template-columns:1fr;gap:12px}#campaign-map-destinations>button{max-width:104px;padding:5px;font-size:11px}.campaign-world-list{grid-template-columns:1fr;gap:10px}.campaign-destination-description{max-height:none}}
+
+#shop[data-section=entry]{background:radial-gradient(ellipse at 50% 54%,#18222def,#080b11fd 78%)}
+#shop[data-section=goods]{isolation:isolate;background:linear-gradient(125deg,#101a25f2,#101a25db 60%,#090e16f2),url("assets/touge_city_assets_part3/textures/facade_shop.png") center / cover}
+#shop-sections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;width:min(690px,100%);margin:auto}
+#shop-sections button{display:grid;justify-items:start;text-align:left;gap:14px;padding:clamp(18px,4vw,44px);border:1px solid #9cabc16c;background:#131f2bd9;min-height:175px;transition:background .18s,border-color .18s}
+#shop-sections button:hover,#shop-sections button:focus-visible{background:#25354b;border-color:#d6e5fb}
+#shop-sections b{font:clamp(20px,3vw,34px) var(--display)}
+#shop-sections span,#shop-base-label{font:12px/1.4 var(--sans);color:#bccbda}
+#shop-sections .menu-icon,.garage-upgrade .menu-icon{width:24px;height:24px}
+#shop-back{margin-bottom:8px}
+#shop-goods{display:flex;flex:1;flex-direction:column;min-height:0}
+#shop-dealer{display:grid;grid-template-columns:minmax(125px,1fr) minmax(150px,1fr);grid-template-rows:1fr auto;gap:18px;flex:1;min-height:min(350px,59vh)}
+#dealer-name,#dealer-stats{align-self:start;max-width:245px;background:#0b111bdd;border:1px solid #c5d4e44d;padding:clamp(10px,2vw,22px)}
+#dealer-name h2{font:clamp(25px,4.6vw,64px)/1 var(--display);margin:10px 0}
+#dealer-name p,.dealer-stat{font:12px/1.4 var(--sans)}
+.dealer-description{margin-top:10px;color:#b7cadd;font-size:11px}
+#dealer-stats{justify-self:end;width:min(100%,235px)}
+.dealer-stat{display:flex;justify-content:space-between;gap:8px;padding-top:7px}
+#dealer-stats .shop-detail-price{margin:12px 0 0;font-size:16px}
+#dealer-stats .start-button{padding:12px;min-height:42px;font:12px var(--sans)}
+#dealer-footer{grid-column:1/-1;min-width:0;align-self:end;background:#0b111bed;border:1px solid #c5d4e44d;padding:10px}
+.dealer-eras,.dealer-roster{display:flex;align-items:center;gap:10px}
+.dealer-eras button,.dealer-car,.dealer-roster>button{border:1px solid #7d94af6c;padding:7px 12px}
+.dealer-eras button[aria-pressed=true],.dealer-car[aria-pressed=true]{background:#324c66;border-color:#afe0ff}
+.dealer-eras small,.dealer-car small{color:#bdc9da;font-size:10px}
+.dealer-roster{margin-top:9px}
+.dealer-roster>button{min-width:34px;min-height:42px;font-size:20px}
+#dealer-items{display:flex;gap:7px;overflow:auto;min-width:0;position:relative;flex:1;scrollbar-width:thin}
+.dealer-car{display:grid;text-align:left;gap:4px;flex:0 0 113px;min-height:48px}
+.garage-upgrade{display:flex;align-items:center;gap:10px;position:absolute;left:50%;bottom:clamp(152px,28vh,240px);transform:translateX(-50%);z-index:1;background:#102033f0;border-color:#b2cce9;padding:12px 20px}
+.garage-upgrade:hover{background:#213a59}
+@media(max-width:760px){
+  #shop-sections{margin-top:14vh;gap:10px}
+  #shop-sections button{min-height:145px;padding:15px}
+  #shop-dealer{min-height:70vh;gap:12px}
+  #dealer-name,#dealer-stats{max-width:165px}
+  .dealer-stat,#dealer-name p{font-size:10px}
+  .garage-upgrade{bottom:215px}
+}
+@media(max-height:560px){.garage-upgrade{bottom:102px;padding:7px 13px}}
+#collection{display:flex;flex-direction:column;gap:16px;padding-top:24px}
+#collection h1{font:clamp(30px,5vw,56px) var(--display)}
+#collection[data-tab=cards]{background:linear-gradient(135deg,#152333,#0b1018)}
+#collection-cars{flex:1;min-height:190px;display:flex;flex-direction:column;justify-content:space-between}
+#collection-car-name{width:fit-content;padding:8px 12px;background:#0c1421ce;font:clamp(14px,2.5vw,23px) var(--sans)}
+#collection-car-controls{background:#0b111bed;padding:14px;border:1px solid #c5d4e44d}
+#collection-car-controls label{display:inline-flex;align-items:center;gap:8px;margin:0 16px 8px 0;font-size:12px}
+#collection-car-items{display:flex;overflow:auto;gap:7px;scrollbar-width:thin}
+#collection-cards{padding-bottom:20px;overflow:auto}
+.collection-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(165px,100%),205px));gap:16px;margin-top:12px}
+.collection-card{--card-border:#b8c0c9;max-width:245px;display:grid;grid-template-rows:auto auto minmax(0,1fr) 67px;gap:6px;border:2px solid var(--card-border);border-radius:12px;background:#151c29;color:#eef1f6;padding:9px;aspect-ratio:2/3;overflow:hidden}
+.collection-card[data-tier=rare]{--card-border:#68b6ff}
+.collection-card[data-tier=special]{--card-border:#c28bf9}
+.collection-card[data-tier=legendary]{--card-border:#f2c267}
+.collection-card small{color:var(--card-border);font:10px var(--mono)}
+.collection-card h3{font:16px/1.2 var(--sans)}
+.collection-card img{display:block;width:100%;height:100%;min-height:0;object-fit:cover;object-position:50% 25%;border-radius:4px}
+.collection-card p{margin:0;overflow:auto;font:11px/1.55 var(--sans);scrollbar-width:thin}
+#shop-buy-chest{align-self:flex-start;margin-bottom:8px}
+#pilot-card-dialog{width:min(710px,calc(100% - 28px));max-height:calc(100% - 42px);overflow:auto;background:#111c29;color:#eef1f6;border:1px solid #a4b9ce80;padding:22px}
+#pilot-card-dialog::backdrop{background:#080d17b8}
+#pilot-card-dialog h2{padding-right:34px;margin-bottom:16px}
+#pilot-card-dialog .collection-card{margin:10px 0}
+#pilot-card-dialog .pilot-records{padding-left:20px;font-size:13px;line-height:1.8}
+.ranking-license{text-align:left;padding:0;text-decoration:underline;text-underline-offset:3px}
+.online-license{padding:0;justify-self:start}
