@@ -9,6 +9,15 @@ import {databaseUnavailable,isMongoError} from './database.mjs';
 import {stockBuild} from '../js/tuning.mjs';
 
 const IDLE_INPUT={steer:0,throttle:false,brake:true,handbrake:false};
+const MAX_SOCKET_BACKLOG=256*1024;
+
+export function sendOnlineFrame(ws,message,replaceable=false){
+  if(ws.readyState!==WebSocket.OPEN)return;
+  if(ws.bufferedAmount>MAX_SOCKET_BACKLOG){ws.terminate();return;}
+  if(replaceable&&ws.bufferedAmount>0)return;
+  ws.send(JSON.stringify(message));
+}
+
 const cleanName=value=>typeof value==='string'?value.normalize('NFKC').replace(/[\p{Cc}\p{Cf}<>]/gu,'').trim().slice(0,20):'';
 const profile=data=>{const name=cleanName(data.name),car=CARS.find(c=>c.id===data.car);if(!name||!car)throw Error('Escribe tu nombre y elige un coche válido.');return {name,car:car.id};};
 const config=data=>({track:TRACKS.some(t=>t.id===data.track)?data.track:TRACKS[0].id,night:data.night!==false,wet:data.wet===true});
@@ -20,8 +29,8 @@ export class OnlineRooms {
   connect(send,close=()=>{},identity=null){
     const c={id:randomUUID(),send,close,identity,room:null,messages:0,window:this.now(),joined:this.now()};this.clients.add(c);this.send(c,{type:'hello',id:c.id});return c;
   }
-  send(c,message){c.send(message);}
-  broadcast(room,message){for(const p of room.players.values())if(p.connected)this.send(p.client,message);}
+  send(c,message,replaceable){c.send(message,replaceable);}
+  broadcast(room,message,replaceable){for(const p of room.players.values())if(p.connected)this.send(p.client,message,replaceable);}
   lobby(room){return {type:'room',code:room.code,public:room.public,hostId:room.hostId,phase:room.phase,config:room.config,players:[...room.players.values()].map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,build:p.build,manual:!!p.manual,ready:p.ready,connected:p.connected}))};}
   publicRooms(){return [...this.rooms.values()].filter(r=>r.public&&r.phase==='lobby'&&r.players.size<4).map(r=>({code:r.code,host:[...r.players.values()].find(p=>p.client.id===r.hostId)?.name||'Piloto',track:r.config.track,night:r.config.night,wet:r.config.wet,players:r.players.size,maxPlayers:4}));}
   details(data,user){if(!this.store)return profile(data);if(!user?.onboarded)throw Error('Inicia sesión y completa tu perfil.');return {name:user.displayName,car:user.defaultCar,userId:user.id,portraitUrl:user.portraitUrl,build:buildFor(user,user.defaultCar)};}
@@ -143,7 +152,7 @@ export class OnlineRooms {
     if(room.hostId===c.id)room.hostId=connected[0].client.id;this.publish(room);
   }
   disconnect(c){this.leave(c);this.clients.delete(c);}
-  snapshot(room){this.broadcast(room,{type:'snapshot',tick:this.tickId,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,build:p.build,connected:p.connected,dnf:p.dnf,place:p.place,state:compact(p.race)}))});}
+  snapshot(room,replaceable=false){this.broadcast(room,{type:'snapshot',tick:this.tickId,phase:room.phase,elapsed:room.elapsed,players:[...room.players.values()].map(p=>({id:p.client.id,name:p.name,car:p.car,build:p.build,connected:p.connected,dnf:p.dnf,place:p.place,state:compact(p.race)}))},replaceable);}
   step(dt=1/120){
     this.tickId++;const now=this.now();
     for(const room of this.rooms.values()){
@@ -168,7 +177,7 @@ export class OnlineRooms {
         for(const p of players)this.saveRun(room,p);
         const results=players.sort((a,b)=>(a.place??99)-(b.place??99)||b.race.s-a.race.s).map(p=>({id:p.client.id,userId:p.userId,portraitUrl:p.portraitUrl,name:p.name,car:p.car,place:p.place,dnf:p.dnf,connected:p.connected,time:p.place?p.finishTime:null,points:Math.floor(p.race.skill.points)}));
         room.results=results;this.snapshot(room);this.broadcast(room,{type:'results',results});this.publish(room);
-      }else if(this.tickId%6===0)this.snapshot(room);
+      }else if(this.tickId%6===0)this.snapshot(room,true);
     }
   }
   sweep(){const now=this.now();for(const room of this.rooms.values())if(room.phase!=='racing'&&now-room.lastActive>30*60*1000){this.broadcast(room,{type:'expired'});for(const p of room.players.values()){p.client.room=null;}this.rooms.delete(room.code);}}
@@ -192,7 +201,7 @@ export function attachOnline(server,{accounts=null,store=null}={}){
     wss.handleUpgrade(req,socket,head,ws=>{ws.sessionToken=session?.token;wss.emit('connection',ws,session?.user);});
   });
   wss.on('connection',(ws,identity)=>{
-    ws.alive=true;const c=rooms.connect(message=>{if(ws.readyState===WebSocket.OPEN){if(ws.bufferedAmount>256*1024){ws.terminate();return;}ws.send(JSON.stringify(message));}},(code,reason)=>ws.close(code,reason),identity);
+    ws.alive=true;const c=rooms.connect((message,replaceable)=>sendOnlineFrame(ws,message,replaceable),(code,reason)=>ws.close(code,reason),identity);
     ws.on('pong',()=>ws.alive=true);ws.on('error',()=>{});ws.on('close',()=>rooms.disconnect(c));
     ws.on('message',(raw,binary)=>{if(binary)return ws.close(1003,'Solo JSON');try{rooms.receive(c,JSON.parse(raw.toString()));}catch{ws.close(1007,'JSON inválido');}});
   });

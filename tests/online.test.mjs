@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {OnlineRooms} from '../server/online.mjs';
+import {WebSocket} from 'ws';
+import {OnlineRooms,sendOnlineFrame} from '../server/online.mjs';
 import {CARS} from '../js/sim.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 
@@ -9,6 +10,26 @@ function fixture(){let now=0;const service=new OnlineRooms({now:()=>now});const 
   const step=(seconds,inputs=true)=>{for(let i=0;i<seconds*120;i++){now+=1000/120;if(inputs&&i%4===0)for(const p of room.players.values())if(p.race)send(p.client,'input',{seq:p.sequence+1,...driverInput(p.race),headlights:true});service.step();}};
   return {service,host,room,client,send,join,step,advance:ms=>now+=ms};
 }
+test('congested sockets skip replaceable poses and still send race events',()=>{
+  const out=[],ws={readyState:WebSocket.OPEN,bufferedAmount:10,send:payload=>out.push(JSON.parse(payload))};
+  const f=fixture(),send=f.host.send;
+  f.host.send=(message,replaceable)=>{send(message);sendOnlineFrame(ws,message,replaceable);};
+  const guest=f.join();
+  for(const c of [f.host,guest])f.send(c,'ready',{ready:true});
+  f.send(f.host,'start');
+  assert.equal(out.at(-1).type,'snapshot','starting state is critical');
+  const count=out.length;
+  f.step(4,false);
+  assert.equal(out.length,count,'regular poses do not add to a congested queue');
+  f.send(f.host,'reposition');
+  assert.equal(out.at(-1).players[0].state.resetId,1,'reposition state is critical');
+  ws.bufferedAmount=0;
+  f.step(1,false);
+  assert.ok(out.at(-1).elapsed>4.5,'the next pose reflects current race time');
+  ws.bufferedAmount=10;
+  f.step(330,false);
+  assert.deepEqual(out.slice(-3).map(message=>message.type),['snapshot','results','room']);
+});
 test('a room has a unique invite code, maximum four slots and rejects the fifth',()=>{
   const f=fixture();assert.match(f.room.code,/^[A-F\d]{8}$/);f.join();f.join('Tercero','r32');f.join('Cuarto','ae86');const fifth=f.join('Quinto');assert.equal(f.room.players.size,4);assert.equal(fifth.room,null);assert.match(fifth.out.at(-1).message,/llena/);assert.equal(f.host.out.at(-1).players.length,4);
 });

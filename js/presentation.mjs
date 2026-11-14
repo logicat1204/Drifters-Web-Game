@@ -31,13 +31,55 @@ export class RacePresentation {
   }
 }
 
+const frameTime=frame=>frame.time??frame.received;
+
+export class RaceSnapshotBuffer {
+  constructor(){this.clear();}
+
+  clear(){
+    this.frames=[];
+    this.renderTime=null;
+    this.lastRender=null;
+  }
+
+  push(message,received){
+    const frame={...message,received,time:message.elapsed*1000};
+    const last=this.frames.at(-1);
+    if(last?.time===frame.time){
+      frame.received=last.received;
+      this.frames[this.frames.length-1]=frame;
+    }else this.frames.push(frame);
+    if(this.frames.length>12)this.frames.shift();
+  }
+
+  poses(now,track){
+    if(!this.frames.length)return [];
+    // Estimate the start of the server race on the client clock using the
+    // least delayed recent snapshot. Use elapsed time to space the poses.
+    let origin=Infinity;
+    for(const frame of this.frames)origin=Math.min(origin,frame.received-frame.time);
+    const target=now-origin-100;
+    if(this.renderTime===null||now-this.lastRender>1000){
+      this.renderTime=target;
+    }else{
+      // Slew the clock instead of jumping as the network delay changes.
+      const dt=Math.max(0,now-this.lastRender);
+      const next=this.renderTime+dt;
+      this.renderTime=next+clamp(target-next,-dt*.15,dt*.15);
+    }
+    this.lastRender=now;
+    return remotePoses(this.frames,this.renderTime,track);
+  }
+}
+
 export function remotePoses(frames,at,track=null){
   if(!frames.length)return [];
   let a=frames[0],b=frames.at(-1);
-  if(at<=a.received)b=a;
-  else if(at>=b.received)a=b;
-  else for(let i=1;i<frames.length;i++)if(frames[i].received>=at){a=frames[i-1];b=frames[i];break;}
-  const t=b.received>a.received?clamp((at-a.received)/(b.received-a.received),0,1):1;
+  if(at<=frameTime(a))b=a;
+  else if(at>=frameTime(b))a=b;
+  else for(let i=1;i<frames.length;i++)if(frameTime(frames[i])>=at){a=frames[i-1];b=frames[i];break;}
+  const timeA=frameTime(a),timeB=frameTime(b);
+  const t=timeB>timeA?clamp((at-timeA)/(timeB-timeA),0,1):1;
   return b.players.filter(p=>p.connected&&!p.dnf).map(p=>{
     const current=p.state,prior=a.players.find(v=>v.id===p.id)?.state||current;
     const cut=prior.resetId!==current.resetId||Math.abs(current.s-prior.s)>20||Math.abs(current.lateral-prior.lateral)>6;
@@ -45,7 +87,7 @@ export function remotePoses(frames,at,track=null){
     const view={...p,...state,s:mix(prior.s,state.s,blend),lateral:mix(prior.lateral,state.lateral,blend),yaw:angleMix(prior.yaw,state.yaw,blend),carId:p.car};
     // Fill only a short late-packet gap; then hold instead of inventing motion.
     // An explicit reset, countdown or finish is always shown at the server pose.
-    const ahead=clamp((at-b.received)/1000,0,.075);
+    const ahead=clamp((at-timeB)/1000,0,.075);
     if(a===b&&ahead>0&&!current.finished&&!(current.resetHold>0)&&!(current.countdown>0)){
       const curve=track?courseSample(track,current.s).curve:0;
       view.s+=Math.max(0,current.speed||0)*Math.max(.12,Math.cos(current.travelYaw??current.yaw??0))/clamp(1-curve*current.lateral,.65,1.35)*ahead;

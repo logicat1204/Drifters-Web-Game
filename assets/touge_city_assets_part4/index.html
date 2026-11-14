@@ -1,0 +1,28 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Parte 4 — Wet Night City + Race Angels</title>
+<body style="margin:0;background:#000;overflow:hidden;font:12px sans-serif;color:#9bd">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<div style="position:fixed;left:8px;top:6px;z-index:2">Demo Parte 4 — arrastra para orbitar</div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {setupWetNight,tuneWetMaterials,createPlanarReflection} from './wet-night.js';
+const q=new URLSearchParams(location.search);
+const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(innerWidth,innerHeight);document.body.appendChild(r.domElement);
+const s=new THREE.Scene(),c=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,.1,800);
+c.position.set(+q.get('cx')||9,+q.get('cy')||3.2,+q.get('cz')||26);const oc=new OrbitControls(c,r.domElement);oc.target.set(0,+q.get('ty')||2,-8);oc.update();
+const wn=setupWetNight(r,s,c,{base:'./',bloom:+q.get('b')||.45});
+const L=new GLTFLoader();let pending=0;
+function put(n,x,y,z,ry=0,sc=1){pending++;L.load(`models/${n}.glb`,g=>{const o=g.scene;o.position.set(x,y,z);o.rotation.y=ry;o.scale.setScalar(sc);tuneWetMaterials(o);s.add(o);if(--pending==0&&!window.done)setTimeout(()=>{window.done=1},1500)});}
+put('road_city_wet_segment',0,0,0);put('road_city_wet_segment',0,0,-20);put('road_city_wet_segment',0,0,-40);put('crosswalk_wet_plane',0,.01,6);
+put('puddle_a',-3,0,-4);put('puddle_b',3.5,0,-12);put('puddle_c',-2,0,-22);
+for(let i=0;i<3;i++){put('building_office_wet_night',-14-0,0,-8-i*16,Math.PI/2);put('building_apartment_wet_night',14,0,-8-i*16,-Math.PI/2);}
+put('building_shop_wet_night',-13,0,8,Math.PI/2);put('building_shop_wet_night',13,0,8,-Math.PI/2);
+put('neon_sign_ramen',-8.2,5,-6,Math.PI/2,2);put('neon_sign_bar',8.2,4.5,-14,-Math.PI/2,2);put('neon_sign_hotel',-8.2,6,-22,Math.PI/2,2.2);put('neon_sign_arcade',8.2,5,-30,-Math.PI/2,2);put('neon_sign_izakaya',-8.2,4,-38,Math.PI/2,2);
+put('chochin_string_6',0,5.2,-3);put('vending_machine_lit',-7.6,0,-2,Math.PI/2);put('streetlight_cone',-7.5,0,-10);put('streetlight_cone',7.5,0,-24,Math.PI);put('traffic_light_red_lit',7,0,3);
+put('crowd_angels_row_6',-4,0,-1,0.3);put('crowd_rain_row',0,0,-16,Math.PI);put('crowd_night_row',-1,0,-30,0);
+const ref=createPlanarReflection(5,12);ref.position.set(2,.025,-10);s.add(ref);
+wn.addRipples(0,-10,14,40,60);
+const clk=new THREE.Clock();(function loop(){requestAnimationFrame(loop);const dt=clk.getDelta();wn.update(dt,clk.elapsedTime);oc.update();wn.render();})();
+addEventListener('resize',()=>{c.aspect=innerWidth/innerHeight;c.updateProjectionMatrix();wn.resize(innerWidth,innerHeight)});
+</script>

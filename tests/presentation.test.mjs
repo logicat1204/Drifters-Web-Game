@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {RacePresentation,PHYSICS_STEP,presentationPose,angleMix,remotePoses} from '../js/presentation.mjs';
+import {RacePresentation,RaceSnapshotBuffer,PHYSICS_STEP,presentationPose,angleMix,remotePoses} from '../js/presentation.mjs';
 import {CARS,TRACKS,createRace,makeTrack,updateRace,repositionRace} from '../js/sim.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 const ready=()=>{const r=createRace(CARS[0],makeTrack(TRACKS[0]),{mode:'time'});r.countdown=0;return r;};
@@ -64,4 +64,32 @@ test('remote reposition never sweeps through the road and finish/held recovery n
  const player=(s,lateral,resetId,extra={})=>({id:'remote',car:'ae86',connected:true,state:{s,lateral,resetId,yaw:0,speed:40,countdown:0,...extra}}),frames=[{received:0,players:[player(100,4.5,0)]},{received:50,players:[player(100,0,1,{speed:0,resetHold:.45})]}];
  assert.equal(remotePoses(frames,25)[0].lateral,4.5);assert.equal(remotePoses(frames,50)[0].lateral,0);assert.equal(remotePoses(frames,500)[0].s,100);
  const finished=[{received:0,players:[player(500,0,0,{finished:true})]}];assert.equal(remotePoses(finished,75)[0].s,500);
+});
+
+test('remote cars keep uniform simulated speed when snapshots arrive in bursts',()=>{
+ const buffer=new RaceSnapshotBuffer(), arrivals=[], speeds=[];
+ for(let i=0;i<=80;i++){
+  const time=i*50,s=time*.04;
+  arrivals.push({received:time+60+[0,35,45,0][i%4],elapsed:time/1000,players:[{id:'remote',car:'ae86',connected:true,state:{s,lateral:0,yaw:0,speed:40,resetId:0}}]});
+ }
+ let index=0,prior=null;
+ for(let now=0;now<4000;now+=10){
+  while(index<arrivals.length&&arrivals[index].received<=now){const frame=arrivals[index++];buffer.push(frame,frame.received);}
+  const view=buffer.poses(now)[0];
+  if(now>250)speeds.push((view.s-prior)*100);
+  prior=view?.s;
+ }
+ assert.ok(speeds.every(speed=>Math.abs(speed-40)<1e-8));
+ buffer.clear();
+ assert.deepEqual(buffer.poses(4000),[]);
+});
+
+test('a second snapshot in the same tick supplies the current pose',()=>{
+ const buffer=new RaceSnapshotBuffer();
+ const players=(lateral,resetId)=>[{id:'remote',connected:true,state:{s:100,lateral,yaw:0,resetId}}];
+ buffer.push({elapsed:3,players:players(4.5,0)},3100);
+ buffer.push({elapsed:3,players:players(0,1)},3101);
+ assert.equal(buffer.frames.length,1);
+ assert.equal(buffer.frames[0].received,3100);
+ assert.equal(buffer.poses(3200)[0].lateral,0);
 });
