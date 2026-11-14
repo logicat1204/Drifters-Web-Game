@@ -17,7 +17,7 @@ const browser = await chromium.launch({
 const errors=[];
 async function pilot(name, mobile=false) {
   const context=await browser.newContext(mobile?{viewport:{width:390,height:844},isMobile:true,hasTouch:true,userAgent:'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/133.0 Mobile Safari/537.36'}:{viewport:{width:1440,height:900}});
-  const response=await context.request.post(base+'/api/register',{data:{username:name,password:'DrivingOptionsQA24'}});
+  const response=await context.request.post(base+'/api/register',{data:{username:name,email:name.toLowerCase()+'@example.test',password:'DrivingOptionsQA24'}});
   assert.equal(response.status(),200);
   const {user,csrf}=await response.json();
   assert.deepEqual(user.cars,[]);
@@ -33,11 +33,15 @@ async function pilot(name, mobile=false) {
   await page.locator('#profile-car').selectOption(mobile?'ae86':'rx7');
   await page.locator('#profile-save').click();
   await page.locator('#account-panel').waitFor({state:'hidden'});
+  await page.locator('#welcome-dialog button[value=menu]').click();
   const session=await(await context.request.get(base+'/api/session')).json();
   assert.deepEqual(session.user.cars,[mobile?'ae86':'rx7']);
   return {page,context,csrf};
 }
-const settings = page => page.locator('#main-menu-actions [data-action=settings]').click();
+const settings = async page => {
+  await page.locator('#main-menu-actions [data-action=settings]').click();
+  await page.locator('[data-settings-tab=controls]').click();
+};
 const closeSettings = page => page.locator('#settings-panel [data-action=close]').click();
 async function drive(page) {
   await openPlayMode(page,'time');

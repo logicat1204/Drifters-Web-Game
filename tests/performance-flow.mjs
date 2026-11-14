@@ -12,7 +12,7 @@ const viewport={width:Number(process.env.PERF_WIDTH)||1100,height:Number(process
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{}),args:process.env.RENDER_BACKEND==='native'?[]:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}),context=await browser.newContext({viewport}),page=await context.newPage(),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
 try{
- const response=await context.request.post(origin+'/api/register',{data:{username:'FpsPilot24',password:'FpsPassword24'}});assert.equal(response.status(),200);const account=await response.json();
+ const response=await context.request.post(origin+'/api/register',{data:{username:'FpsPilot24',email:'fpspilot24@example.test',password:'FpsPassword24'}});assert.equal(response.status(),200);const account=await response.json();
  assert.equal((await context.request.patch(origin+'/api/profile',{headers:{'X-CSRF-Token':account.csrf},data:{displayName:'FPS Test',complete:true}})).status(),200);
  await page.addInitScript(()=>{
   if(!localStorage.getItem('touge-settings'))localStorage.setItem('touge-settings',JSON.stringify({quality:'1',camera:'3',autoQuality:true,performanceDisplay:'detailed'}));

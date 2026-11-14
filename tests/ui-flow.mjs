@@ -15,16 +15,27 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`htt
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{}),args:process.env.RENDER_BACKEND==='native'?[]:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}),errors=[],contexts=[];
 const waitHidden=locator=>locator.waitFor({state:'hidden',timeout:15000});
 async function pageFor(){const ctx=await browser.newContext({viewport:{width:1280,height:800}});contexts.push(ctx);const page=await ctx.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await page.locator('#auth-submit').waitFor({state:'visible'});await page.waitForFunction(()=>!document.getElementById('auth-submit').disabled);return page;}
-async function register(page,username,car='ae86',displayName=username){await page.locator('[data-auth-mode=register]').click();await page.locator('#auth-username').fill(username);await page.locator('#auth-password').fill('DisposablePassword24');await page.locator('#auth-confirm').fill('DisposablePassword24');const registered=page.waitForResponse(r=>r.url().endsWith('/api/register')&&r.request().method()==='POST');await page.locator('#auth-submit').click();const response=await registered;assert.equal(response.status(),200,await response.text());await page.locator('#account-panel').waitFor({state:'visible'});await page.locator('#profile-display-name').fill(displayName);await page.locator('#profile-car').selectOption(car);}
-async function openLicense(page){if(await page.locator('#main-menu').isVisible())await page.locator('#main-menu-actions [data-action=profile]').click();else await page.locator('#account-open').click();}
-async function save(page){await page.locator('#profile-save').click();await waitHidden(page.locator('#account-panel'));}
+async function register(page,username,car='ae86',displayName=username){await page.locator('[data-auth-mode=register]').click();await page.locator('#auth-username').fill(username);await page.locator('#auth-email').fill(username.toLowerCase()+'@example.test');await page.locator('#auth-password').fill('DisposablePassword24');await page.locator('#auth-confirm').fill('DisposablePassword24');const registered=page.waitForResponse(r=>r.url().endsWith('/api/register')&&r.request().method()==='POST');await page.locator('#auth-submit').click();const response=await registered;assert.equal(response.status(),200,await response.text());await page.locator('#account-panel').waitFor({state:'visible'});await page.locator('#profile-display-name').fill(displayName);await page.locator('#profile-car').selectOption(car);}
+async function chooseCosmetic(page,slot,id){
+  const actions={hair:'cabello',accessory:'accesorios',eyes:'ojos',mouth:'labios',outfit:'ropa'};
+  await page.getByRole('button',{name:'Cambiar '+actions[slot],exact:true}).click();
+  await page.locator('#cosmetic-browse').click();
+  await page.locator('#cosmetic-grid [data-cosmetic="'+id+'"]').click();
+  await page.locator('#cosmetic-dialog form button').click();
+}
+async function openLicense(page){if(await page.locator('#main-menu').isVisible())await page.locator('#main-menu-actions [data-action=profile]').click();else{await page.locator('#header [data-action=home]').click();await page.locator('#main-menu-actions [data-action=profile]').click();}}
+async function save(page){
+  const first=await page.locator('#profile-starter').isVisible();
+  await page.locator('#profile-save').click();await waitHidden(page.locator('#account-panel'));
+  if(first)await page.locator('#welcome-dialog button[value=menu]').click();
+}
 try{
   const host=await pageFor();await register(host,'ConceptPilot24','r32','Akina Runner');
-  await host.locator('#avatar-hair').selectOption('spiked');await host.locator('#avatar-accessory').selectOption('cap');
+  await chooseCosmetic(host,'hair','spiked');await chooseCosmetic(host,'accessory','cap');
   await host.locator('#avatar-base').selectOption('female');
   assert.deepEqual(await host.locator('#avatar-hair option').evaluateAll(options=>options.map(o=>o.value)),['bob','long','ponytail','wavy']);
   assert.equal(await host.locator('#avatar-accessory option[value=cap]').count(),0);assert.equal(await host.locator('#avatar-hair').inputValue(),'bob');
-  await host.locator('#avatar-skin').selectOption('#a66e4f');await host.locator('#avatar-hair').selectOption('ponytail');await host.locator('#avatar-eyes').selectOption('soft');await host.locator('#avatar-mouth').selectOption('defined');await host.locator('#avatar-outfit').selectOption('hoodie');await host.locator('#avatar-accessory').selectOption('glasses');
+  await host.locator('#avatar-skin').selectOption('#a66e4f');await chooseCosmetic(host,'hair','ponytail');await chooseCosmetic(host,'eyes','soft');await chooseCosmetic(host,'mouth','defined');await chooseCosmetic(host,'outfit','hoodie');await chooseCosmetic(host,'accessory','glasses');
   await host.locator('#avatar-base').selectOption('male');assert.equal(await host.locator('#avatar-hair').inputValue(),'spiked');assert.equal(await host.locator('#avatar-accessory').inputValue(),'cap');
   await host.locator('#profile-preview').evaluate(img=>img.decode());await host.screenshot({path:path.join(root,'screenshots/licencia-avatar-hombre.png')});
   await host.locator('#avatar-base').selectOption('female');assert.equal(await host.locator('#avatar-hair').inputValue(),'ponytail');assert.equal(await host.locator('#avatar-accessory').inputValue(),'glasses');assert.equal(await host.locator('#avatar-skin').inputValue(),'#a66e4f');
@@ -34,7 +45,7 @@ try{
   await host.reload();await host.locator('#title-enter').click();
   await host.locator('#main-menu-actions [data-action=garage]').click();const carSaved=host.waitForResponse(r=>r.url().endsWith('/api/profile')&&r.request().method()==='PATCH');await host.locator('#car-picker .car-card').nth(1).click();assert.equal((await (await carSaved).json()).user.defaultCar,'mr2');
   await openLicense(host);assert.equal(await host.locator('#avatar-hair').inputValue(),'ponytail');assert.equal(await host.locator('#avatar-eyes').inputValue(),'soft');await host.locator('#portrait-mode').selectOption('photo');await host.locator('#profile-photo').setInputFiles(path.join(root,'assets/avatars/v2/base-female.png'));await host.locator('#profile-status').filter({hasText:'Foto cargada'}).waitFor();await save(host);assert.equal((await (await host.request.get(base+'/api/session')).json()).user.portraitMode,'photo');
-  await openLicense(host);await host.locator('#account-logout').click();await host.locator('#auth-gate').waitFor({state:'visible'});await host.locator('#auth-username').fill('conceptpilot24');await host.locator('#auth-password').fill('DisposablePassword24');await host.locator('#auth-submit').click();await waitHidden(host.locator('#auth-gate'));await waitHidden(host.locator('#account-panel'));
+  await openLicense(host);await host.locator('#account-logout').click();await host.locator('#auth-gate').waitFor({state:'visible'});await host.locator('#auth-email').fill('conceptpilot24@example.test');await host.locator('#auth-password').fill('DisposablePassword24');await host.locator('#auth-submit').click();await waitHidden(host.locator('#auth-gate'));await waitHidden(host.locator('#account-panel'));
   const restored=await (await host.request.get(base+'/api/session')).json();assert.equal(restored.user.defaultCar,'mr2');assert.equal(restored.user.portraitMode,'photo');
   const r=createRace(CARS[3],makeTrack(TRACKS[0]),{mode:'time'});Object.assign(r,{s:r.track.length,elapsed:132.456,finished:true,won:true});r.skill.points=1200;store.addRun('ui-record',me.user.id,r);
   await openLicense(host);await host.locator('[data-license-tab=records]').click();await host.locator('#records-board li').waitFor();assert.match(await host.locator('#course-record').innerText(),/Akina Runner/);assert.match(await host.locator('#personal-records').innerText(),/2′12″456/);await host.screenshot({path:path.join(root,'screenshots/licencia-records.png')});await host.locator('#account-close').click();

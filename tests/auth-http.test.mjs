@@ -10,12 +10,39 @@ let base,id=0;
 before(async()=>{await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;});
 after(async()=>{await new Promise(resolve=>server.close(resolve));});
 async function request(route,method='GET',data,session,extra={}){return fetch(base+route,{method,headers:{...(data?{'Content-Type':'application/json'}:{}),Origin:base,...(session?{Cookie:session.cookie,'X-CSRF-Token':session.csrf}:{}),...extra},body:data?JSON.stringify(data):undefined});}
-async function register(){const response=await request('/api/register','POST',{username:'HTTPUser'+(++id),password:'http-password-24'});assert.equal(response.status,200);const data=await response.json();return {...data,cookie:response.headers.get('set-cookie').split(';')[0]};}
+async function register(){const response=await request('/api/register','POST',{username:'HTTPUser'+(++id),email:'http'+id+'@example.test',password:'http-password-24'});assert.equal(response.status,200);const data=await response.json();return {...data,cookie:response.headers.get('set-cookie').split(';')[0]};}
 test('HTTP registration checks availability, sets an HttpOnly session and requires onboarding before online',async()=>{
   assert.equal((await request('/api/rooms')).status,401);const session=await register();assert.equal((await request('/api/rooms','GET',null,session)).status,403);const me=await (await request('/api/session','GET',null,session)).json();assert.equal(me.user.id,session.user.id);assert.equal(me.user.onboarded,false);assert.equal(me.csrf,session.csrf);
-  const availability=await (await request('/api/username?name='+session.user.username.toLowerCase())).json();assert.equal(availability.available,false);assert.equal((await request('/api/register','POST',{username:session.user.username.toLowerCase(),password:'different-password'})).status,409);
-  const login=await request('/api/login','POST',{username:session.user.username.toUpperCase(),password:'http-password-24'});assert.equal(login.status,200);assert.match(login.headers.get('set-cookie'),/HttpOnly; SameSite=Lax/);
-  assert.equal((await request('/api/login','POST',{username:session.user.username,password:'wrong-password'})).status,401);
+  const email='http'+id+'@example.test';
+  assert.equal(me.user.hasEmail,true);assert.equal(Object.hasOwn(me.user,'email'),false);
+  const availability=await (await request('/api/username?name='+session.user.username.toLowerCase())).json();assert.equal(availability.available,false);
+  assert.equal((await request('/api/register','POST',{username:session.user.username.toLowerCase(),email:'other@example.test',password:'different-password'})).status,409);
+  assert.equal((await request('/api/register','POST',{username:'EmailReuse24',email:email.toUpperCase(),password:'different-password'})).status,409);
+  assert.equal((await request('/api/register','POST',{username:'MissingEmail24',password:'different-password'})).status,400);
+  const login=await request('/api/login','POST',{email:email.toUpperCase(),password:'http-password-24'});assert.equal(login.status,200);assert.match(login.headers.get('set-cookie'),/HttpOnly; SameSite=Lax/);
+  assert.equal((await request('/api/login','POST',{email,password:'wrong-password'})).status,401);
+  assert.equal((await request('/api/login','POST',{username:session.user.username,password:'http-password-24'})).status,401);
+});
+test('legacy accounts can link one unique email and continue with the same license',async()=>{
+  const legacy=await store.register('LegacyPilot24','legacy-password-24');
+  const response=await request('/api/login','POST',{username:legacy.username,password:'legacy-password-24'});
+  const session={...await response.json(),cookie:response.headers.get('set-cookie').split(';')[0]};
+  assert.equal(session.user.hasEmail,false);
+  const email='legacy-pilot@example.test';
+  assert.equal((await request('/api/profile/email','POST',{email,password:'incorrect'},session)).status,401);
+  const linked=await request('/api/profile/email','POST',{email,password:'legacy-password-24'},session);
+  assert.equal(linked.status,200);assert.equal((await linked.json()).user.id,legacy.id);
+  assert.equal((await request('/api/login','POST',{username:legacy.username,password:'legacy-password-24'})).status,401);
+  assert.equal((await(await request('/api/login','POST',{email,password:'legacy-password-24'})).json()).user.id,legacy.id);
+});
+test('license background catalog validates selection and stores the identifier',async()=>{
+  const {backgrounds}=await(await request('/api/license-backgrounds')).json();
+  assert.deepEqual(backgrounds.slice(0,3).map(item=>item.id),['001','002','003']);
+  const session=await register();
+  assert.equal((await request('/api/profile','PATCH',{licenseBackground:'99999999'},session)).status,400);
+  const result=await request('/api/profile','PATCH',{licenseBackground:'001'},session);
+  assert.equal(result.status,200);assert.equal((await result.json()).user.licenseBackground,'001');
+  assert.equal((await(await request('/api/session','GET',null,session)).json()).user.licenseBackground,'001');
 });
 test('CSRF and origin checks protect profile writes; identity and car cannot be forged through protected routes',async()=>{
   const s=await register();assert.equal((await request('/api/profile','PATCH',{complete:true},s,{'X-CSRF-Token':'wrong'})).status,403);assert.equal((await request('/api/profile','PATCH',{complete:true},s,{Origin:'https://attacker.example'})).status,403);

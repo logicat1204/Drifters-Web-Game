@@ -17,7 +17,7 @@ const wait=name=>page.waitForFunction(value=>window.touge?.state.screen===value,
 const home=async()=>{await page.locator('#header .brand').click();await wait('menu');};
 const user=async()=>(await (await context.request.get(base+'/api/session')).json()).user;
 try{
- const registered=await context.request.post(base+'/api/register',{data:{username:'StoryPilot24',password:'StoryPassword24'}}),session=await registered.json();assert.equal(registered.status(),200);
+ const registered=await context.request.post(base+'/api/register',{data:{username:'StoryPilot24',email:'storypilot24@example.test',password:'StoryPassword24'}}),session=await registered.json();assert.equal(registered.status(),200);
  await context.request.patch(base+'/api/profile',{headers:{'X-CSRF-Token':session.csrf},data:{displayName:'Mountain Story',complete:true}});
  await page.goto(base);await wait('title');await page.keyboard.press('Enter');await wait('menu');
  await openPlayMode(page,'campaign');await wait('campaign');await page.locator('[data-stage=kenji]').waitFor();assert.equal(await page.locator('[data-chapter]').count(),9);assert.equal(await page.locator('#campaign-start').isEnabled(),true);await page.waitForTimeout(400);await shot('campania-01-akina');

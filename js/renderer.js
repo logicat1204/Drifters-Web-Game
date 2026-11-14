@@ -378,7 +378,7 @@ export class Renderer {
     const gl=this.gl,u=this.uniforms,mobile=w/h<.85,garage=mode==='garage',workshop=mode==='workshop',exhibition=mode==='menu';
     if(exhibition&&!this.menuModel){this.menuModel=new MenuModel(gl);this.menuModel.load().then(()=>{this.boundBuffer=null;});}
     const drift=this.reducedMotion?.matches?0:Math.sin(this.time*.08)*.24;
-    const eye=mobile?(workshop?[8.5,3.4,12.3]:exhibition?[7.8,3.0,11.3]:[9.5,3.8,13.8]):exhibition?[6.4+drift,2.1,8.2-drift]:[8.4+drift,2.65,10.8-drift],target=mobile?(workshop?[0,.4,.3]:exhibition?[-1.1,1.8,.3]:[-.2,1.8,.3]):exhibition?[-2.6,.65,.9]:[workshop?2.5:garage?0:-3.1,.95,1.35];
+    const eye=mobile?(workshop?[8.5,3.4,12.3]:exhibition?[8.5,3.5,15]:[9.5,3.8,13.8]):exhibition?[8.5+drift,2.9,11.7-drift]:[8.4+drift,2.65,10.8-drift],target=mobile?(workshop?[0,.4,.3]:exhibition?[.4,1.6,1]:[-.2,1.8,.3]):exhibition?[-2,.85,1.35]:[workshop?2.5:garage?0:-3.1,.95,1.35];
     this.eye=eye;this.target=target;
     const view=lookAt(eye,target),projection=perspective((mobile?49:38)*Math.PI/180,w/h,.15,4000);
     gl.uniformMatrix4fv(u.uView,false,view);gl.uniformMatrix4fv(u.uProjection,false,projection);
@@ -390,7 +390,10 @@ export class Renderer {
     if(exhibition){for(const [size,alpha]of [[1.1,.06],[.97,.1],[.84,.14]])this.draw(this.shadow,transform(0,0,0,0,size),alpha);}else this.draw(this.shadow,transform(0,0,0),.4);
     if(exhibition&&this.menuModel.status==='ready'){const stats=this.menuModel.draw(view,projection,eye);this.stats.drawCalls+=stats.drawCalls;this.stats.vertices+=stats.vertices;this.showcaseActive=true;gl.useProgram(this.program);this.boundBuffer=null;gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.activeTexture(gl.TEXTURE0);}
     else if(exhibition){this.menuFallback??=meshCar(gl,CARS[0].color,CARS[0].id);this.boundBuffer=null;this.draw(this.menuFallback,transform(0,.035,0));}
-    else this.drawCar(this.car.id,transform(0,.035,0),{headlights:true});
+    if(exhibition){
+      this.draw(this.shadow,transform(3.15,0,2.7,.18),.4);
+      this.drawCar(this.car.id,transform(3.15,.035,2.7,.18),{headlights:true});
+    }else this.drawCar(this.car.id,transform(0,.035,0),{headlights:true});
     gl.depthMask(false);this.draw(this.menuLightPools,identity(),.12);gl.depthMask(true);
   }
   setCar(car) {this.car=car;this.meshLooks??={};const key=car.id,look=appearanceKey(car);if(!this.cars[key]||this.meshLooks[key]!==look){if(this.cars[key])this.gl.deleteBuffer?.(this.cars[key].buffer);this.cars[key]=meshCar(this.gl,car.color,car.id,car.build);this.meshLooks[key]=look;}}

@@ -4,6 +4,11 @@ const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const TRANSMISSIONS = ['auto', 'sequential', 'direct', 'shifter'];
 const defaultKeys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
 const reserved = new Set(['KeyA', 'KeyC', 'KeyD', 'KeyH', 'KeyM', 'KeyR', 'KeyS', 'KeyW', 'KeyX', 'KeyZ']);
+const keyboardDefaults={throttle:'KeyW',brake:'KeyS',left:'KeyA',right:'KeyD',handbrake:'Space',down:'KeyQ',up:'KeyE',camera:'KeyC',headlights:'KeyH',focus:'KeyX',reposition:'KeyZ',pause:'Escape'};
+const gamepadDefaults={throttle:7,brake:6,handbrake:0,down:4,up:5,camera:3,headlights:2,focus:1,reposition:11,pause:9};
+const keyboardAlternates={throttle:'ArrowUp',brake:'ArrowDown',left:'ArrowLeft',right:'ArrowRight'};
+const bindingNames={camera:'Cambiar cámara',headlights:'Faros',focus:'Superconcentración',reposition:'Centrar coche',pause:'Pausa'};
+const keyLabel=code=>code.replace(/^(Digit|Key)/,'').replace(/^Arrow/,'Flecha ');
 const names = {
   left: 'Izquierda', right: 'Derecha', wheel: 'Volante', throttle: 'Acelerador',
   brake: 'Freno', handbrake: 'Freno de mano', down: 'Bajar marcha', up: 'Subir marcha',
@@ -95,10 +100,26 @@ export class DrivingControls {
       this.showEditor();
       this.sync();
     };
-    this.coarsePointer.addEventListener('change', () => { this.clear(); this.showGuide(); this.sync(); });
+    this.coarsePointer.addEventListener('change', () => { this.clear(); this.updateDevices(); });
+    for(const [device,defaults] of [['key',keyboardDefaults],['gamepad',gamepadDefaults]]){
+      const saved=settings[device+'Bindings'];
+      const valid=device==='key'?code=>typeof code==='string'&&/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space|Escape)$/.test(code)&&!['KeyM','KeyR'].includes(code):button=>Number.isInteger(button)&&button>=0&&button<=31;
+      const values=Object.keys(defaults).map(action=>saved?.[action]);
+      settings[device+'Bindings']=values.every(valid)&&new Set(values).size===values.length?Object.fromEntries(Object.keys(defaults).map((action,index)=>[action,values[index]])):{...defaults};
+      byId(device==='key'?'reset-keys':'reset-gamepad').onclick=()=>{
+        settings[device+'Bindings']={...defaults};this.cancelBinding();this.renderBindings(device);this.save();
+      };
+      this.renderBindings(device);
+    }
+    settings.enableGamepad=settings.enableGamepad!==false;
+    byId('enable-gamepad').checked=settings.enableGamepad;
+    byId('enable-gamepad').onchange=event=>{
+      settings.enableGamepad=event.target.checked;this.clear();this.sync();this.save();
+    };
+    for(const event of ['gamepadconnected','gamepaddisconnected'])window.addEventListener(event,()=>this.updateDevices());
     new ResizeObserver(() => this.positionControls()).observe(this.layer);
     new ResizeObserver(() => this.positionPreview()).observe(this.editor);
-    this.showGuide();
+    this.updateDevices();
   }
 
   static validKey(code) {
@@ -109,6 +130,8 @@ export class DrivingControls {
     return this.coarsePointer.matches || (navigator.maxTouchPoints>0 && (matchMedia('(hover: none)').matches || /Android|iPad|iPhone/.test(navigator.userAgent)));
   }
   get choice() { return transmissionMode(this.settings.transmission, this.mobile); }
+  get gamepad(){return Array.from(navigator.getGamepads?.()||[]).find(p=>p?.connected);}
+  get usingGamepad(){return !!this.gamepad&&this.settings.enableGamepad;}
   get mode() {
     const race = this.race();
     if (!race?.manual) return 'auto';
@@ -117,13 +140,63 @@ export class DrivingControls {
   get orientation() { return innerWidth > innerHeight ? 'landscape' : 'portrait'; }
   get layoutName() { return byId('control-layout').value; }
 
+  updateDevices(){
+    byId('keyboard-options').hidden=this.mobile;
+    byId('gamepad-options').hidden=!this.gamepad;
+    this.showGuide();
+    this.sync();
+  }
+
+  renderBindings(device){
+    const list=byId(device+'-bindings');
+    list.replaceChildren(...Object.entries(this.settings[device+'Bindings']).map(([action,value])=>{
+      const row=document.createElement('label'),button=document.createElement('button');
+      row.className='setting-row';row.textContent=names[action]||bindingNames[action];
+      button.type='button';button.className='secondary-button';button.textContent=device==='key'?keyLabel(value):'Botón '+value;
+      button.setAttribute('aria-label',row.textContent+' · '+button.textContent);
+      button.onclick=()=>{this.pendingBinding={device,action};byId(device+'-bindings-status').textContent=device==='key'?'Pulsa una tecla o Esc para cancelar.':'Pulsa un botón del mando.';};
+      row.append(button);return row;
+    }));
+  }
+
+  cancelBinding(){
+    if(!this.pendingBinding)return;
+    byId(this.pendingBinding.device+'-bindings-status').textContent='';this.pendingBinding=null;
+  }
+
+  assignBinding(value){
+    const {device,action}=this.pendingBinding,bindings=this.settings[device+'Bindings'];
+    const other=Object.keys(bindings).find(key=>bindings[key]===value);
+    if(other)bindings[other]=bindings[action];
+    bindings[action]=value;this.cancelBinding();this.renderBindings(device);this.showGuide();this.save();
+  }
+
+  captureKey(event){
+    if(this.pendingBinding?.device!=='key'||event.code==='Tab')return false;
+    event.preventDefault();
+    const code=event.code;
+    if(code==='Escape'){this.cancelBinding();return true;}
+    if(!event.repeat&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&/^(Key[A-Z]|Digit[0-9]|Numpad[0-9]|Arrow(Up|Down|Left|Right)|Space)$/.test(code)&&!['KeyM','KeyR',...this.settings.gearKeys].includes(code))this.assignBinding(code);
+    else byId('key-bindings-status').textContent='Esa tecla está reservada o no es compatible.';
+    return true;
+  }
+
+  keyMatches(action,code){
+    const bindings=this.settings.keyBindings;
+    return bindings[action]===code||(keyboardAlternates[action]===code&&bindings[action]===keyboardDefaults[action]&&!Object.values(bindings).includes(code));
+  }
+
   showGuide() {
     const select = byId('transmission');
-    for (const option of select.options) option.hidden = option.disabled = this.mobile && ['direct','shifter'].includes(option.value);
+    for (const option of select.options){
+      const unavailable=this.mobile&&['direct','shifter'].includes(option.value);
+      option.hidden=unavailable;
+      option.disabled=unavailable;
+    }
     const mode = select.value = this.choice;
     byId('transmission-help').textContent = this.mobile && mode === 'sequential'
       ? 'Toca − para bajar una marcha y + para subir. Puedes mover y redimensionar ambos botones.'
-      : guide[mode];
+      : mode==='sequential'?`${keyLabel(this.settings.keyBindings.down)} baja una marcha y ${keyLabel(this.settings.keyBindings.up)} sube una.`:guide[mode];
     const diagram = byId('transmission-diagram');
     diagram.replaceChildren();
     diagram.className = 'transmission-diagram diagram-' + mode;
@@ -131,7 +204,7 @@ export class DrivingControls {
     keyboard.classList.toggle('hidden', mode !== 'direct');
     if (mode === 'shifter') diagram.innerHTML = hPattern();
     if (mode === 'auto' || mode === 'sequential') {
-      for (const label of (mode === 'auto' ? ['1', '2', '3', '4', '5'] : ['Q  −', '1 → 5', '+  E'])) {
+      for (const label of (mode === 'auto' ? ['1', '2', '3', '4', '5'] : [this.mobile?'−':keyLabel(this.settings.keyBindings.down)+'  −','1 → 5',this.mobile?'+':'+  '+keyLabel(this.settings.keyBindings.up)])) {
         const item = document.createElement('span');
         item.textContent = label;
         diagram.append(item);
@@ -157,7 +230,7 @@ export class DrivingControls {
       if (event.code === 'Tab') return false;
       event.preventDefault();
       if (event.code !== 'Escape') {
-        if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || !DrivingControls.validKey(event.code)) {
+        if (event.repeat || event.ctrlKey || event.altKey || event.metaKey || !DrivingControls.validKey(event.code)||Object.values(this.settings.keyBindings).includes(event.code)) {
           byId('transmission-help').textContent = 'Esa tecla está reservada. Prueba con otra o pulsa Esc.';
           return true;
         }
@@ -176,8 +249,8 @@ export class DrivingControls {
     let gear;
     if (this.mode === 'direct') gear = this.settings.gearKeys.indexOf(event.code) + 1;
     if (this.mode === 'sequential') {
-      if (event.code === 'KeyQ') gear = -1;
-      if (event.code === 'KeyE') gear = 1;
+      if (this.keyMatches('down',event.code)) gear = -1;
+      if (this.keyMatches('up',event.code)) gear = 1;
     }
     if (!gear) return false;
     event.preventDefault();
@@ -306,14 +379,14 @@ export class DrivingControls {
   }
 
   sync() {
-    const active = !!this.race(), mobile = active && this.mobile;
+    const active = !!this.race(), mobile = active && this.mobile, touch=mobile&&!this.usingGamepad;
     const wheel = this.settings.touchSteering === 'wheel';
     for (const [id,button] of Object.entries(this.buttons)) {
       if (id === 'shifter') button.hidden = !active || mobile || this.mode !== 'shifter';
-      else if (id === 'up' || id === 'down') button.hidden = !mobile || this.mode !== 'sequential';
-      else if (id === 'wheel') button.hidden = !mobile || !wheel;
-      else if (id === 'left' || id === 'right') button.hidden = !mobile || wheel;
-      else button.hidden = !mobile;
+      else if (id === 'up' || id === 'down') button.hidden = !touch || this.mode !== 'sequential';
+      else if (id === 'wheel') button.hidden = !touch || !wheel;
+      else if (id === 'left' || id === 'right') button.hidden = !touch || wheel;
+      else button.hidden = !touch;
     }
     this.positionControls();
     this.renderGear();

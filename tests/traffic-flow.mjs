@@ -13,7 +13,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');await
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}),contexts=[],errors=[];
 async function pilot(name){
  const context=await browser.newContext({viewport:{width:1100,height:760}});contexts.push(context);
- const response=await context.request.post(base+'/api/register',{data:{username:name,password:'Slipstream-2026'}});assert.equal(response.status(),200);const account=await response.json();
+ const response=await context.request.post(base+'/api/register',{data:{username:name,email:name.toLowerCase()+'@example.test',password:'Slipstream-2026'}});assert.equal(response.status(),200);const account=await response.json();
  assert.equal((await context.request.patch(base+'/api/profile',{headers:{'X-CSRF-Token':account.csrf},data:{displayName:name,defaultCar:'ae86',complete:true}})).status(),200);
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.waitForFunction(()=>window.touge?.state.screen==='title');await page.keyboard.press('Enter');await page.waitForFunction(()=>window.touge.state.screen==='menu');await openPlayMode(page,'online');return page;
 }

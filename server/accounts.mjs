@@ -2,6 +2,8 @@ import {UPGRADES,VEHICLE_PARTS,PAINTS} from '../js/tuning.mjs';
 import {timingSafeEqual} from 'node:crypto';
 import {AVATAR_VERSION,avatarOptions,defaultAvatar,COSMETICS,installCosmetics,validateAvatar} from '../js/avatar.mjs';
 import {avatarSvg} from './store.mjs';
+import {emailAddress} from './account-email.mjs';
+import {licenseBackgrounds} from './license-backgrounds.mjs';
 import {Runs} from './runs.mjs';
 import {databaseUnavailable,isMongoError} from './database.mjs';
 import {readFileSync} from 'node:fs';
@@ -41,24 +43,39 @@ export class Accounts {
     const p=url.pathname;if(!p.startsWith('/api/'))return false;
     try{
       if(p==='/api/health'){json(res,200,{ok:true});return true;}
+      if(p==='/api/license-backgrounds'&&req.method==='GET'){json(res,200,{backgrounds:await licenseBackgrounds()});return true;}
       if(p==='/api/avatar/catalog'&&req.method==='GET'){await this.refreshCosmetics();json(res,200,{version:AVATAR_VERSION,options:{male:avatarOptions('male'),female:avatarOptions('female')},defaults:{male:defaultAvatar('male'),female:defaultAvatar('female')},items:COSMETICS});return true;}
       if(p==='/api/avatar/preview'&&req.method==='GET'){
-        const a={...defaultAvatar(url.searchParams.get('base')||'male'),...Object.fromEntries(url.searchParams),version:AVATAR_VERSION},svg=avatarSvg(validateAvatar(a));res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'private, max-age=60','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(svg);return true;
+        const a={...defaultAvatar(url.searchParams.get('base')||'male'),...Object.fromEntries(url.searchParams),version:AVATAR_VERSION},svg=avatarSvg(validateAvatar(a),url.searchParams.get('transparent')==='1');res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'private, max-age=60','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(svg);return true;
       }
       const portrait=/^\/api\/users\/([a-f\d-]{36})\/portrait$/.exec(p);
-      if(portrait&&['GET','HEAD'].includes(req.method)){const image=await this.store.portrait(portrait[1]);if(!image)throw fail('Piloto inexistente.',404);res.writeHead(200,{'Content-Type':image.mime,'Content-Length':image.bytes.length,'Cache-Control':'private, max-age=60','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(req.method==='HEAD'?undefined:image.bytes);return true;}
+      if(portrait&&['GET','HEAD'].includes(req.method)){const image=await this.store.portrait(portrait[1],url.searchParams.get('transparent')==='1');if(!image)throw fail('Piloto inexistente.',404);res.writeHead(200,{'Content-Type':image.mime,'Content-Length':image.bytes.length,'Cache-Control':'private, max-age=60','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; img-src data:; style-src 'unsafe-inline'"});res.end(req.method==='HEAD'?undefined:image.bytes);return true;}
       if(p==='/api/username'&&req.method==='GET'){this.throttle(req,'available',90,60000);json(res,200,{available:await this.store.available(url.searchParams.get('name'))});return true;}
       if(p==='/api/session'&&req.method==='GET'){const s=await this.session(req);json(res,200,{user:s?.user||null,csrf:s?.csrf||null});return true;}
       if(p==='/api/songs'&&req.method==='GET'){const user=(await this.session(req))?.user,shop=await this.media.shopSongs();json(res,200,{songs:[...await this.media.freeSongs(),...shop.filter(song=>user?.music.includes(song.id)).map(({absolute,...song})=>({...song,detail:'TU COLECCIÓN · '+song.author}))]});return true;}
       if(['/api/register','/api/login'].includes(p)&&req.method==='POST'){
         if(!sameOrigin(req))throw fail('Origen no permitido.',403);this.throttle(req,p,p==='/api/register'?12:35,p==='/api/register'?3600000:60000);
-        const data=await jsonBody(req),user=p==='/api/register'?await this.store.register(data.username,data.password):await this.store.login(data.username,data.password),session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
+        const data=await jsonBody(req);
+        const user=p==='/api/register'?await this.store.register(data.username,data.password,emailAddress(data.email)):await this.store.login(data.email??data.username,data.password);
+        const session=await this.store.createSession(user.id);this.cookie(req,res,session.token);json(res,200,{user,csrf:session.csrf});return true;
       }
-      const routes=['/api/logout','/api/profile','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
+      const routes=['/api/logout','/api/profile','/api/profile/email','/api/profile/photo','/api/records','/api/records/me','/api/rankings','/api/rooms','/api/runs/start','/api/runs/finish','/api/campaign','/api/campaign/story','/api/shop','/api/shop/buy','/api/garage','/api/garage/upgrade','/api/garage/buy','/api/garage/customize'];if(!routes.includes(p))return false;
       const s=await this.require(req,['/api/rooms','/api/runs/start','/api/runs/finish'].includes(p));
       if(!['GET','HEAD'].includes(req.method)&&(!sameOrigin(req)||!safeEqual(req.headers['x-csrf-token'],s.csrf)))throw fail('La sesión cambió. Actualiza la página e intenta de nuevo.',403);
       if(p==='/api/logout'&&req.method==='POST'){await this.store.logout(s.token);online?.rooms?.revoke(s.user.id);this.cookie(req,res,null);json(res,200,{ok:true});return true;}
-      if(p==='/api/profile'&&req.method==='PATCH'){json(res,200,{user:await this.store.updateProfile(s.user.id,await jsonBody(req))});return true;}
+      if(p==='/api/profile/email'&&req.method==='POST'){
+        this.throttle(req,'link-email',12,3600000);
+        if(s.user.hasEmail)throw fail('Esta cuenta ya tiene un correo vinculado.',409);
+        const data=await jsonBody(req);
+        const pilot=await this.store.login(s.user.username,data.password);
+        if(pilot.id!==s.user.id)throw fail('La sesión cambió.',403);
+        json(res,200,{user:await this.store.linkEmail(s.user.id,data.email)});return true;
+      }
+      if(p==='/api/profile'&&req.method==='PATCH'){
+        const data=await jsonBody(req);
+        if(data.licenseBackground!=null&&data.licenseBackground!==s.user.licenseBackground&&!(await licenseBackgrounds()).some(item=>item.id===data.licenseBackground))throw fail('Ese fondo de licencia no está disponible.');
+        json(res,200,{user:await this.store.updateProfile(s.user.id,data)});return true;
+      }
       if(p==='/api/profile/photo'&&req.method==='GET'){const photo=await this.store.photo(s.user.id);if(!photo)throw fail('Aún no hay una foto.',404);res.writeHead(200,{'Content-Type':photo.mime,'Cache-Control':'private, no-cache','X-Content-Type-Options':'nosniff'});res.end(photo.bytes);return true;}
       if(p==='/api/profile/photo'&&req.method==='POST'){
         this.throttle(req,'photo',20,60000);const data=await jsonBody(req,750000);if(typeof data.image!=='string')throw fail('Elige una imagen.');const match=/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(data.image);if(!match)throw fail('Usa una foto PNG, JPEG o WebP.');const bytes=Buffer.from(match[2],'base64');if(bytes.length>512000||bytes.length<12)throw fail('La foto debe ocupar como máximo 500 KB.');

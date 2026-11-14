@@ -9,7 +9,7 @@ const {server,store}=await import('../server.mjs');
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE}:{}),args:process.env.RENDER_BACKEND==='native'?[]:['--use-angle=swiftshader','--enable-unsafe-swiftshader']}),page=await browser.newPage({viewport:{width:1100,height:730}});
 try{
- const reg=await page.request.post(base+'/api/register',{data:{username:'BossVisual24',password:'BossVisualPassword24'}});assert.equal(reg.status(),200);const account=await reg.json();const campaign=await(await page.request.get(base+'/api/campaign')).json();assert.deepEqual(campaign.stages.filter(s=>s.chapter==='odawara').map(s=>[s.id,s.level]),[['nozomi',3],['kakeru',3],['jackson',4]]);
+ const reg=await page.request.post(base+'/api/register',{data:{username:'BossVisual24',email:'bossvisual24@example.test',password:'BossVisualPassword24'}});assert.equal(reg.status(),200);const account=await reg.json();const campaign=await(await page.request.get(base+'/api/campaign')).json();assert.deepEqual(campaign.stages.filter(s=>s.chapter==='odawara').map(s=>[s.id,s.level]),[['nozomi',3],['kakeru',3],['jackson',4]]);
  await page.goto(base+'/api/health');
  await page.evaluate(async origin=>{
    const [{Renderer},{CornerEffects},sim,campaign]=await Promise.all([import(origin+'/js/renderer.js'),import(origin+'/js/effects.js'),import(origin+'/js/sim.mjs'),import(origin+'/js/campaign.mjs')]);

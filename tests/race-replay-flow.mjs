@@ -23,7 +23,7 @@ window.finishReplayTest=()=>{
 };
 `}));
 try{
-  const registered=await (await context.request.post(base+'/api/register',{data:{username:'ReplayPilot24',password:'ReplayPassword24'}})).json();
+  const registered=await (await context.request.post(base+'/api/register',{data:{username:'ReplayPilot24',email:'replaypilot24@example.test',password:'ReplayPassword24'}})).json();
   assert.ok(registered.user);
   const profile=await context.request.patch(base+'/api/profile',{headers:{'x-csrf-token':registered.csrf},data:{complete:true}});
   assert.equal(profile.status(),200,await profile.text());

@@ -181,6 +181,11 @@ export class OnlineProbe {
     }
   }
 
+  raceLinksOpen(host){
+    const peers=this.id===host?[...this.peers.values()]:[this.peers.get(host)];
+    return peers.every(peer=>peer?.channel?.readyState==='open'&&peer.actions?.readyState==='open');
+  }
+
   sendSample(samples,channel){
     const id=samples.count++;
     samples.sent.set(id,performance.now());

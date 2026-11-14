@@ -31,7 +31,7 @@ const quitDuel=async()=>{
  await screen('menu');
 };
 try{
- const response=await context.request.post(base+'/api/register',{data:{username:'SeasonBrowser24',password:'season-browser-24'}}),session=await response.json();assert.equal(response.status(),200);
+ const response=await context.request.post(base+'/api/register',{data:{username:'SeasonBrowser24',email:'seasonbrowser24@example.test',password:'season-browser-24'}}),session=await response.json();assert.equal(response.status(),200);
  await context.request.patch(base+'/api/profile',{headers:{'X-CSRF-Token':session.csrf},data:{displayName:'Campeón',complete:true}});
  const win=stage=>{
   const car=stage.ngplus?competitionCar:CARS[0];

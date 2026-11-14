@@ -126,6 +126,65 @@ test('direct preparation falls back to the server and a lost connection reopens 
   assert.equal(f.room.phase,'racing');
   assert.equal(f.room.transport,'server');
 });
+
+test('loading holds the direct start until every pilot confirms the current run',()=>{
+  const f=fixture(),g=f.join();
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,direct:true,loadGate:true});
+  f.send(f.host,'start');
+  const {runId}=f.room;
+  f.send(g,'direct-report',{runId,peers:[link(f.host.id,60)]});
+  f.send(f.host,'direct-report',{runId,peers:[link(g.id,65)]});
+  assert.equal(f.room.phase,'loading');
+  assert.equal(f.room.transport,'direct');
+  f.send(g,'loaded',{runId:'previous'});
+  f.send(f.host,'loaded',{runId});
+  f.step(2,false);
+  assert.equal(f.room.phase,'loading');
+  assert.equal(f.room.players.get(g.id).race.countdown,3);
+  assert.equal(g.out.at(-1).players.filter(p=>p.loaded).length,1);
+  f.send(g,'loaded',{runId});
+  assert.equal(f.room.phase,'racing');
+  assert.equal(g.out.at(-1).type,'snapshot');
+  assert.equal(g.out.at(-1).players[1].state.countdown,3);
+});
+
+test('a browser without WebRTC uses the server through the same loading screen',()=>{
+  const f=fixture(),g=f.join();
+  f.send(f.host,'ready',{ready:true,direct:true,loadGate:true});
+  f.send(g,'ready',{ready:true,direct:false,loadGate:true});
+  f.send(f.host,'start');
+  assert.equal(f.room.phase,'loading');
+  assert.equal(f.room.transport,'server');
+  f.send(f.host,'loaded',{runId:f.room.runId});
+  f.send(g,'loaded',{runId:f.room.runId});
+  assert.equal(f.room.phase,'racing');
+});
+
+test('abandoning or timing out during loading reopens the room without a result',()=>{
+  const f=fixture(),g=f.join();
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,loadGate:true});
+  f.send(f.host,'start');
+  f.send(g,'cancel-start',{runId:f.room.runId});
+  assert.equal(f.room.phase,'lobby');
+  assert.match(f.host.out.at(-1).message,/canceló la salida/);
+  assert.equal(f.room.players.size,2);
+
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,loadGate:true});
+  f.send(f.host,'start');
+  f.advance(31000);
+  f.service.step();
+  assert.equal(f.room.phase,'lobby');
+  assert.equal(f.room.runId,null);
+  assert.equal(f.host.out.some(message=>message.type==='results'),false);
+  assert.match(f.host.out.at(-1).message,/tiempo de carga/);
+
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,loadGate:true});
+  f.send(f.host,'start');
+  f.service.disconnect(g);
+  assert.equal(f.room.phase,'lobby');
+  assert.equal(f.room.players.size,1);
+  assert.match(f.host.out.at(-1).message,/abandonó/);
+});
 test('all seven garage cars can join and use their own authoritative physics',()=>{
   for(const car of CARS){const f=fixture(),guest=f.join('Nuevo coche',car.id);assert.equal(f.room.players.get(guest.id)?.car,car.id);
     for(const c of [f.host,guest])f.send(c,'ready',{ready:true});f.send(f.host,'start');f.step(7);

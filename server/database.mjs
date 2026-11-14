@@ -41,11 +41,15 @@ export async function connectMongo(){
 }
 export async function prepareMongo(db){
   await db.collection('pilots').createIndex({username_key:1},{unique:true});
+  await ensureEmailIndex(db);
   await db.collection('sessions').createIndex({expires_at:1},{expireAfterSeconds:0});
   const runs=db.collection('runs');
   await runs.createIndex({handling:1,track:1,source:1,wet:1,night:1,manual:1,completed:1,elapsed:1,created_at:1,_id:1});
   await runs.createIndex({user_id:1,handling:1,track:1,car:1,build_key:1,completed:1,elapsed:1});
   await db.collection('economy_ledger').createIndex({user_id:1,run_id:1});
+}
+export function ensureEmailIndex(db){
+  return db.collection('pilots').createIndex({email:1},{unique:true,partialFilterExpression:{email:{$type:'string'}}});
 }
 export async function ensureMongoSchema(client,db){
   const migrations=db.collection('migrations');
@@ -80,6 +84,7 @@ export async function openStore(){
   const {client,db}=await connectMongo();
   try{
     await ensureMongoSchema(client,db);
+    await ensureEmailIndex(db);
     const {MongoStore}=await import('./mongo-store.mjs');
     return new MongoStore(client,db);
   }catch(error){

@@ -4,6 +4,7 @@ import {COSMETICS,DEFAULT_AVATAR} from '../js/avatar.mjs';
 import {campaignStage,focusUnlocks} from '../js/campaign.mjs';
 import {UPGRADES,VEHICLE_PARTS,stockBuild,validateBuild} from '../js/tuning.mjs';
 import {avatarSvg,campaignPayout,checkChapterStory,checkRecordFilters,derivePassword,hashToken,password,profileUpdate,runDocument,username} from './store.mjs';
+import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
 
 const noPhoto={projection:{password_hash:0,salt:0,'profile.photo':0}};
 const finishSort={elapsed:1,created_at:1,_id:1};
@@ -19,7 +20,7 @@ export function pilotView(pilot){
     build:validateBuild(row),parts:pilot.parts.filter(part=>part.car_id===row.car_id).map(part=>part.part_id).sort()
   }]));
   return {
-    id:pilot._id,username:pilot.username,createdAt:pilot.created_at,displayName:p.display_name,focusType:p.focus_type,
+    id:pilot._id,username:pilot.username,hasEmail:!!pilot.email,licenseBackground:p.license_background??null,createdAt:pilot.created_at,displayName:p.display_name,focusType:p.focus_type,
     avatar:p.avatar,portraitMode:p.portrait_mode,portraitUrl:portraitUrl(pilot._id,p.photo_version),photoVersion:p.photo_version,
     hasPhoto:p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,garage,coins:pilot.balance,
     cars:pilot.cars.map(row=>row.car_id),cosmetics:pilot.inventory.map(row=>row.item_id),music:pilot.music.map(row=>row.song_id),
@@ -37,21 +38,33 @@ export class MongoStore {
   close(){return this.client.close();}
   syncCosmetics(){} // The live catalog comes from the same asset packs as SQLite.
   async available(name){return !await this.pilots.findOne({username_key:username(name).toLowerCase()},{projection:{_id:1}});}
-  async register(name,pass){
+  async register(name,pass,email=null){
+    if(email!==null)email=emailAddress(email);
     name=username(name);password(pass);
     const now=this.now(),salt=randomBytes(16).toString('hex'),hash=await derivePassword(pass,salt);
     const pilot={_id:randomUUID(),username:name,username_key:name.toLowerCase(),password_hash:hash.toString('hex'),salt,created_at:now,
       profile:{display_name:name,avatar:DEFAULT_AVATAR,photo_version:0,portrait_mode:'avatar',has_photo:false,default_car:'ae86',arcade_stage:0,onboarded:0,focus_type:'balance'},
       balance:0,inventory:COSMETICS.filter(item=>item.starter).map(item=>({item_id:item.id,acquired_at:now})),
       cars:[],builds:[],parts:[],music:[],stories:[],campaign:[]};
-    try{await this.pilots.insertOne(pilot);}catch(error){if(error.code===11000)throw duplicateName();throw error;}
+    if(email!==null)pilot.email=email;
+    try{await this.pilots.insertOne(pilot);}catch(error){if(error.code===11000)throw error.keyPattern?.email?duplicateEmail():duplicateName();throw error;}
     return pilotView(pilot);
   }
   async login(name,pass){
-    const row=typeof name==='string'&&/^[a-zA-Z0-9]{3,24}$/.test(name)?await this.pilots.findOne({username_key:name.toLowerCase()},{projection:{salt:1,password_hash:1}}):null;
+    const email=typeof name==='string'&&name.includes('@');
+    const filter=email?{email:emailAddress(name)}:typeof name==='string'&&/^[a-zA-Z0-9]{3,24}$/.test(name)?{username_key:name.toLowerCase(),email:null}:null;
+    const row=filter?await this.pilots.findOne(filter,{projection:{salt:1,password_hash:1}}):null;
     const candidate=await derivePassword(typeof pass==='string'&&Buffer.byteLength(pass)<=256?pass:'',row?.salt||this.dummySalt);
-    if(!row||!timingSafeEqual(candidate,Buffer.from(row.password_hash,'hex')))throw Object.assign(Error('Usuario o contraseña incorrectos.'),{status:401});
+    if(!row||!timingSafeEqual(candidate,Buffer.from(row.password_hash,'hex')))throw invalidCredentials();
     return this.user(row._id);
+  }
+  async linkEmail(id,value){
+    const email=emailAddress(value);
+    try{
+      const result=await this.pilots.updateOne({_id:id,email:null},{$set:{email}});
+      if(!result.modifiedCount)throw emailAlreadyLinked();
+    }catch(error){if(error.code===11000)throw duplicateEmail();throw error;}
+    return this.user(id);
   }
   async user(id){return id?pilotView(await this.pilots.findOne({_id:id},noPhoto)):null;}
   async createSession(id){
@@ -78,8 +91,8 @@ export class MongoStore {
   async updateProfile(id,data){
     return this.transaction(async session=>{
       const pilot=await this.pilot(id,session);
-      const {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded}=profileUpdate(pilotView(pilot),data);
-      const fields={display_name:displayName,default_car:car,focus_type:selectedFocus,arcade_stage:stage,avatar,portrait_mode:mode,onboarded:Number(onboarded),photo_version:pilot.profile.photo_version+1};
+      const {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded,licenseBackground}=profileUpdate(pilotView(pilot),data);
+      const fields={display_name:displayName,default_car:car,focus_type:selectedFocus,arcade_stage:stage,avatar,portrait_mode:mode,license_background:licenseBackground,onboarded:Number(onboarded),photo_version:pilot.profile.photo_version+1};
       const update={$set:Object.fromEntries(Object.entries(fields).map(([key,value])=>['profile.'+key,value]))};
       if(grantStarter){
         const starter={car_id:car,acquired_at:this.now()};
@@ -98,11 +111,11 @@ export class MongoStore {
     const row=await this.pilots.findOne({_id:id},{projection:{'profile.photo':1,'profile.photo_mime':1}});
     return row?.profile.photo?{bytes:row.profile.photo,mime:row.profile.photo_mime}:null;
   }
-  async portrait(id){
+  async portrait(id,transparent=false){
     const row=await this.pilots.findOne({_id:id},{projection:{profile:1}}),p=row?.profile;
     if(!p)return null;
     if(p.portrait_mode==='photo'&&p.photo)return {bytes:p.photo,mime:p.photo_mime};
-    return {bytes:Buffer.from(avatarSvg(p.avatar)),mime:'image/svg+xml'};
+    return {bytes:Buffer.from(avatarSvg(p.avatar,transparent)),mime:'image/svg+xml'};
   }
   async markChapterStory(id,chapter,phase){
     return this.transaction(async session=>{

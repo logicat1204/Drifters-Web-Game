@@ -9,6 +9,7 @@ import {CARS,STARTER_CARS,ALL_CARS,HANDLING_VERSION,ALL_TRACKS as TRACKS} from '
 import {DEFAULT_AVATAR,defaultAvatar,validateAvatar,migrateAvatar,cosmeticId,avatarLayers,COSMETICS} from '../js/avatar.mjs';
 import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,campaignStage,stageAvailable,focusUnlocks,campaignReward,campaignReplayReward,campaignStages} from '../js/campaign.mjs';
 import {FOCUS_TYPES} from '../js/focus.mjs';
+import {emailAddress,duplicateEmail,emailAlreadyLinked,invalidCredentials} from './account-email.mjs';
 const scrypt=promisify(scryptCallback),root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 export const hashToken=value=>createHash('sha256').update(value).digest('hex');
 export const derivePassword=(value,salt)=>scrypt(value,salt,64,{N:16384,r:8,p:1});
@@ -33,7 +34,9 @@ export function profileUpdate(current,data){
   const mode=data.portraitMode??current.portraitMode;
   if(!['avatar','photo'].includes(mode))throw Error('Elige foto o avatar.');
   if(mode==='photo'&&!current.hasPhoto)throw Error('Sube una foto antes de continuar.');
-  return {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded:current.onboarded||data.complete===true};
+  const licenseBackground=data.licenseBackground===undefined?current.licenseBackground??null:data.licenseBackground;
+  if(licenseBackground!==null&&(typeof licenseBackground!=='string'||!/^\d{3,8}$/.test(licenseBackground)))throw Error('Fondo de licencia inválido.');
+  return {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,licenseBackground,onboarded:current.onboarded||data.complete===true};
 }
 export function checkChapterStory(cleared,chapter,phase){
   const parts=chapter?.split(':')||[],season=parts.length===2?parts[0]:'dry',base=parts.length===2?parts[1]:chapter;
@@ -63,7 +66,7 @@ export class Store {
   constructor(filename=process.env.NODE_TEST_CONTEXT&&!process.env.DB_PATH?':memory:':sqlitePath(),{now=()=>Date.now()}={}){
     this.now=now;if(filename!==':memory:')mkdirSync(path.dirname(path.resolve(filename)),{recursive:true});this.db=new DatabaseSync(filename);this.db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
     const version=this.db.prepare('PRAGMA user_version').get().user_version;
-    if(version>7){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
+    if(version>8){this.db.close();throw Error('La base de datos requiere una versión más reciente del servidor.');}
     if(version===0){this.db.exec('BEGIN IMMEDIATE');try{this.db.exec(readFileSync(new URL('./migrations/001-accounts.sql',import.meta.url),'utf8'));this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}}
 
     this.db.exec('BEGIN IMMEDIATE');try{
@@ -93,6 +96,11 @@ export class Store {
         if(!columns.some(column=>column.name==='handling'))this.db.exec("ALTER TABLE campaign_progress ADD COLUMN handling TEXT NOT NULL DEFAULT 'v8'");
         this.db.exec('PRAGMA user_version=7');
       }
+      if(version<8){
+        if(!this.db.prepare('PRAGMA table_info(users)').all().some(column=>column.name==='email'))this.db.exec('ALTER TABLE users ADD COLUMN email TEXT');
+        if(!this.db.prepare('PRAGMA table_info(profiles)').all().some(column=>column.name==='license_background'))this.db.exec('ALTER TABLE profiles ADD COLUMN license_background TEXT');
+        this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email); PRAGMA user_version=8');
+      }
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');this.db.close();throw error;}
     this.dummySalt=randomBytes(16).toString('hex');this.dummyHash=null;
@@ -103,40 +111,49 @@ export class Store {
     checkChapterStory(this.progression(id).campaign.map(s=>s.id),chapter,phase);
     this.db.prepare('INSERT OR IGNORE INTO chapter_story_seen VALUES(?,?,?,?)').run(id,chapter,phase,this.now());return this.user(id);
   }
-  async register(name,pass){
+  async register(name,pass,email=null){
+    if(email!==null)email=emailAddress(email);
     name=username(name);password(pass);if(!this.available(name))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});
     const salt=randomBytes(16).toString('hex'),hash=await derivePassword(pass,salt),id=randomUUID();
     this.db.exec('BEGIN IMMEDIATE');try{
-      this.db.prepare('INSERT INTO users VALUES(?,?,?,?,?)').run(id,name,hash.toString('hex'),salt,this.now());
+      this.db.prepare('INSERT INTO users(id,username,password_hash,salt,created_at,email) VALUES(?,?,?,?,?,?)').run(id,name,hash.toString('hex'),salt,this.now(),email);
       this.db.prepare('INSERT INTO profiles(user_id,display_name,avatar) VALUES(?,?,?)').run(id,name,JSON.stringify(DEFAULT_AVATAR));
       this.db.prepare('INSERT INTO wallets(user_id) VALUES(?)').run(id);
       const grant=this.db.prepare('INSERT INTO inventory VALUES(?,?,?)');for(const item of COSMETICS)if(item.starter)grant.run(id,item.id,this.now());this.db.exec('COMMIT');
-    }catch(error){this.db.exec('ROLLBACK');if(/UNIQUE/.test(error.message))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});throw error;}return this.user(id);
+    }catch(error){this.db.exec('ROLLBACK');if(/users\.email/.test(error.message))throw duplicateEmail();if(/UNIQUE/.test(error.message))throw Object.assign(Error('Ese nombre de usuario ya está ocupado.'),{status:409});throw error;}return this.user(id);
   }
   async login(name,pass){
     // Unknown and known users both perform a password derivation.
-    const row=typeof name==='string'&&name.length<=24?this.db.prepare('SELECT * FROM users WHERE username=? COLLATE NOCASE').get(name):null;
+    const email=typeof name==='string'&&name.includes('@');
+    const row=email?this.db.prepare('SELECT * FROM users WHERE email=?').get(emailAddress(name)):typeof name==='string'&&name.length<=24?this.db.prepare('SELECT * FROM users WHERE username=? COLLATE NOCASE AND email IS NULL').get(name):null;
     const text=typeof pass==='string'&&Buffer.byteLength(pass)<=256?pass:'';
     const candidate=await derivePassword(text,row?.salt||this.dummySalt);
-    if(!row||!timingSafeEqual(candidate,Buffer.from(row.password_hash,'hex')))throw Object.assign(Error('Usuario o contraseña incorrectos.'),{status:401});return this.user(row.id);
+    if(!row||!timingSafeEqual(candidate,Buffer.from(row.password_hash,'hex')))throw invalidCredentials();return this.user(row.id);
   }
-  user(id){const p=this.db.prepare('SELECT u.id,u.username,u.created_at,p.display_name,p.avatar,p.photo_version,p.portrait_mode,p.photo IS NOT NULL AS has_photo,p.default_car,p.arcade_stage,p.onboarded,p.focus_type FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?').get(id);if(!p)return null;return {id:p.id,username:p.username,displayName:p.display_name,focusType:p.focus_type,...this.progression(id),avatar:JSON.parse(p.avatar),portraitMode:p.portrait_mode,portraitUrl:`/api/users/${p.id}/portrait?v=${p.photo_version}`,photoVersion:p.photo_version,hasPhoto:!!p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,createdAt:p.created_at};}
+  linkEmail(id,value){
+    const email=emailAddress(value);
+    try{
+      if(!this.db.prepare('UPDATE users SET email=? WHERE id=? AND email IS NULL').run(email,id).changes)throw emailAlreadyLinked();
+    }catch(error){if(/users\.email/.test(error.message))throw duplicateEmail();throw error;}
+    return this.user(id);
+  }
+  user(id){const p=this.db.prepare('SELECT u.id,u.username,u.email,u.created_at,p.license_background,p.display_name,p.avatar,p.photo_version,p.portrait_mode,p.photo IS NOT NULL AS has_photo,p.default_car,p.arcade_stage,p.onboarded,p.focus_type FROM users u JOIN profiles p ON p.user_id=u.id WHERE u.id=?').get(id);if(!p)return null;return {id:p.id,username:p.username,hasEmail:!!p.email,licenseBackground:p.license_background,displayName:p.display_name,focusType:p.focus_type,...this.progression(id),avatar:JSON.parse(p.avatar),portraitMode:p.portrait_mode,portraitUrl:`/api/users/${p.id}/portrait?v=${p.photo_version}`,photoVersion:p.photo_version,hasPhoto:!!p.has_photo,defaultCar:p.default_car,arcadeStage:p.arcade_stage,onboarded:!!p.onboarded,createdAt:p.created_at};}
   createSession(id){const token=randomBytes(32).toString('hex'),csrf=randomBytes(24).toString('hex');this.db.prepare('DELETE FROM sessions WHERE expires_at<=?').run(this.now());this.db.prepare('INSERT INTO sessions VALUES(?,?,?,?)').run(hashToken(token),id,csrf,this.now()+30*24*60*60*1000);return {token,csrf};}
   session(token){if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))return null;const row=this.db.prepare('SELECT user_id,csrf,expires_at FROM sessions WHERE token_hash=? AND expires_at>?').get(hashToken(token),this.now());return row?{user:this.user(row.user_id),csrf:row.csrf,token}:null;}
   logout(token){if(token)this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hashToken(token));}
   updateProfile(id,data){
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded}=profileUpdate(this.user(id),data);
+      const {displayName,car,grantStarter,selectedFocus,stage,avatar,mode,onboarded,licenseBackground}=profileUpdate(this.user(id),data);
       if(grantStarter)this.db.prepare('INSERT INTO owned_cars VALUES(?,?,?)').run(id,car,this.now());
-      this.db.prepare('UPDATE profiles SET display_name=?,avatar=?,portrait_mode=?,default_car=?,arcade_stage=?,onboarded=?,focus_type=?,photo_version=photo_version+1 WHERE user_id=?').run(displayName,JSON.stringify(avatar),mode,car,stage,Number(onboarded),selectedFocus,id);
+      this.db.prepare('UPDATE profiles SET display_name=?,avatar=?,portrait_mode=?,default_car=?,arcade_stage=?,onboarded=?,focus_type=?,license_background=?,photo_version=photo_version+1 WHERE user_id=?').run(displayName,JSON.stringify(avatar),mode,car,stage,Number(onboarded),selectedFocus,licenseBackground,id);
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
     return this.user(id);
   }
   setPhoto(id,bytes,mime){this.db.prepare('UPDATE profiles SET photo=?,photo_mime=?,photo_version=photo_version+1 WHERE user_id=?').run(bytes,mime,id);return this.user(id);}
   photo(id){const p=this.db.prepare('SELECT photo,photo_mime FROM profiles WHERE user_id=?').get(id);return p?.photo?{bytes:Buffer.from(p.photo),mime:p.photo_mime}:null;}
-  portrait(id){const p=this.db.prepare('SELECT portrait_mode,photo,photo_mime,avatar FROM profiles WHERE user_id=?').get(id);if(!p)return null;if(p.portrait_mode==='photo'&&p.photo)return {bytes:Buffer.from(p.photo),mime:p.photo_mime};return {bytes:Buffer.from(avatarSvg(JSON.parse(p.avatar))),mime:'image/svg+xml'};}
+  portrait(id,transparent=false){const p=this.db.prepare('SELECT portrait_mode,photo,photo_mime,avatar FROM profiles WHERE user_id=?').get(id);if(!p)return null;if(p.portrait_mode==='photo'&&p.photo)return {bytes:Buffer.from(p.photo),mime:p.photo_mime};return {bytes:Buffer.from(avatarSvg(JSON.parse(p.avatar),transparent)),mime:'image/svg+xml'};}
   progression(id){
     const cleared=this.db.prepare('SELECT level_id AS id,CASE WHEN handling=? THEN best_time END AS bestTime,best_points AS bestPoints,reward_coins AS rewardCoins FROM campaign_progress WHERE user_id=?').all(HANDLING_VERSION,id);
     return {chapterStories:this.db.prepare('SELECT chapter_id,phase FROM chapter_story_seen WHERE user_id=?').all(id).map(s=>s.chapter_id+':'+s.phase),music:this.db.prepare('SELECT song_id FROM owned_music WHERE user_id=?').all(id).map(s=>s.song_id),garage:this.garage(id),coins:this.db.prepare('SELECT balance FROM wallets WHERE user_id=?').get(id)?.balance||0,campaign:cleared,focusUnlocked:focusUnlocks(cleared.map(s=>s.id)),cars:this.db.prepare('SELECT car_id FROM owned_cars WHERE user_id=?').all(id).map(c=>c.car_id),cosmetics:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(c=>c.item_id)};
@@ -233,14 +250,15 @@ export class Store {
   backup(filename){return backup(this.db,filename);}
 }
 const layerCache=new Map();
-export function avatarSvg(value){
+export function avatarSvg(value,transparent=false){
   const layers=avatarLayers(value),defs=[],images=[];
   for(const [i,layer] of layers.entries()){
     const key=layer.id+':'+(layer.revision||''),file=layer.url?path.resolve(root,'.'+decodeURIComponent(layer.url)):path.join(root,'assets/avatars/v2/layers',layer.id+'.png');
     if(!file.startsWith(path.join(root,'assets')+path.sep))throw Error('Capa inválida.');
-    if(!layerCache.has(key)){if(layerCache.size>512)layerCache.clear();try{layerCache.set(key,readFileSync(file).toString('base64'));}catch(error){if(layer.url)return avatarSvg(defaultAvatar(value.base==='female'?'female':'male'));throw error;}}
+    if(!layerCache.has(key)){if(layerCache.size>512)layerCache.clear();try{layerCache.set(key,readFileSync(file).toString('base64'));}catch(error){if(layer.url)return avatarSvg(defaultAvatar(value.base==='female'?'female':'male'),transparent);throw error;}}
     if(layer.tint)defs.push(`<filter id="t${i}" color-interpolation-filters="sRGB"><feFlood flood-color="${layer.tint}"/><feComposite in2="SourceAlpha" operator="in"/></filter>`);
     images.push(`<image width="512" height="640" href="data:image/png;base64,${layerCache.get(key)}"${layer.tint?` filter="url(#t${i})"`:''}/>`);
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 640"><defs>${defs.join('')}</defs><path fill="#273c43" d="M0 0h512v640H0z"/><path fill="#3c5358" d="M0 500 512 80v560H0z"/>${images.join('')}</svg>`;
+  const background=transparent?'':'<path fill="#273c43" d="M0 0h512v640H0z"/><path fill="#3c5358" d="M0 500 512 80v560H0z"/>';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 640"><defs>${defs.join('')}</defs>${background}${images.join('')}</svg>`;
 }
