@@ -485,3 +485,30 @@ body #touch-controls{display:block;position:absolute;inset:0;pointer-events:none
 #online-private-pane label{display:block;margin:16px 0 8px;font:10px var(--mono)}
 #online-code{width:100%;padding:10px}
 #online-private-status,#online-verification{margin-top:10px;font:12px/1.5 var(--sans)}
+.menu-music-player{position:fixed;z-index:9;top:8px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;width:min(356px,calc(100vw - 24px));padding:6px 8px;background:#0c131de8;border:1px solid #b3c3d04d}
+.menu-screen .menu-music-player{top:18px}
+body[data-screen=settings] #settings-panel{padding-top:max(72px,5vw)}
+#menu-music-cover{flex:none;width:40px;height:40px;object-fit:cover;background:#22344a}
+#menu-music-name{flex:1;min-width:0;font:12px var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu-music-buttons{display:flex;gap:2px}
+.menu-music-buttons button{width:36px;height:40px;padding:7px;display:grid;place-items:center}
+.menu-music-buttons button:hover:not(:disabled){background:#26374c}
+.menu-music-buttons svg{width:18px;height:18px;fill:currentColor}
+.menu-music-buttons [hidden]{display:none}
+#menu-playlist-panel{z-index:20}
+.menu-playlist-header{display:flex;justify-content:space-between;gap:10px;font:12px var(--sans);margin:12px 0}
+#menu-playlist-list{max-height:48vh;overflow:auto}
+#menu-playlist-list label{display:flex;gap:10px;align-items:center;min-height:40px;padding:6px 4px;border-top:1px solid #bbc7d52e;font:12px var(--sans);cursor:pointer}
+#menu-playlist-list input{flex:none}
+#menu-playlist-empty,#menu-playlist-status{font:11px/1.5 var(--sans);margin-top:10px}
+#menu-playlist-refresh{margin-top:13px}
+@media(max-width:600px){.menu-music-player{top:7px;width:min(330px,calc(100vw - 24px));gap:7px;padding:3px 6px}#menu-music-cover{width:31px;height:31px}.menu-music-buttons button{height:35px;width:35px}#menu-music-name{font-size:10px}}
+@media(max-width:600px){
+  .menu-screen .menu-music-player{top:7px}
+  #main-menu .menu-brand,#main-menu .menu-location{top:58px}
+  .menu-browsing:not(.menu-screen) #header{height:102px;align-items:flex-end;padding-bottom:4px}
+  .menu-browsing:not(.menu-screen) #app>.screen{top:102px}
+}
+@media(min-width:601px) and (max-height:520px){
+  .menu-browsing:not(.menu-screen) .menu-music-player{top:3px;padding-block:2px}
+}

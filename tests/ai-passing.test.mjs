@@ -67,7 +67,12 @@ test('all three AI styles can pass through an actual course bend while respectin
  for(const style of ['Grip','Complete','Skiller']){const rival={...CAMPAIGN_STAGES.find(s=>s.id==='kanata-final'),id:'curve-pass',boss:null,style},r=ready(rival,{track,playerS:900,gap:45,playerSpeed:30,aiSpeed:42});const result=runPass(r,{speed:30,seconds:30});assert.ok(result.passed,style);assert.equal(result.hits,0,style);assert.equal(result.walls,0,style);}
 });
 test('campaign rivals also pass on their own real roads and keep control after merging',()=>{
- for(const rival of CAMPAIGN_STAGES){const track=makeTrack(ALL_TRACKS.find(t=>t.id===rival.track)),r=ready(rival,{track,playerS:260,gap:45,playerSpeed:30,aiSpeed:38});const result=runPass(r,{speed:30,seconds:40});assert.ok(result.passed,rival.id);assert.equal(result.hits,0,rival.id);assert.equal(result.walls,0,rival.id);}
+ for(const rival of CAMPAIGN_STAGES){
+  const speed=['kenji','iketani-akina'].includes(rival.id)?24:30;
+  const track=makeTrack(ALL_TRACKS.find(t=>t.id===rival.track));
+  const r=ready(rival,{track,playerS:260,gap:45,playerSpeed:speed,aiSpeed:38});
+  const result=runPass(r,{speed,seconds:40});assert.ok(result.passed,rival.id);assert.equal(result.hits,0,rival.id);assert.equal(result.walls,0,rival.id);
+ }
 });
 test('an early detected stationary player can be passed without using the bumper or guardrail',()=>{
  const r=ready(CAMPAIGN_STAGES.find(s=>s.id==='kanata-final'),{gap:65,playerSpeed:0,aiSpeed:35});const result=runPass(r,{speed:0});assert.ok(result.passed);assert.equal(result.hits,0);assert.equal(result.walls,0);

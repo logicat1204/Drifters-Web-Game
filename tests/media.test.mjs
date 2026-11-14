@@ -12,6 +12,21 @@ test('shop names are parsed from the right; ownership remains stable if price or
  const a=parseShopSong('GasGasGas_Manuel_300.mp3');assert.equal(a.name,'GasGasGas - Manuel');assert.equal(a.price,300);assert.equal(a.id,parseShopSong('GasGasGas_Manuel_900.ogg').id);assert.equal(parseShopSong('Night_Drive_Manuel_100.wav').title,'Night Drive');
  for(const name of ['bad.mp3','Gas_Manuel_0.mp3','Gas_Manuel_1000001.mp3','Gas_Manuel_-4.wav','Gas_Manuel_300.txt'])assert.equal(parseShopSong(name),null,name);
 });
+test('music for the menu matches adjacent covers and has its own catalog',async()=>{
+ const root=await mkdtemp(path.join(tmpdir(),'touge-menu-music-'));
+ try{
+  const folder=path.join(root,'songs','menu','Eurobeat');
+  await mkdir(folder,{recursive:true});
+  for(const name of ['Noche en Akina.ogg','Noche en Akina.WEBP','Última curva.mp3'])await writeFile(path.join(folder,name),'fixture');
+  await writeFile(path.join(root,'songs','Race track.wav'),'fixture');
+  const media=new MediaLibrary(root),songs=await media.menuSongs();
+  assert.deepEqual(songs.map(song=>[song.id,song.cover]),[
+   ['menu/Eurobeat/Noche en Akina.ogg','/songs/menu/Eurobeat/Noche%20en%20Akina.WEBP'],
+   ['menu/Eurobeat/Última curva.mp3',null]
+  ]);
+  assert.deepEqual((await media.freeSongs()).map(song=>song.name),['Race track']);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
 test('campaign resources scan natural multi-page order, independent soundtracks, endings and live additions',async()=>{
  const root=await mkdtemp(path.join(tmpdir(),'touge-media-'));try{
   const media=new MediaLibrary(root),folder=path.join(root,'campaign_files','akina','kenji'),put=async(dir,name)=>{await mkdir(path.join(folder,dir),{recursive:true});await writeFile(path.join(folder,dir,name),'fixture');};

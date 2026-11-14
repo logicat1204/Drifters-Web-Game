@@ -8,6 +8,7 @@ import {Ranking} from './ranking.js';
 import {applyBuild} from './tuning.mjs';
 import {Workshop} from './workshop.js';
 import {Collectibles} from './collectibles.js';
+import {MenuMusic} from './menu-music.js';
 import { ALL_CARS as CARS, CAR_PROFILES, ALL_TRACKS as TRACKS, RIVALS, makeTrack, createRace, updateRace, toggleHeadlights, repositionRace, clamp } from './sim.mjs';
 import { Renderer } from './renderer.js';
 import { Cockpit } from './cockpit.js';
@@ -91,6 +92,7 @@ class SoundSystem {
   volume(){
     this.pageAudio.setVolume(this.muted?0:settings.engineVolume/100);
     const volume=this.muted?0:clamp(settings.musicVolume/100,0,1),level=volume*this.musicDuck,time=this.ctx?.currentTime||0;
+    menuMusic.volume(volume,this.muted);
     this.audio.volume=this.fileGain?1:level*.58;
     this.fileGain?.gain.setTargetAtTime(level*.58,time,.12);
     this.musicGain?.gain.setTargetAtTime(level*.24,time,.12);
@@ -131,6 +133,16 @@ class SoundSystem {
   }
 }
 const sound=new SoundSystem();
+const menuMusic=new MenuMusic(settings,save,toast);
+menuMusic.volume(clamp(settings.musicVolume/100,0,1),sound.muted);
+const menuScreens=new Set(['menu','play','home','campaign','garage','workshop','shop','collection','online','settings']);
+function syncMenuMusic(){
+  const browsing=menuScreens.has(screen);
+  const available=browsing&&modal!=='music'&&!progression?.comicOpen;
+  document.body.classList.toggle('menu-browsing',browsing);
+  $('menu-music-player').classList.toggle('hidden',!available);
+  menuMusic.setActive(available);
+}
 const builtin=[{id:'synth',name:'Midnight Transmission',detail:'ORIGINAL SYNTH EUROBEAT · 154 BPM'},{id:'none',name:'Solo el sonido del motor',detail:'SIN MÚSICA'}];
 let folderSongs=[],importedSongs=[],songsRequest=0;
 const allSongs=()=>[...builtin,...folderSongs,...importedSongs];
@@ -148,12 +160,14 @@ async function refreshSongs(notify=false){
     const status=`${folderSongs.length} ${folderSongs.length===1?'canción detectada':'canciones detectadas'} · actualización automática`;if($('folder-status').textContent!==status)$('folder-status').textContent=status;
     if(!allSongs().some(s=>s.id===settings.song)){settings.song='synth';save();}
     if(notify)toast(`${folderSongs.length} canciones encontradas en songs/.`);if(changed){renderSongs();progression?.refreshMusicControls();}else updateSongLabels();
+    menuMusic.setLibrary(folderSongs);
   }catch{$('folder-status').textContent='Inicia con JUGAR.bat o npm start para leer songs/.';if(notify)toast('Servidor no disponible. También puedes agregar archivos desde el botón.');}
 }
 $('import-music').addEventListener('click',()=>$('music-files').click());
 $('music-files').addEventListener('change',event=>{const files=[...event.target.files];for(const file of files){if(!/\.(mp3|ogg|wav|m4a|aac|flac|opus|webm)$/i.test(file.name)&&!file.type.startsWith('audio/'))continue;const id='local-'+file.name+'-'+file.size;if(importedSongs.some(s=>s.id===id))continue;importedSongs.push({id,name:file.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(file),detail:'ARCHIVO LOCAL · ESTA SESIÓN'});}renderSongs();progression?.refreshMusicControls();toast('Archivos listos. Elige tu canción antes de correr.');event.target.value='';});
 $('refresh-music').addEventListener('click',()=>refreshSongs(true));
-refreshSongs();setInterval(()=>{if(screen!=='race')refreshSongs();},8000);
+refreshSongs();menuMusic.refresh();
+setInterval(()=>{if(screen!=='race')refreshSongs();},8000);
 
 function drawTrackCards(){
   $('track-picker').replaceChildren();TRACKS.forEach((t,i)=>{const b=document.createElement('button'),mini=makeTrack(t),pts=mini.points.filter((p,j)=>j%12===0&&p.s<=t.length),xs=pts.map(p=>p.x),zs=pts.map(p=>p.z),minX=Math.min(...xs),minZ=Math.min(...zs),sx=58/(Math.max(...xs)-minX||1),sz=49/(Math.max(...zs)-minZ||1),scale=Math.min(sx,sz);const shape=pts.map((p,j)=>`${j?'L':'M'}${(10+(p.x-minX)*scale).toFixed(1)} ${(58-(p.z-minZ)*scale).toFixed(1)}`).join('');b.className='track-card'+(i===settings.track?' active':'');b.setAttribute('aria-pressed',String(i===settings.track));b.innerHTML=`<span class="track-index">0${i+1} / ${t.difficulty}</span><svg viewBox="0 0 80 65" aria-hidden="true"><path d="${shape}"/></svg><h3>${t.name}</h3><small>${(t.length/1000).toFixed(1)} KM &nbsp; / &nbsp; TIME ATTACK</small><span class="track-jp">${t.jp}</span>`;b.title=t.subtitle;b.addEventListener('click',()=>{if($('mode').value==='arcade'){$('mode').value='battle';updateModeDescription();}selectCourse(i);});$('track-picker').append(b);});$('track-number').textContent=String(settings.track+1).padStart(2,'0');$('track-total').textContent=String(TRACKS.length).padStart(2,'0');
@@ -203,20 +217,22 @@ function selectMenuButton(button){if(!button)return;for(const b of $('main-menu-
 function moveMenu(code){const buttons=[...$('main-menu-actions').querySelectorAll('button')],current=buttons.findIndex(b=>b.classList.contains('selected'));const index=code==='Home'?0:code==='End'?buttons.length-1:(current+(code==='ArrowUp'?-1:1)+buttons.length)%buttons.length;selectMenuButton(buttons[index]);buttons[index].focus({preventScroll:true});}
 function openRaceSetup(){currentCampaign=null;closeModal();$('setup-title').textContent='Time Attack';$('setup-eyebrow').textContent='TU MÁQUINA / EL CRONÓMETRO';$('setup-description').textContent='Practica y mejora tus tiempos. Deja tu nombre en el ranking.';$('mode').value='time';updateModeDescription();showScreen('home');}
 
-function enterGame(){if(screen!=='title')return;sound.ensure();if(account?.user?.onboarded&&settings.autoFullscreen)requestFullscreen(true);showScreen('menu');if(account?.user&&!account.user.onboarded)account.open(true);else if(account?.user?.onboarded){if(invitation){$('online-code').value=invitation;invitation=null;net.selectTab('private');showScreen('online');}else $('main-menu-actions').querySelector('.selected')?.focus({preventScroll:true});}}
+function enterGame(){if(screen!=='title')return;sound.ensure();menuMusic.startSession();if(account?.user?.onboarded&&settings.autoFullscreen)requestFullscreen(true);showScreen('menu');if(account?.user&&!account.user.onboarded)account.open(true);else if(account?.user?.onboarded){if(invitation){$('online-code').value=invitation;invitation=null;net.selectTab('private');showScreen('online');}else $('main-menu-actions').querySelector('.selected')?.focus({preventScroll:true});}}
 function leaveToTitle(){closeModal();if(net?.room)net.leave();sound.stop();sound.update(race,false);race=null;keys.clear();driving.clear();showScreen('title');$('title-enter').focus({preventScroll:true});}
 window.addEventListener('keydown',e=>{if(screen==='title'&&!e.repeat&&!['Shift','Control','Alt','Meta'].includes(e.key)&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();e.stopImmediatePropagation();enterGame();}},true);
 $('title-screen').addEventListener('click',enterGame);
 for(const button of $('main-menu-actions').querySelectorAll('button')){button.addEventListener('pointerenter',()=>selectMenuButton(button));button.addEventListener('focus',()=>selectMenuButton(button));}
 
-function showScreen(name){if(name!=='replay')replayPlayer=null;$('replay-controls').classList.toggle('hidden',name!=='replay');playMenu?.cancelHover();racePresentation.reset(race);accumulator=0;frameMonitor.reset();adaptiveResolution.reset();renderer.resolutionScale=1;performanceSnapshot={};screen=name;document.body.dataset.screen=name;document.body.classList.toggle('title-screen',name==='title');document.body.classList.toggle('menu-screen',name==='menu');$('title-screen').classList.toggle('hidden',name!=='title');$('app').inert=['title','online-loading','settings'].includes(name);$('settings-panel').classList.toggle('hidden',name!=='settings');$('auth-gate').inert=name==='title';if(name==='menu')selectMenuButton($('main-menu-actions').querySelector('.selected')||$('main-menu-actions').querySelector('button'));if(name==='online'){net?.refreshIdentity();if(net?.tab==='public')net.refreshRooms();renderer.setCar(ownedCar(CARS.find(c=>c.id===$('online-car').value)||CARS[settings.car]));}else if(['menu','play','home','garage','title','campaign','shop','collection'].includes(name))renderer.setCar(ownedCar());for(const id of ['main-menu','play-screen','home','garage','workshop','online','race','campaign','shop','collection'])$(id).classList.toggle('hidden',(id==='main-menu'?name!=='menu':id==='play-screen'?name!=='play':name!==id)&&!(id==='race'&&['paused','results'].includes(name)));document.body.classList.toggle('racing',['race','paused','results','replay'].includes(name));driving.clear();driving.sync();document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.action===name));renderer.resetCamera=true;}
-const gameDialogs=['music','controls','control-layout','gamepad-config','pause','results','online-results','exit','mode','ranking'];
+function showScreen(name){if(name!=='replay')replayPlayer=null;$('replay-controls').classList.toggle('hidden',name!=='replay');playMenu?.cancelHover();racePresentation.reset(race);accumulator=0;frameMonitor.reset();adaptiveResolution.reset();renderer.resolutionScale=1;performanceSnapshot={};screen=name;syncMenuMusic();document.body.dataset.screen=name;document.body.classList.toggle('title-screen',name==='title');document.body.classList.toggle('menu-screen',name==='menu');$('title-screen').classList.toggle('hidden',name!=='title');$('app').inert=['title','online-loading','settings'].includes(name);$('settings-panel').classList.toggle('hidden',name!=='settings');$('auth-gate').inert=name==='title';if(name==='menu')selectMenuButton($('main-menu-actions').querySelector('.selected')||$('main-menu-actions').querySelector('button'));if(name==='online'){net?.refreshIdentity();if(net?.tab==='public')net.refreshRooms();renderer.setCar(ownedCar(CARS.find(c=>c.id===$('online-car').value)||CARS[settings.car]));}else if(['menu','play','home','garage','title','campaign','shop','collection'].includes(name))renderer.setCar(ownedCar());for(const id of ['main-menu','play-screen','home','garage','workshop','online','race','campaign','shop','collection'])$(id).classList.toggle('hidden',(id==='main-menu'?name!=='menu':id==='play-screen'?name!=='play':name!==id)&&!(id==='race'&&['paused','results'].includes(name)));document.body.classList.toggle('racing',['race','paused','results','replay'].includes(name));driving.clear();driving.sync();document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.action===name));renderer.resetCamera=true;}
+const gameDialogs=['music','menu-playlist','controls','control-layout','gamepad-config','pause','results','online-results','exit','mode','ranking'];
 function openModal(name,opener=document.activeElement){
   if(name==='settings'){openOptions();return;}
   returnFocus=opener;modal=name;$('modal-backdrop').classList.remove('hidden');
   for(const id of gameDialogs)$(id+'-panel').classList.toggle('hidden',id!==name);
   $('settings-panel').inert=screen==='settings';
-  const first=[...$(name+'-panel').querySelectorAll('button,select,input')].find(el=>!el.disabled&&el.getClientRects().length);first?.focus();if(name==='music')refreshSongs();
+  const first=[...$(name+'-panel').querySelectorAll('button,select,input')].find(el=>!el.disabled&&el.getClientRects().length);first?.focus();
+  syncMenuMusic();
+  if(name==='music')refreshSongs();
 }
 function closeModal(){
   const was=modal;modal=null;$('modal-backdrop').classList.add('hidden');
@@ -224,6 +240,7 @@ function closeModal(){
   $('settings-panel').inert=false;
   if(was==='gamepad-config')driving.cancelBinding();
   if(was==='music'&&sound.preview&&screen!=='race')sound.stop();
+  syncMenuMusic();
   if(was)returnFocus?.focus();
 }
 function openOptions(){
@@ -242,6 +259,7 @@ function requestFullscreen(automatic=false){
   if(!automatic&&!pending)toast('La pantalla completa no está disponible.');
   pending?.catch(()=>{if(!automatic)toast('La pantalla completa no está disponible.');});
 }
+$('menu-playlist-open').onclick=()=>{openModal('menu-playlist');menuMusic.renderEditor();menuMusic.refresh();};
 for(const button of document.querySelectorAll('[data-settings-tab]'))button.onclick=()=>{
   driving.cancelBinding();
   for(const item of document.querySelectorAll('[data-settings-tab]'))item.setAttribute('aria-pressed',String(item===button));
@@ -623,7 +641,7 @@ account=new AccountClient({
   onPreferences:()=>net.refreshIdentity(),onError:toast,onSessionLost:()=>{if(net.room)net.leave();if(screen==='race')pause();},onLogout:()=>{net.leave();quit();lastAccountId=null;}
 });
 $('welcome-dialog').addEventListener('close',event=>{if(event.currentTarget.returnValue==='options')openModal('settings');});
-progression=new ProgressionClient(account,{screen:showScreen,car:ownedCar,garage:()=>workshop.open(CARS[settings.car]),prepare:prepareCampaign,start:()=>startRace(),preview:car=>renderer.setCar(car),songs:allSongs,refreshSongs,selectSong:id=>{const song=allSongs().find(s=>s.id===id);if(song)selectSong(song);},storyPage:file=>{sound.pageAudio.setVolume(sound.muted?0:settings.engineVolume/100);sound.pageAudio.play(file);},storyAudio:song=>{sound.stop();if(song)sound.play(song);},storyStop:()=>sound.stop()});
+progression=new ProgressionClient(account,{screen:showScreen,car:ownedCar,garage:()=>workshop.open(CARS[settings.car]),prepare:prepareCampaign,start:()=>startRace(),preview:car=>renderer.setCar(car),songs:allSongs,refreshSongs,selectSong:id=>{const song=allSongs().find(s=>s.id===id);if(song)selectSong(song);},storyPage:file=>{sound.pageAudio.setVolume(sound.muted?0:settings.engineVolume/100);sound.pageAudio.play(file);},storyAudio:song=>{syncMenuMusic();sound.stop();if(song)sound.play(song);},storyStop:()=>{sound.stop();syncMenuMusic();}});
 progression.callbacks.shopScene=section=>{renderer.shopSection=section;};
 playMenu=new PlayMenu({openModal,closeModal,active:()=>screen==='play'&&!modal,enter:mode=>mode==='campaign'?progression.openCampaign():mode==='time'?openRaceSetup():showScreen('online')});
 const collectibles=new Collectibles(account,{screen:showScreen,cars:CARS,tracks:TRACKS,preview:car=>renderer.setCar(ownedCar(car)),view:(angle,zoom)=>{renderer.collectionAngle=angle;renderer.collectionZoom=zoom;}});

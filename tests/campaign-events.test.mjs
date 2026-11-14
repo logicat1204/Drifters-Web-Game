@@ -20,11 +20,8 @@ test('the new campaign requires qualifiers and the final duel, and claims focus 
     };
     const start=(campaignStage)=>new Runs(store).start(id,{mode:'campaign',campaignRules:true,car:'r32',campaignStage});
     assert.throws(()=>store.claimCampaignChest(id,'chest-akina'),/bloqueado/);
-    for(const event of events.slice(0,3))clear(event);
-    assert.deepEqual(store.user(id).focusUnlocked,[]);
-    assert.equal(store.claimCampaignChest(id,'chest-akina').alreadyClaimed,false);
-    assert.equal(store.claimCampaignChest(id,'chest-akina').alreadyClaimed,true);
-    assert.deepEqual(store.user(id).focusUnlocked,['balance']);
+    assert.equal(events[0].id,'trial-akina');
+    assert.throws(()=>start('kenji'),/bloqueado/);
     assert.throws(()=>start('shingo-myogi'),/bloqueado/);
     assert.throws(()=>store.markChapterStory(id,'map:akina','end'),/anteriores/);
     const runs=new Runs(store,{now:()=>now});let now=1;
@@ -36,13 +33,31 @@ test('the new campaign requires qualifiers and the final duel, and claims focus 
     const saved=await runs.submit(id,attempt.id,recorder.frames);
     assert.ok(saved.won&&saved.completed);
     assert.equal(saved.reward.stage,'trial-akina');
-    assert.doesNotThrow(()=>start('shingo-myogi'));
+    assert.doesNotThrow(()=>start('kenji'));
+    for(const event of events.slice(1,4))clear(event);
+    assert.deepEqual(store.user(id).focusUnlocked,[]);
+    assert.equal(store.claimCampaignChest(id,'chest-akina').alreadyClaimed,false);
+    assert.equal(store.claimCampaignChest(id,'chest-akina').alreadyClaimed,true);
+    assert.deepEqual(store.user(id).focusUnlocked,['balance']);
+    assert.doesNotThrow(()=>start('trial-myogi'));
+    assert.throws(()=>start('shingo-myogi'),/bloqueado/);
     assert.throws(()=>start('kenta'),/bloqueado/);
     assert.doesNotThrow(()=>store.markChapterStory(id,'map:akina','end'));
     const cleared=events.slice(0,-1).map(event=>event.id);
     assert.equal(worldSeasonAvailable('ngplus',cleared),false);
     assert.equal(worldSeasonAvailable('ngplus',events.map(event=>event.id)),true);
   }finally{store.close();}
+});
+
+test('each Initial D chapter opens with a trial while mid-chapter saves can continue',()=>{
+  for(const season of ['dry','rain','ngplus']){
+    const events=campaignEvents(season).filter(event=>event.world==='initial-d');
+    for(const chapter of new Set(events.map(event=>event.chapter)))assert.equal(events.find(event=>event.chapter===chapter).kind,'trial');
+  }
+  assert.equal(eventAvailable(campaignEvent('iketani-akina'),['kenji']),true);
+  assert.equal(eventAvailable(campaignEvent('trial-myogi'),['kenji','iketani-akina','event-takumi-initial']),false);
+  assert.equal(campaignEvent('iketani-akina').level,1);
+  assert.equal(campaignEvent('iketani-usui').level,2);
 });
 
 test('a grid retains race progress across the lap seam and simulates each rival',()=>{

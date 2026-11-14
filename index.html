@@ -207,6 +207,16 @@
       <div id="touch-controls" aria-label="Controles de conducción en pantalla"></div>
     </section>
   </div>
+  <section id="menu-music-player" class="menu-music-player hidden" aria-label="Música del menú">
+    <audio id="menu-music-audio" preload="none" hidden></audio>
+    <img id="menu-music-cover" alt="" width="40" height="40">
+    <span id="menu-music-name" aria-live="polite">Música del menú</span>
+    <div class="menu-music-buttons">
+      <button id="menu-music-prev" type="button" aria-label="Canción anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zm12 0L8 12l10 7z"/></svg></button>
+      <button id="menu-music-toggle" type="button" aria-label="Reproducir"><svg data-play-icon viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l13 8-13 8z"/></svg><svg data-pause-icon viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg></button>
+      <button id="menu-music-next" type="button" aria-label="Siguiente canción"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM6 5l10 7-10 7z"/></svg></button>
+    </div>
+  </section>
   <div id="modal-backdrop" class="modal-backdrop hidden"></div>
   <section id="music-panel" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="music-title"><div class="drawer-header"><span class="eyebrow">04 / SOUND SYSTEM</span><button class="close-button" data-action="close" aria-label="Cerrar">×</button></div><h2 id="music-title">TU NOCHE.<br><em>TU BANDA SONORA.</em></h2><p>Hay curvas que se toman mejor con la canción correcta.</p><div class="music-toolbar"><button class="secondary-button" id="import-music">＋ AGREGAR ARCHIVOS</button><button class="text-button" id="refresh-music">↻ ACTUALIZAR</button></div><input type="file" id="music-files" accept="audio/*,.flac,.opus,.m4a" multiple hidden><div class="folder-note"><span>↳</span><div><b>Tu carpeta <code>songs/</code> está conectada</b><small id="folder-status">Buscando canciones…</small></div><span class="live-dot"></span></div><div id="song-list" class="song-list"></div><div class="volume-control"><label for="music-volume">VOLUMEN DE MÚSICA</label><input type="range" id="music-volume" min="0" max="100" value="50"><span id="volume-label">50%</span></div><p class="drawer-footnote">Motores: domasx2 (CC0) y qubodup (CC BY 3.0). <a href="/assets/audio/credits.html" target="_blank" rel="noopener">Créditos de audio</a>.</p><p class="drawer-footnote">Copia tus archivos a <code>songs/</code> y aparecerán aquí automáticamente. MP3, OGG, WAV, M4A y más. Los archivos agregados desde el botón duran esta sesión.</p></section>
   <section id="control-layout-panel" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="layout-title">
@@ -248,8 +258,17 @@
         <label class="setting-row">Volumen de música<input id="options-music-volume" type="range" min="0" max="100"></label>
         <label class="setting-row">Volumen del motor y efectos<input id="engine-volume" type="range" min="0" max="100" value="35"></label><label class="setting-row">Neumáticos y frenada<input id="tire-volume" aria-label="Volumen de neumáticos" type="range" min="0" max="100" value="35"></label><label class="setting-row">Lluvia y ambiente<input id="weather-volume" aria-label="Volumen de lluvia" type="range" min="0" max="100" value="35"></label><label class="setting-row">Vibración y estelas de velocidad<input id="camera-shake" type="checkbox" checked></label>
         <button class="secondary-button full" data-action="music">♪ BANDA SONORA / MÚSICA</button>
+        <button id="menu-playlist-open" class="secondary-button full" type="button">Música del menú</button>
       </section>
     </div>
+  </section>
+  <section id="menu-playlist-panel" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="menu-playlist-title">
+    <div class="drawer-header"><h2 id="menu-playlist-title">Música del menú</h2><button class="close-button" data-action="close" aria-label="Cerrar">×</button></div>
+    <div class="menu-playlist-header"><span>Selecciona hasta ocho canciones en orden.</span><output id="menu-playlist-count" aria-live="polite">0 / 8</output></div>
+    <div id="menu-playlist-list" aria-label="Canciones disponibles"></div>
+    <p id="menu-playlist-empty">Añade canciones a <code>songs/menu/</code>.</p>
+    <button id="menu-playlist-refresh" class="secondary-button" type="button">Actualizar carpeta</button>
+    <p id="menu-playlist-status" role="status"></p>
   </section>
   <section id="gamepad-config-panel" class="dialog hidden" role="dialog" aria-modal="true" aria-labelledby="gamepad-config-title">
     <div class="drawer-header"><h2 id="gamepad-config-title">Mando</h2><button class="close-button" data-action="close" aria-label="Cerrar">×</button></div>

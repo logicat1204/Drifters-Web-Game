@@ -27,8 +27,9 @@ function makeEvents(season){
     const mf=Boolean(mfStages[chapter.id]);
     if(mf&&season==='rain')return [];
     const common={season,chapter:chapter.id,track:chapter.track,index:chapterIndex*2,ngplus,team:chapter.name,world:mf?'mf-ghost':'initial-d'};
+    const pace=chapter.id==='akina'&&!ngplus?80:targetPace[chapter.id];
     const trial={...common,id:stageId(season,'trial-'+chapter.id),baseId:'trial-'+chapter.id,kind:'trial',name:'Time Trial',short:'Time Trial',level:ngplus?4:2,
-      pace:targetPace[chapter.id]*(ngplus?(chapter.expansion||chapter.id==='akagi'?1.065:1.14):season==='rain'?.92:1)};
+      pace:pace*(ngplus?(chapter.expansion||chapter.id==='akagi'?1.065:1.14):season==='rain'?.92:1)};
     const duel=id=>{
       const stage=duels.find(s=>s.id===stageId(season,id));
       return {...stage,baseId:id,world:common.world,kind:'duel',season,...(season==='dry'&&stage.unlock?{id:'event-'+id,legacyId:id}:{})};
@@ -38,9 +39,9 @@ function makeEvents(season){
         ...common,id:stageId(season,baseId),baseId,name,short:name.split(' · ')[0],car,color,style,level:ngplus?Math.min(5,level+1):level,
         kind:'duel',folder:baseId,portrait
       }));
-      return [...rivals,trial];
+      return [trial,...rivals];
     }
-    if(!mf)return [...duels.filter(s=>s.chapter===chapter.id).map(stage=>duel(stage.baseId||stage.id)),trial];
+    if(!mf)return [trial,...duels.filter(s=>s.chapter===chapter.id).map(stage=>duel(stage.baseId||stage.id))];
     return [trial,...mfStages[chapter.id].map(event=>{
       if(typeof event==='string')return duel(event);
       const [baseId,laps,...ids]=event;
@@ -71,7 +72,11 @@ export function eventAvailable(event,cleared){
   if(!event||!worldSeasonAvailable(event.season,cleared))return false;
   if(eventCleared(event,cleared))return true;
   const list=campaignEvents(event.season),index=list.findIndex(candidate=>candidate.id===event.id);
-  return index>=0&&list.slice(0,index).every(previous=>eventCleared(previous,cleared));
+  return index>=0&&list.slice(0,index).every(previous=>
+    eventCleared(previous,cleared)||(
+      previous.kind==='trial'&&previous.world==='initial-d'&&previous.chapter===event.chapter&&
+      list.some(old=>old.chapter===previous.chapter&&old.kind==='duel'&&eventCleared(old,cleared))
+    ));
 }
 
 const chestRewards={

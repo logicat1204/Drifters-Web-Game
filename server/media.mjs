@@ -24,20 +24,33 @@ export function parseShopSong(filename){
  return {id,title,author,name:title+' - '+author,price,kind:'music'};
 }
 export class MediaLibrary {
- constructor(root){this.root=path.resolve(root);this.songsRoot=path.join(this.root,'songs');this.shopRoot=path.join(this.songsRoot,'shop');this.campaignRoot=path.join(this.root,'campaign_files');}
- async files(dir,extensions,recursive=false){
+ constructor(root){this.root=path.resolve(root);this.songsRoot=path.join(this.root,'songs');this.shopRoot=path.join(this.songsRoot,'shop');this.menuRoot=path.join(this.songsRoot,'menu');this.campaignRoot=path.join(this.root,'campaign_files');}
+ async files(dir,extensions,{recursive=false,exclude=[]}={}){
   try{
    const actual=await realpath(dir),base=await realpath(this.root);if(!actual.startsWith(base+path.sep))return [];
    const result=[];for(const entry of(await readdir(dir,{withFileTypes:true})).sort(natural)){
     if(entry.name.startsWith('.')||entry.isSymbolicLink())continue;const full=path.join(dir,entry.name);
-    if(entry.isDirectory()&&recursive)result.push(...await this.files(full,extensions,true));
+   if(entry.isDirectory()&&recursive&&!exclude.includes(full))result.push(...await this.files(full,extensions,{recursive,exclude}));
     else if(entry.isFile()&&extensions.has(path.extname(entry.name).toLowerCase()))result.push({name:entry.name,absolute:full,url:'/'+path.relative(this.root,full).split(path.sep).map(encodeURIComponent).join('/')});
    }return result;
   }catch{return [];}
  }
- async freeSongs(){return(await this.files(this.songsRoot,AUDIO_EXTENSIONS,true)).filter(f=>!this.isShopFile(f.absolute)).map(f=>({id:path.relative(this.songsRoot,f.absolute).split(path.sep).join('/'),name:path.parse(f.name).name,url:f.url}));}
+ async freeSongs(){
+  const files=await this.files(this.songsRoot,AUDIO_EXTENSIONS,{recursive:true,exclude:[this.shopRoot,this.menuRoot]});
+  return files.filter(file=>!this.isShopFile(file.absolute)).map(file=>({id:path.relative(this.songsRoot,file.absolute).split(path.sep).join('/'),name:path.parse(file.name).name,url:file.url}));
+ }
+ async menuSongs(){
+  const files=await this.files(this.menuRoot,new Set([...AUDIO_EXTENSIONS,...IMAGES]),{recursive:true});
+  const images=new Map(files.filter(file=>IMAGES.has(path.extname(file.name).toLowerCase()))
+    .map(file=>[path.join(path.dirname(file.absolute),path.parse(file.name).name.toLowerCase()),file.url]));
+  return files.filter(file=>AUDIO_EXTENSIONS.has(path.extname(file.name).toLowerCase())).map(file=>{
+    const name=path.parse(file.name).name;
+    const id=path.relative(this.songsRoot,file.absolute).split(path.sep).join('/');
+    return {id,name,url:file.url,cover:images.get(path.join(path.dirname(file.absolute),name.toLowerCase()))||null};
+  });
+ }
  isShopFile(filename){return path.resolve(filename).toLowerCase().startsWith(this.shopRoot.toLowerCase()+path.sep);}
- async shopSongs(){const found=new Map();for(const file of await this.files(this.shopRoot,AUDIO_EXTENSIONS,true)){const song=parseShopSong(file.name);if(song&&!found.has(song.id))found.set(song.id,{...song,absolute:file.absolute,url:'/api/music/'+song.id});}return [...found.values()];}
+ async shopSongs(){const found=new Map();for(const file of await this.files(this.shopRoot,AUDIO_EXTENSIONS,{recursive:true})){const song=parseShopSong(file.name);if(song&&!found.has(song.id))found.set(song.id,{...song,absolute:file.absolute,url:'/api/music/'+song.id});}return [...found.values()];}
  async stageMedia(stage,legacy={}){
   const inherited=stage.season?await this.stageMedia({...stage,id:stage.baseId,season:undefined},legacy):null;
   const folder=path.join(this.campaignRoot,stage.chapter,stage.baseId||stage.id,...(stage.season?[stage.season]:[])),[music,start,end,introAudio,endAudio,startSounds,endSounds,portraits]=await Promise.all([

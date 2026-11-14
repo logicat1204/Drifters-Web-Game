@@ -35,7 +35,9 @@ function paceFor(track,rival,wet){
  }
  const row=track.geometryVersion&&COURSE_PACE[track.id];
  if(!row)return 1;
- return row[rival.ngplus?wet?2:1:0]*(!rival.ngplus&&rival.level===1?.96:1);
+ const id=rival.baseId||rival.id;
+ const beginnerPace=track.id==='akina'&&!rival.ngplus?(id==='kenji'?.84:id==='iketani-akina'?.90:1):1;
+ return row[rival.ngplus?wet?2:1:0]*(!rival.ngplus&&rival.level===1?.96:1)*beginnerPace;
 }
 export function rivalLevel(rival){return Math.max(1,Math.min(5,Math.round(rival.level||3)));}
 export function rivalStyle(rival){return AI_STYLES[rival.style]?rival.style:'Complete';}

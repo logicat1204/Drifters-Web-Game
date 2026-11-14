@@ -59,6 +59,7 @@ export class Accounts {
     const p=url.pathname;if(!p.startsWith('/api/'))return false;
     try{
       if(p==='/api/health'){json(res,200,{ok:true});return true;}
+      if(p==='/api/menu-songs'&&req.method==='GET'){json(res,200,{songs:await this.media.menuSongs()});return true;}
       if(p==='/api/license-backgrounds'&&req.method==='GET'){json(res,200,{backgrounds:await licenseBackgrounds()});return true;}
       if(p==='/api/avatar/catalog'&&req.method==='GET'){await this.refreshCosmetics();json(res,200,{version:AVATAR_VERSION,options:{male:avatarOptions('male'),female:avatarOptions('female')},defaults:{male:defaultAvatar('male'),female:defaultAvatar('female')},items:COSMETICS});return true;}
       if(p==='/api/avatar/preview'&&req.method==='GET'){

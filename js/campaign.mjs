@@ -22,7 +22,7 @@ export const CAMPAIGN_CHAPTERS=[
 ];
 const rows=[
   ['akina','kenji','Kenji','180sx','#eeeae0',1,'Grip','Kenji'],
-  ['akina','iketani-akina','Koichiro Iketani','silvia','#a0bb92',2,'Grip','Iketani'],
+  ['akina','iketani-akina','Koichiro Iketani','silvia','#a0bb92',1,'Grip','Iketani'],
   ['akina','takumi-initial','Takumi Fujiwara (Inicial)','ae86','#e5e5dc',3,'Skiller','Takumi','balance'],
   ['akagi','kenta','Kenta Nakamura','s14','#d87835',2,'Grip','kenta'],
   ['akagi','keisuke-initial','Keisuke Takahashi','rx7','#e7b948',3,'Complete','keisuke','time'],
