@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {WebSocket} from 'ws';
 import {OnlineRooms,sendOnlineFrame} from '../server/online.mjs';
+import {selectRaceHost} from '../js/online-direct.mjs';
+import {OnlineHost} from '../js/online-host.js';
 import {CARS} from '../js/sim.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 
@@ -53,6 +55,76 @@ test('WebRTC probes only relay signals between opted-in pilots in the same lobby
   f.send(f.host,'start');
   f.send(f.host,'probe-signal',{to:guest.id,kind:'offer',value:'sdp'});
   assert.equal(guest.out.at(-1).type,'snapshot');
+});
+
+const link=(id,p95,received=30)=>({id,p95,received,sent:30});
+
+test('the direct race chooses the pilot with the lowest worst bidirectional latency',()=>{
+  const reports=new Map([
+    ['a',[link('b',20),link('c',90)]],
+    ['b',[link('a',20),link('c',35)]],
+    ['c',[link('a',100),link('b',35)]]
+  ]);
+  assert.equal(selectRaceHost(['a','b','c'],reports),'b');
+  reports.set('c',[link('a',100,20),link('b',35,20)]);
+  assert.equal(selectRaceHost(['a','b','c'],reports),null);
+});
+
+test('a direct race hands the initial state to the elected browser and keeps test results out of the records',()=>{
+  const f=fixture(),g=f.join();
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,direct:true});
+  f.send(f.host,'start',{direct:true});
+  assert.equal(f.room.phase,'preparing');
+  const {runId}=f.room;
+  f.send(f.host,'direct-signal',{to:g.id,runId,kind:'offer',value:'sdp'});
+  assert.equal(g.out.at(-1).from,f.host.id);
+  f.send(g,'direct-report',{runId,peers:[link(f.host.id,65)]});
+  f.send(f.host,'direct-report',{runId,peers:[link(g.id,70)]});
+  assert.equal(f.room.transport,'direct');
+  assert.equal(f.host.out.at(-1).players.length,2);
+  const browser=new OnlineHost(f.service.lobby(f.room),f.room.track,f.host.out.at(-1),0);
+  let snapshot;
+  for(let i=1;i<500;i++){
+    const now=i*10;
+    browser.input(g.id,{seq:i,steer:0,throttle:true},now);
+    snapshot=browser.step(now)??snapshot;
+  }
+  assert.ok(snapshot.players.find(p=>p.id===g.id).state.speed>5);
+  browser.action(g.id,'reposition');
+  assert.equal(browser.room.players.get(g.id).race.speed,0);
+  assert.equal(browser.room.players.get(g.id).race.resetId,1);
+  f.step(3,false);
+  assert.equal(f.room.elapsed,0,'Render does not step the direct race');
+  const results=[{id:f.host.id,place:1,time:80},{id:g.id,place:2,time:100}];
+  const winner=f.room.players.get(f.room.raceHost).client;
+  const other=winner===g?f.host:g;
+  f.send(other,'direct-finish',{runId,results});
+  assert.equal(f.room.phase,'racing');
+  f.send(winner,'direct-finish',{runId,results});
+  assert.equal(f.room.phase,'results');
+  assert.ok([...f.room.players.values()].every(p=>p.saved===null));
+  f.send(f.host,'rematch');
+  assert.equal(f.room.phase,'lobby');
+});
+
+test('direct preparation falls back to the server and a lost connection reopens the room',()=>{
+  const f=fixture(),g=f.join();
+  for(const c of [f.host,g])f.send(c,'ready',{ready:true,direct:true});
+  f.send(f.host,'start',{direct:true});
+  const {runId}=f.room;
+  f.send(g,'direct-report',{runId,peers:[link(f.host.id,60)]});
+  f.send(f.host,'direct-report',{runId,peers:[link(g.id,65)]});
+  f.service.disconnect(g);
+  assert.equal(f.room.phase,'lobby');
+  assert.equal(f.room.players.size,1);
+
+  const replacement=f.join();
+  for(const c of [f.host,replacement])f.send(c,'ready',{ready:true,direct:true});
+  f.send(f.host,'start',{direct:true});
+  f.advance(13001);
+  f.service.step();
+  assert.equal(f.room.phase,'racing');
+  assert.equal(f.room.transport,'server');
 });
 test('all seven garage cars can join and use their own authoritative physics',()=>{
   for(const car of CARS){const f=fixture(),guest=f.join('Nuevo coche',car.id);assert.equal(f.room.players.get(guest.id)?.car,car.id);

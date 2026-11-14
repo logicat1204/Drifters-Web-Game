@@ -1,4 +1,4 @@
-// Lobby-only comparison. The race still uses the authoritative server.
+// Measures peer links in the lobby and keeps the selected race channels open.
 const SAMPLE_COUNT=30, SAMPLE_INTERVAL=100, SIGNAL_WAIT=7000, DRAIN_WAIT=1000;
 const defaultIce=[{urls:'stun:stun.l.google.com:19302'}];
 
@@ -18,14 +18,18 @@ export class OnlineProbe {
     this.timers=new Set();
   }
 
-  start(id){
+  start(id,directPeers=null){
     if(this.active&&!this.finished)return;
     this.cancel(true);
     this.id=id;
     this.active=true;
-    this.server=createSamples();
-    this.send({type:'probe-ready',ready:true});
-    this.sendSample(this.server);
+    this.direct=!!directPeers;
+    if(this.direct)this.setPeers(directPeers);
+    else{
+      this.server=createSamples();
+      this.send({type:'probe-ready',ready:true});
+      this.sendSample(this.server);
+    }
     this.render();
     this.timer(()=>this.sample(),SAMPLE_INTERVAL,true);
     this.timer(()=>this.finish(),SIGNAL_WAIT+SAMPLE_COUNT*SAMPLE_INTERVAL+DRAIN_WAIT);
@@ -37,7 +41,7 @@ export class OnlineProbe {
   }
 
   cancel(notify=false){
-    if(this.active&&notify)this.send({type:'probe-ready',ready:false});
+    if(this.active&&notify&&!this.direct)this.send({type:'probe-ready',ready:false});
     this.active=false;
     this.finished=false;
     for(const id of this.timers)clearTimeout(id);
@@ -51,6 +55,7 @@ export class OnlineProbe {
     if(!this.active)return;
     this.finished=true;
     this.render();
+    if(this.direct)return;
     // Peers who clicked later can still receive replies while they finish.
     this.timer(()=>this.cancel(true),4000);
   }
@@ -84,6 +89,7 @@ export class OnlineProbe {
         pc.ondatachannel=({channel})=>this.bindChannel(peer,channel);
         if(this.id<id){
           this.bindChannel(peer,pc.createDataChannel('touge-probe',{ordered:false,maxRetransmits:0}));
+          if(this.direct)this.bindChannel(peer,pc.createDataChannel('touge-actions'));
           this.enqueue(peer,()=>this.describe(peer,'offer',pc.createOffer()));
         }
       }catch{this.fail(peer);}
@@ -133,24 +139,53 @@ export class OnlineProbe {
   }
 
   bindChannel(peer,channel){
+    if(this.direct&&channel.label==='touge-actions'&&!peer.actions){
+      peer.actions=channel;
+      channel.onmessage=({data})=>{
+        if(this.current(peer)&&this.finished&&typeof data==='string'&&data.length<=512)this.onRaceMessage?.(peer.id,data);
+      };
+      return;
+    }
     if(channel.label!=='touge-probe'||peer.channel){channel.close();return;}
     peer.channel=channel;
-    channel.onopen=()=>{if(this.current(peer)){peer.status='connected';this.render();}};
+    const open=()=>{if(this.current(peer)){peer.status='connected';this.render();}};
+    channel.onopen=open;
+    if(channel.readyState==='open')open();
     channel.onclose=()=>this.fail(peer);
     channel.onmessage=({data})=>{
-      if(!this.current(peer)||typeof data!=='string'||!/^([pq]):\d{1,2}$/.test(data))return;
-      if(data[0]==='p'&&channel.readyState==='open'&&channel.bufferedAmount===0){
+      if(!this.current(peer)||typeof data!=='string')return;
+      if(this.direct&&this.finished&&data.startsWith('{')&&data.length<=24000){
+        this.onRaceMessage?.(peer.id,data);
+        return;
+      }
+      if(!/^([pq]):\d{1,2}$/.test(data))return;
+      if(data[0]==='p'&&channel.readyState==='open'&&channel.bufferedAmount<1024){
         try{channel.send('q'+data.slice(1));}catch{this.fail(peer);}
       }
       if(data[0]==='q')this.record(peer.samples,Number(data.slice(2)));
     };
   }
 
+  sendRace(id,message,reliable=false){
+    const peer=this.peers.get(id),channel=reliable?peer?.actions:peer?.channel;
+    if(channel?.readyState!=='open'||channel.bufferedAmount>(reliable?4096:0))return false;
+    try{channel.send(message);return true;}catch{return false;}
+  }
+
+  keepRacePeers(host){
+    if(this.id===host)return;
+    for(const peer of this.peers.values()){
+      if(peer.id===host)continue;
+      peer.status='left';
+      peer.pc?.close();
+    }
+  }
+
   sendSample(samples,channel){
     const id=samples.count++;
     samples.sent.set(id,performance.now());
     if(!channel)this.send({type:'probe-ping',id});
-    else if(channel.bufferedAmount===0&&channel.readyState==='open')channel.send('p:'+id);
+    else if(channel.bufferedAmount<1024&&channel.readyState==='open')channel.send('p:'+id);
   }
 
   record(samples,id){
@@ -161,7 +196,7 @@ export class OnlineProbe {
 
   sample(){
     if(this.finished)return;
-    if(this.server.count<SAMPLE_COUNT)this.sendSample(this.server);
+    if(this.server&&this.server.count<SAMPLE_COUNT)this.sendSample(this.server);
     for(const peer of this.peers.values()){
       if(peer.status==='connected'&&peer.samples.count<SAMPLE_COUNT){
         try{this.sendSample(peer.samples,peer.channel);}catch{this.fail(peer);}

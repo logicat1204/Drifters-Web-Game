@@ -279,12 +279,12 @@ let lastCheckpoint=0,lastCount=4,messageUntil=0,lastLandmark=-1,lastAward=0,last
 function repositionNotice(){$('race-message').textContent='CENTRO DE PISTA / 0 KM/H';messageUntil=performance.now()+1800;hud();}
 function repositionPlayer(){
   if(!race||!['race','paused'].includes(screen))return;
-  if(race.online){net.send({type:'reposition'});return;}
+  if(race.online){net.raceAction('reposition');return;}
   if(repositionRace(race)){race.recorder?.action(2);racePresentation.reset(race);keys.clear();driving.clear();renderer.resetCamera=true;repositionNotice();}
 }
 function useFocus(){
   if(!race||screen!=='race')return;if(race.focus.enabled===false){toast(FOCUS_TYPES[race.focus.type].unlock+' para desbloquear esta especialidad.');return;}
-  if(race.online){net.send({type:'focus'});return;}
+  if(race.online){net.raceAction('focus');return;}
   if(activateFocus(race)){race.recorder?.action(1);hud();}else toast('Necesitas 30% de concentración, sin impacto ni recuperación activa.');
 }
 function focusHud(){
@@ -345,7 +345,7 @@ function onlineHud(){
   $('position').textContent=`${position||1} / ${net.room?.players.length||2}`;$('race-mode-label').textContent='ONLINE / '+(net.room?.code||'');
   const leader=players.find(p=>!p.dnf),following=players.find(p=>p.id!==net.id&&!p.dnf),gap=leader?.id===net.id?race.s-(following?.state.s??race.s):(leader?.state.s??race.s)-race.s;
   $('advantage').textContent=race.netDnf?'RETIRADO':race.netFinished?'META / ESPERANDO':leader?`${leader.id===net.id?'+':'−'}${Math.abs(gap).toFixed(1)} m`:'';
-  $('online-standings').replaceChildren();const caption=document.createElement('small');caption.textContent=`EN PISTA · ${Math.round(net.latency)} ms`;$('online-standings').append(caption);
+  $('online-standings').replaceChildren();const caption=document.createElement('small');caption.textContent=net.room?.transport==='direct'?net.directLabel:`SERVIDOR · ${Math.round(net.latency)} ms`;$('online-standings').append(caption);
   players.forEach((p,i)=>{const row=document.createElement('div');row.className=p.id===net.id?'you':'';const place=document.createElement('span'),name=document.createElement('b'),state=document.createElement('span');place.textContent=String(i+1).padStart(2,'0');name.textContent=p.name;state.textContent=p.dnf?'DNF':p.place?'META':CARS.find(c=>c.id===p.car)?.code;row.append(place,name,state);$('online-standings').append(row);});
   if(race.netFinished)$('race-message').textContent=race.netDnf?'FIN DE TU CARRERA / ESPERA LOS RESULTADOS':'META / ESPERANDO AL RESTO';
 }
@@ -353,7 +353,7 @@ function startOnline(room){
   closeModal();keys.clear();driving.clear();sound.ensure();track=makeTrack(TRACKS.find(t=>t.id===room.config.track));const me=room.players.find(p=>p.id===net.id),car=CARS.find(c=>c.id===me.car);
   race=createRace(car,track,{mode:'time',manual:!!me.manual,build:me.build,night:room.config.night,wet:room.config.wet});race.online=true;race.transmissionMode=me.manual?(driving.choice==='auto'?'sequential':driving.choice):'auto';race.netPlayers=[];race.netOpponents=[];net.lights=true;
   race.watchReplay=new RaceReplay(race);race.replaySong=chosenSong();renderer.setTrack(track);renderer.setCar(race.car);renderer.setNetworkPlayers(room.players);renderer.particles=[];showScreen('race');sound.play(chosenSong());
-  $('track-hud-name').textContent=track.name;$('total-distance').textContent=(track.length/1000).toFixed(2);$('transmission-label').textContent=race.manual?'MT':'AT';$('driver-cards').classList.add('hidden');$('online-standings').classList.remove('hidden');$('race-message').textContent='SALIDA ONLINE / TODOS A LA VEZ';
+  $('track-hud-name').textContent=track.name;$('total-distance').textContent=(track.length/1000).toFixed(2);$('transmission-label').textContent=race.manual?'MT':'AT';$('driver-cards').classList.add('hidden');$('online-standings').classList.remove('hidden');$('race-message').textContent=net.directLabel;
   messageUntil=performance.now()+4000;lastLandmark=-1;lastCheckpoint=0;lastCount=4;lastAward=0;lastBlind=0;awardUntil=0;zoneWasActive=false;lastZoneCue=-10;lastFocusActivation=0;$('zone-award').textContent='';hud();
 }
 function onlineResults(results){
