@@ -1,10 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {Renderer} from '../js/renderer.js';
 import {makeTrack,ALL_TRACKS} from '../js/sim.mjs';
 import {createRoadIndex} from '../js/scenery.mjs';
 import {TEXTURES,SCENERY_MODELS} from '../js/scenery-assets.mjs';
 import {ENVIRONMENTS,environmentZone} from '../js/environment.mjs';
+
+const routePack=new URL('../assets/routes_part1/',import.meta.url);
+const landmarks=JSON.parse(readFileSync(new URL('assets.json',routePack))).assets;
 
 test('compiled pack keeps UVs, original props, day/night materials and finite geometry',()=>{
  assert.equal(Object.keys(TEXTURES).length,35);assert.equal(Object.keys(SCENERY_MODELS).length,20);
@@ -30,6 +34,18 @@ test('all decorated maps retain safe road corridors and sector culling, includin
   const track=makeTrack(config),index=createRoadIndex(track),renderer=Object.create(Renderer.prototype);let uploads=0;
   renderer.gl={createBuffer:()=>({}),bindBuffer(){},bufferData(_target,data){assert.ok(data.every(Number.isFinite),config.id);uploads++;},deleteBuffer(){},ARRAY_BUFFER:1,STATIC_DRAW:2};renderer.setTrack(track);
   const env=renderer.environment;assert.ok(env.profile.name);assert.ok(env.props.length>800);assert.equal(uploads,2,'one world buffer and one backdrop buffer');
+  const folder={iroha:'irohazaka',enna:'ennaskyline'}[config.id]??config.id;
+  const expected=landmarks.filter(asset=>asset.folder===folder&&!asset.file.endsWith('_rotor.glb')).map(asset=>asset.file);
+  assert.deepEqual([...new Set(env.landmarks.map(spot=>spot.file+'.glb'))],expected,config.id+' route landmarks');
+  if(config.id==='tsuchisaka')assert.equal(env.landmarks.filter(spot=>spot.portal).length,2);
+  for(const spot of env.landmarks)if(!spot.portal)assert.ok(index.distance(spot.x,spot.z)>6.2,config.id+' landmark inside the guardrail');
+  const sections=renderer.spectatorSpots.map(spot=>spot.section);
+  assert.ok(sections.includes(0)&&sections.includes(1)&&sections.some(section=>section>=2),config.id+' spectator coverage');
+  for(const spot of renderer.spectatorSpots){
+   assert.ok(index.distance(spot.x,spot.z,16)>6.2,config.id+' crowd inside the guardrail');
+   const y=env.ground.groundAt(spot.x,spot.z)??env.ground.heightAt(spot.x,spot.z);
+   assert.ok(Math.abs(spot.y+.10-y)<1e-5,config.id+' crowd without ground support');
+  }
   assert.equal(renderer.scene.chunks.reduce((n,c)=>n+c.count,6),renderer.scene.count);
   for(const prop of env.props)assert.ok(index.distance(prop.x,prop.z,prop.radius+32)>track.width/2+prop.radius+1.79,config.id+' '+prop.kind);
   for(const prop of env.props)if(!['dock','railway-bridge'].includes(prop.kind)){

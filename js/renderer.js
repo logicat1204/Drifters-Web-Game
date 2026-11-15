@@ -9,13 +9,34 @@ import {FOCUS_TYPES} from './focus.mjs';
 import {chunkVisible,viewPlanes,mirrorLayout} from './render-performance.mjs';
 import {createEnvironment} from './environment.mjs';
 import {TEXTURES} from './scenery-assets.mjs';
-import {MenuModel} from './menu-model.mjs';
+import {MenuModel,parseMenuModel} from './menu-model.mjs';
 import {VehicleModels,ORIGINAL_CARS} from './vehicle-model.mjs';
 import {CabinView} from './cabin-view.js';
 import {cabinProfile} from './cabin-geometry.mjs';
 import {DriverCamera} from './driver-camera.mjs';
+import {landmarkUrl,TURBINE_ROTOR} from './route-landmarks.mjs';
 
 const V = (x=0,y=0,z=0) => [x,y,z];
+const sceneryModel=(pack,name)=>new URL(`../assets/touge_city_assets_part${pack}/models/${name}.glb`,import.meta.url);
+const SKID_SEGMENTS=256, SKID_VERTICES=12, SKID_BYTES=SKID_VERTICES*14*4;
+const GARAGE_FIXTURES=[
+  ['workbench_pegboard',1.35,[-4.3,0,-6.6]],
+  ['toolbox_small',1.22,[-4.02,1.3,-6.55]],
+  ['toolbox_rolling_chest',1.4,[3.4,0,-5.1]],
+  ['tire_rack_3x4',1.28,[.3,0,-7.85]],
+  ['tire_stack_4',1.4,[-6.65,0,-.75]],
+  ['shelf_parts',1.3,[4.5,0,-7.65]],
+  ['crate_parts',1.42,[2.3,0,-6.3]],
+  ['sign_garage_hanging',1.55,[-.7,4.1,-8.85]],
+  ['poster_frame_a',1.4,[4.7,3.55,-8.84]]
+];
+const WORKSHOP_FIXTURES=[
+  ['tire_changer',1.4,[-5.9,0,-3.65]],
+  ['hydraulic_jack',1.25,[3.1,.446,-1.6]],
+  ['work_light_stand',1.3,[-6.4,0,-.1]],
+  ['air_compressor',1.32,[5.55,0,-5.6]],
+  ['wheel_rim_loose',1.3,[3.85,0,-5.15]]
+];
 function roadBankHeight(track,curve,lateral){
   if(!track.visualBank)return 0;
   const fade=clamp(1-(Math.abs(lateral)-4.5)*.5,0,1);
@@ -185,7 +206,7 @@ export class Renderer {
       precision mediump float;
       #endif
       varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;
-      uniform sampler2D uAtlas,uCourseSky;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain,uCourseSkyReady;
+      uniform sampler2D uAtlas,uCourseSky,uRoadEffects;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain,uCourseSkyReady,uRoadEffectsReady;
       uniform vec4 uStreetLights[3];
       uniform vec3 uFog,uEye,uCar,uRivalCar;uniform vec2 uForward,uRivalForward;
       uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];uniform vec3 uNetSlopes;
@@ -200,6 +221,10 @@ export class Renderer {
         return cone*height;
       }
       float hashRain(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}
+      // Dry rubber, wet rubber and four ripple frames.
+      vec4 roadEffect(float tile,vec2 uv){
+        return texture2D(uRoadEffects,(vec2(tile*256.+2.5,2.5)+uv*251.)/vec2(1024.,256.));
+      }
       float rearReflection(vec3 car,vec2 forward){
         vec2 delta=vWorld.xz-car.xz;
         float depth=-dot(delta,forward),offset=abs(delta.x*forward.y-delta.y*forward.x);
@@ -217,6 +242,34 @@ export class Renderer {
           gl_FragColor=vec4(mix(sky,uFog,haze),1.);return;
         }
         float f=smoothstep(uFogStart,uFogEnd,distance(vWorld,mix(uEye,uCar,uFogFromCar)));
+        if(vSurface.z<-31.5){
+          vec2 uv=vec2(mix(vSurface.x,.135+vSurface.x*.312,uWet),vSurface.y);
+          vec4 rubber=roadEffect(uWet,uv);
+          gl_FragColor=vec4(rubber.rgb*mix(.55,1.,uDay),rubber.a*vColor.a*(1.-f)*uRoadEffectsReady);
+          return;
+        }
+        if(vSurface.z<-30.5){
+          vec3 view=normalize(uEye-vWorld);
+          vec3 normal=normalize(vNormal),reflection=reflect(-view,normal);
+          float grazing=pow(1.-clamp(abs(dot(normal,view)),0.,1.),2.);
+          float glare=beam(uCar,uForward,uCarSlope)*uHeadlights;
+          vec2 skyUV=vec2(atan(reflection.z,reflection.x)/6.2831853+.5,.5-asin(clamp(reflection.y,-1.,1.))/3.1415927);
+          vec3 water=mix(vec3(.035,.052,.068),vec3(.16,.23,.27),uDay);
+          water=mix(water,texture2D(uCourseSky,skyUV).rgb,.67*grazing*uCourseSkyReady);
+          water+=vec3(.29,.37,.46)*glare*grazing*(1.-uDay);
+          float near=1.-smoothstep(17.,58.,distance(uEye,vWorld));
+          if(near>.01){
+            vec2 grid=vWorld.xz*1.4;
+            float seed=hashRain(floor(grid));
+            float phase=fract(uWeatherTime*(1.05+seed)+seed*11.);
+            vec2 frame=fract(grid)*.94+.03;
+            frame.x=(frame.x+floor(phase*4.))*.25;
+            water+=roadEffect(3.,frame).a*vec3(.51,.66,.78)*near*(.45+uDay*.3+glare*.38);
+          }
+          float edge=smoothstep(0.,.19,vColor.a);
+          gl_FragColor=vec4(water,(.48+.29*grazing)*edge*(1.-f)*uRoadEffectsReady);
+          return;
+        }
         vec4 texel=vec4(1.);float tile=-1.;if(vSurface.z>=0.){tile=floor((uDay>.5?vSurface.z:vSurface.w)+.5);if(uAtlasReady<.5){if(tile>=29.&&tile<=32.)discard;texel=vec4(.6,.65,.55,1.);}else {vec2 cell=vec2(mod(tile,8.),floor(tile/8.)),uv=(cell*256.+8.+vec2(fract(vSurface.x),1.-fract(vSurface.y))*240.)/2048.;
         ${this.textureGrad?'vec2 dx=dFdx(vSurface.xy)*vec2(240./2048.,-240./2048.),dy=dFdy(vSurface.xy)*vec2(240./2048.,-240./2048.);dx*=min(1.,.0078125/max(length(dx),.000001));dy*=min(1.,.0078125/max(length(dy),.000001));texel=texture2DGradEXT(uAtlas,uv,dx,dy);':'texel=texture2D(uAtlas,uv);'}
         if(texel.a<.45)discard;}}
@@ -252,10 +305,8 @@ export class Renderer {
           float eyeDistance=length(toEye);
           vec3 view=toEye/max(.001,eyeDistance);
           vec2 road=vSurface.xy;
-          float poolShape=sin(road.y*.91+cos(road.x*3.3))+sin(road.x*5.4-road.y*.41)*.58;
-          float pool=smoothstep(.22,.80,poolShape);
           float grazing=pow(1.-clamp(abs(dot(n,view)),0.,1.),2.);
-          float water=.27+pool*.73;
+          float water=.44;
           float ripple=0.;
           float nearRoad=1.-smoothstep(12.,32.,eyeDistance);
           if(nearRoad>.01){
@@ -270,7 +321,7 @@ export class Renderer {
           float skyBand=smoothstep(.07,.61,reflect(-view,n).y);
           vec3 reflectedSky=mix(vec3(.028,.053,.083),vec3(.19,.30,.41),daylight);
           reflectedSky+=skyBand*mix(vec3(.020,.028,.040),vec3(.23,.24,.25),daylight);
-          c=mix(c*(.79-pool*.19),reflectedSky,water*(.17+grazing*.66));
+          c=mix(c*.75,reflectedSky,water*(.17+grazing*.66));
           float streak=.88+.12*sin(road.y*42.+road.x*8.);
           c+=vec3(.72,.84,1.)*headlights*water*(.06+grazing*.16)*streak;
           float tail=0.;
@@ -282,7 +333,7 @@ export class Renderer {
             float glint=1.-smoothstep(.16,1.85,length(offset));
             c+=vec3(.55,.38,.18)*glint*glint*uStreetLights[i].w*water*grazing*(1.-daylight);
           }
-          c+=vec3(.31,.40,.50)*ripple*(.22+headlights*.31+daylight*.24)*(.30+pool*.70);
+          c+=vec3(.31,.40,.50)*ripple*(.22+headlights*.31+daylight*.24)*.44;
         }
         if(uVehicle>.5){vec3 view=normalize(uEye-vWorld),h=normalize(view+normalize(vec3(-.35,.85,.4)));float fresnel=pow(1.-abs(dot(n,view)),4.),shine=pow(max(0.,dot(n,h)),kind==4.?70.:100.);float visibility=mix(.075,1.,daylight)+headlights*.22;
          if(kind==2.||kind==8.||kind==7.||kind==4.)c+=vec3(.66,.80,1.)*(fresnel*(.18+uWet*.07)+shine*(.38+uWet*.24))*visibility;
@@ -296,13 +347,22 @@ export class Renderer {
     this.attrs={};for(const name of ['aPos','aNormal','aColor','aSurface'])this.attrs[name]=gl.getAttribLocation(this.program,name);
     this.uniforms={};for(const name of ['uCarSlope','uRivalSlope','uNetSlopes','uTerrain','uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uAtlas','uAtlasReady','uCourseSky','uCourseSkyReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
-    for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor','uWet','uWeatherTime'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor','uWet','uWeatherTime','uRoadEffects','uRoadEffectsReady'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     this.initAtlas();
     this.courseSkyTexture=gl.createTexture();
     gl.uniform1i(this.uniforms.uCourseSky,4);
+    gl.uniform1i(this.uniforms.uRoadEffects,5);
     gl.activeTexture(gl.TEXTURE4);
     gl.bindTexture(gl.TEXTURE_2D,this.courseSkyTexture);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    this.roadEffects=gl.createTexture();
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D,this.roadEffects);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
@@ -444,23 +504,51 @@ export class Renderer {
     const gl=this.gl,u=this.uniforms,mobile=w/h<.85,garage=mode==='garage',workshop=mode==='workshop',exhibition=mode==='menu';
     const dealership=mode==='shop'&&this.shopSection==='dealer',collection=mode==='collection',showroom=dealership||collection,indoors=garage||workshop||showroom;
     if(exhibition&&!this.menuModel){this.menuModel=new MenuModel(gl);this.menuModel.load().then(()=>{this.boundBuffer=null;});}
+    let garageModels;
+    if(garage||workshop){
+      this.garageModels??=new Map();
+      const load=(name,scale,offset)=>{
+        if(!this.garageModels.has(name)){
+          const model=new MenuModel(gl,sceneryModel(5,name),scale,offset);
+          this.garageModels.set(name,model);
+          model.load().then(()=>{this.boundBuffer=null;});
+        }
+        return this.garageModels.get(name);
+      };
+      const room=load(workshop?'garage_room_tuning':'garage_room_day',1.8);
+      const shared=GARAGE_FIXTURES.map(([name,scale,offset])=>load(name,scale,offset));
+      const equipment=workshop?WORKSHOP_FIXTURES.map(([name,scale,offset])=>load(name,scale,offset)):[];
+      if(room.status==='ready')garageModels=[room,...shared,...equipment];
+    }
     const drift=this.reducedMotion?.matches?0:Math.sin(this.time*.08)*.24;
     const zoom=collection?this.collectionZoom||1:1;
-    const eye=showroom?(mobile?[10.8,3.3,14]:[7.5,2.6,9.4]).map(value=>value/zoom):mobile?(workshop?[8.5,3.4,12.3]:exhibition?[8.5,3.5,15]:[9.5,3.8,13.8]):exhibition?[8.5+drift,2.9,11.7-drift]:[8.4+drift,2.65,10.8-drift];
-    const target=showroom?[0,.65,0]:mobile?(workshop?[0,.4,.3]:exhibition?[.4,1.6,1]:[-.2,1.8,.3]):exhibition?[-2,.85,1.35]:[workshop?2.5:garage?0:-3.1,.95,1.35];
+    const eye=garageModels?(mobile?[3.7,2.8,8.1]:[6.4+drift,2.8,7.5-drift]):showroom?(mobile?[10.8,3.3,14]:[7.5,2.6,9.4]).map(value=>value/zoom):mobile?(workshop?[8.5,3.4,12.3]:exhibition?[8.5,3.5,15]:[9.5,3.8,13.8]):exhibition?[8.5+drift,2.9,11.7-drift]:[8.4+drift,2.65,10.8-drift];
+    const target=garageModels?[0,1.15,0]:showroom?[0,.65,0]:mobile?(workshop?[0,.4,.3]:exhibition?[.4,1.6,1]:[-.2,1.8,.3]):exhibition?[-2,.85,1.35]:[workshop?2.5:garage?0:-3.1,.95,1.35];
     this.eye=eye;this.target=target;
-    const view=lookAt(eye,target),projection=perspective((mobile?49:38)*Math.PI/180,w/h,.15,4000);
+    const view=lookAt(eye,target),projection=perspective((garageModels?(mobile?64:47):(mobile?49:38))*Math.PI/180,w/h,.15,4000);
     gl.uniformMatrix4fv(u.uView,false,view);gl.uniformMatrix4fv(u.uProjection,false,projection);
     gl.uniform1f(u.uWet,0);gl.uniform3fv(u.uFog,[.39,.48,.58]);gl.uniform3fv(u.uEye,eye);gl.uniform1f(u.uDay,.9);gl.uniform1f(u.uTunnel,0);gl.uniform4fv(u['uStreetLights[0]'],new Float32Array(12));gl.uniform1f(u.uFogStart,240);gl.uniform1f(u.uFogEnd,1800);gl.uniform1f(u.uFogFromCar,0);
     gl.uniform3fv(u.uCar,[0,0,0]);gl.uniform2fv(u.uForward,[0,1]);gl.uniform1f(u.uHeadlights,1);gl.uniform1f(u.uRivalLights,0);
     gl.uniform4fv(u['uNetCars[0]'],new Float32Array(12));gl.uniform2fv(u['uNetForward[0]'],new Float32Array(6));gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,0);
     if(indoors){
-      const key=showroom?'dealerRoom':'garageRoom';
-      this[key]??=this.buildCarRoom(showroom);
-      this.draw(this[key]);
+      if(garageModels){
+        for(const model of garageModels){
+          const stats=model.draw(view,projection,eye);
+          this.stats.drawCalls+=stats.drawCalls;
+          this.stats.vertices+=stats.vertices;
+        }
+        gl.useProgram(this.program);
+        this.boundBuffer=null;
+        gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.activeTexture(gl.TEXTURE0);
+      }else{
+        const key=showroom?'dealerRoom':'garageRoom';
+        this[key]??=this.buildCarRoom(showroom);
+        this.draw(this[key]);
+      }
       const angle=collection?this.collectionAngle||0:dealership?.23:0;
-      this.draw(this.shadow,transform(0,0,0,angle),.4);
-      this.drawCar(this.car.id,transform(0,.035,0,angle),{headlights:false});
+      const floor=garageModels ? .446 : 0;
+      this.draw(this.shadow,transform(0,floor,0,angle),.4);
+      this.drawCar(this.car.id,transform(0,floor+.035,0,angle),{headlights:false});
       return;
     }
     gl.disable(gl.DEPTH_TEST);gl.depthMask(false);gl.uniform1f(u.uBackdrop,2);this.draw(this.menuSky);this.draw(this.moon,transform(-900,180,-1000,.73,1.65),.025);this.draw(this.moon,transform(-900,180,-1000,.73,1.25),.055);this.draw(this.moon,transform(-900,180,-1000,.73,.85));gl.uniform1f(u.uBackdrop,0);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
@@ -517,6 +605,9 @@ export class Renderer {
   setRival(rival){this.rival=rival;const key='rival-'+rival.id;if(!this.cars[key])this.cars[key]=meshCar(this.gl,rival.color,rival.car);}
   setTrack(track) {
     this.track=track;const gl=this.gl;
+    this.resetTireMarks();
+    if(this.puddleMesh)gl.deleteBuffer(this.puddleMesh.buffer);
+    this.puddleMesh=null;
     if(this.scene)gl.deleteBuffer(this.scene.buffer);if(this.backdrop)gl.deleteBuffer(this.backdrop.buffer);
     const g=new Geometry(),roadIndex=createRoadIndex(track);this.sceneryBounds=[];let seed=track.seed*11231;
     const spans=[];let spanStart=6,spanKind='road',sector=0,baseY=0;
@@ -526,13 +617,13 @@ export class Renderer {
     const point=(p,l,y=0)=>V(p.x+Math.cos(p.heading)*l,p.y+y+roadBankHeight(track,p.curve,l),p.z-Math.sin(p.heading)*l);
     const strip=(a,b,l1,l2,y,color)=>g.quad(point(a,l1,y),point(b,l1,y),point(b,l2,y),point(a,l2,y),color);
     const ground=createTerrainField(track,roadIndex);
-    const environment=this.environment=createEnvironment(track,g,roadIndex,this.sceneryBounds,{layer,ground});
     const water=['atami','tsubaki','odawara','manazuru','ashinoko'].includes(track.id);
     const minY=Math.min(...track.points.map(p=>p.y))-(water?12:35);
     const minX=Math.min(...track.points.map(p=>p.x))-1500,maxX=Math.max(...track.points.map(p=>p.x))+1500,minZ=Math.min(...track.points.map(p=>p.z))-1500,maxZ=Math.max(...track.points.map(p=>p.z))+1500;
     if(water)g.surface(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),TEXTURES.water,[[0,0],[0,40],[40,40],[40,0]]);else g.quad(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),'#22372d');
     ground.build(g,(id,y)=>{layer('terrain');sector=-id-1;baseY=y;},TEXTURES.grass);
     layer('road');sector=0;baseY=0;
+    const environment=this.environment=createEnvironment(track,g,roadIndex,this.sceneryBounds,{layer,ground});
     for(let i=0;i<(track.renderSegments??track.points.length-1);i++) {
       const a=track.points[i],b=track.points[i+1];layer('road');baseY=a.y;
       for(const side of [-1,1]){strip(a,b,side*5.3,side*6.05,-.015,'#747972');g.quad(point(a,side*6.05,-.015),point(b,side*6.05,-.015),point(b,side*6.05,-.48),point(a,side*6.05,-.48),'#5f655f');}
@@ -554,6 +645,14 @@ export class Renderer {
       if(i===(track.renderSegments?track.renderSegments-1:Math.floor(track.length/track.step)))for(let k=0;k<12;k++)strip(a,b,-5.2+k*.87,-5.2+(k+1)*.87,.04,k%2?'#d1d2bd':'#171f22');
       if((i+1)%Math.max(1,Math.round(96/track.step))===0)endChunk();
     }
+    this.spectatorSpots=this.findSpectatorSpots(track,ground,roadIndex,environment);
+    for(const spot of environment.landmarks){
+      const radius=spot.rotor?18:spot.radius;
+      spot.min=[spot.x-radius,spot.y-1,spot.z-radius];
+      spot.max=[spot.x+radius,spot.y+spot.height+(spot.rotor?16:0),spot.z+radius];
+      spot.matrix=transform(spot.x,spot.y,spot.z,spot.angle);
+      for(const [axis,scale] of spot.scale.entries())for(let row=0;row<3;row++)spot.matrix[axis*4+row]*=scale;
+    }
     endChunk();const chunks=packScene(g.data,spans);this.scene=g.upload(gl);this.scene.chunks=chunks;
     const bg=new Geometry();
     bg.box(0,100,0,2000,2000,2000,'#ffffff',[-30,-30]);
@@ -564,6 +663,234 @@ export class Renderer {
     if(['tsubaki','odawara','ashinoko','manazuru','atami'].includes(track.id))horizon('bg_mountain_fuji',650,-180,-1050,2,1.4,2);
     this.backdrop=bg.upload(gl);
     this.resetCamera=true;
+  }
+  findSpectatorSpots(track,ground,roadIndex,environment){
+    const spots=[];
+    const sections=[28,track.length-30,track.length*.32,track.length*.67];
+    for(const [section,target] of sections.entries()){
+      let spot;
+      const offsets=[0,-12,12,-24,24,-42,42,-64,64,-92,92,-120,120];
+      if(section>=2)offsets.push(-160,160,-220,220);
+      for(const offset of offsets){
+        const s=clamp(target+offset,10,track.length-10);
+        if(environment.tunnels.some(t=>s>t.start-12&&s<t.end+12))continue;
+        const preferred=section%2?1:-1;
+        search: for(const reach of section<2?[5.7,2.35]:[2.35])for(const distance of [8.7,10.5,12.3])for(const side of [preferred,-preferred]){
+          const p=worldAt(track,s,side*distance),angle=p.heading-side*Math.PI/2;
+          const cos=Math.cos(angle),sin=Math.sin(angle);
+          if(environment.props.some(prop=>{
+            if(!prop.solid||Math.abs(prop.y-p.y)>3.5)return false;
+            const dx=prop.x-p.x,dz=prop.z-p.z;
+            if(Math.abs(dx)>reach+2.5+prop.radius||Math.abs(dz)>reach+2.5+prop.radius)return false;
+            const across=Math.max(0,Math.abs(dx*cos-dz*sin)-reach);
+            const depth=Math.max(0,Math.abs(dx*sin+dz*cos+.35)-1.75);
+            return across*across+depth*depth<(prop.radius+.4)**2;
+          }))continue;
+          const corners=[[0,0],[-reach,-2.1],[-reach,1.4],[reach,-2.1],[reach,1.4]];
+          const heights=corners.map(([a,b])=>{
+            const x=p.x+a*cos+b*sin,z=p.z-a*sin+b*cos;
+            if(roadIndex.distance(x,z,15)<6.2)return NaN;
+            return ground.groundAt(x,z)??ground.heightAt(x,z);
+          });
+          if(heights.some(y=>!Number.isFinite(y)||Math.abs(y-p.y)>3.1||y<=(ground.waterHeight??-Infinity)+.1))continue;
+          const [center,backLeft,frontLeft,backRight,frontRight]=heights;
+          const along=(backRight+frontRight-backLeft-frontLeft)/(4*reach);
+          const across=(frontLeft+frontRight-backLeft-backRight)/7;
+          if(Math.hypot(along,across)>.5||corners.some(([x,z],i)=>Math.abs(heights[i]-center-x*along-z*across)>.35))continue;
+          if(spots.some(other=>Math.hypot(other.x-p.x,other.z-p.z)<14))continue;
+          const y=center-.10,model=transform(p.x,y,p.z,angle);
+          model[1]=along;model[9]=across;
+          spot={...p,y,model,min:[p.x-reach-2,Math.min(...heights)-.3,p.z-reach-2],max:[p.x+reach+2,Math.max(...heights)+3,p.z+reach+2],section,roomForRainRow:reach>3};
+          break search;
+        }
+        if(spot)break;
+      }
+      if(spot)spots.push(spot);
+    }
+    return spots;
+  }
+  spectatorMesh(name){
+    this.spectatorMeshes??=new Map();
+    if(!this.spectatorMeshes.has(name)){
+      const entry={};
+      this.spectatorMeshes.set(name,entry);
+      const url=sceneryModel(4,name);
+      fetch(url).then(response=>{
+        if(!response.ok)throw Error('No se pudo cargar el público');
+        return response.arrayBuffer();
+      }).then(buffer=>{
+        const model=parseMenuModel(buffer,{assetUrl:url,worldScale:1});
+        const geometry=new Geometry();
+        for(const batch of model.batches){
+          const material=model.materials[batch.material]?.pbrMetallicRoughness;
+          const color=(material?.baseColorFactor||[1,1,1]).slice(0,3).map(v=>v**.65);
+          for(let i=0;i<batch.data.length;i+=8){
+            geometry.data.push(...batch.data.subarray(i,i+6),...color,0,0,0,-1,-1);
+          }
+        }
+        entry.mesh=geometry.upload(this.gl);
+        this.boundBuffer=null;
+      }).catch(error=>{entry.error=error.message;});
+    }
+    return this.spectatorMeshes.get(name).mesh;
+  }
+  drawSpectators(view,projection,eye,far,wet){
+    if(!this.spectatorSpots?.length)return;
+    const planes=this.culling===false||!this.scene.chunks?viewPlanes(view,projection,this.planes):this.planes;
+    for(const spot of this.spectatorSpots||[]){
+      if(!chunkVisible(spot,planes,eye,Math.min(far,115)))continue;
+      const name=wet&&spot.roomForRainRow?'crowd_rain_row':spot.section%2?'crowd_fans_group_a':'crowd_fans_group_b';
+      this.draw(this.spectatorMesh(name),spot.model);
+    }
+  }
+  drawRouteLandmarks(view,projection,eye,weather){
+    const spots=this.environment.landmarks;
+    if(!spots.length)return;
+    const gl=this.gl,planes=this.culling===false?viewPlanes(view,projection,this.planes):this.planes;
+    this.routeModels??=new Map();
+    let changedProgram=false;
+    const draw=(file,matrix,portal=false)=>{
+      if(!this.routeModels.has(file)){
+        const model=new MenuModel(gl,landmarkUrl(file),1,undefined,{preserveHeight:true,omitGround:portal});
+        this.routeModels.set(file,model);
+        model.load().then(()=>{this.boundBuffer=null;});
+      }
+      const model=this.routeModels.get(file);
+      if(model.status!=='ready')return;
+      const stats=model.draw(view,projection,eye,matrix,weather);
+      this.stats.drawCalls+=stats.drawCalls;
+      this.stats.vertices+=stats.vertices;
+      changedProgram=true;
+    };
+    for(const spot of spots){
+      if(!chunkVisible(spot,planes,weather.origin,Math.min(weather.far,spot.height>10?330:180)))continue;
+      draw(spot.file,spot.matrix,spot.portal);
+      if(spot.rotor){
+        const {x,y,z,angle}=spot;
+        const rotor=transform(x+Math.sin(angle)*2.5,y+30.6,z+Math.cos(angle)*2.5,angle);
+        const phase=this.reducedMotion?.matches?0:this.time*.54,cos=Math.cos(phase),sin=Math.sin(phase);
+        const rx=rotor[0],rz=rotor[2];
+        rotor[0]=rx*cos;rotor[1]=sin;rotor[2]=rz*cos;
+        rotor[4]=-rx*sin;rotor[5]=cos;rotor[6]=-rz*sin;
+        draw(TURBINE_ROTOR,rotor);
+      }
+    }
+    if(changedProgram){
+      gl.useProgram(this.program);
+      this.boundBuffer=null;
+      gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.activeTexture(gl.TEXTURE0);
+    }
+  }
+  drawPuddles(eye,far){
+    if(!this.puddleAssetRequest){
+      this.puddleAssetRequest=Promise.all(['a','b','c'].map(async suffix=>{
+        const assetUrl=sceneryModel(4,'puddle_'+suffix);
+        const response=await fetch(assetUrl);
+        if(!response.ok)throw Error('No se pudo cargar el charco');
+        return parseMenuModel(await response.arrayBuffer(),{assetUrl,worldScale:1});
+      })).then(shapes=>{this.puddleShapes=shapes;}).catch(error=>{this.puddleAssetError=error.message;});
+    }
+    if(!this.puddleShapes||!this.roadEffectsLoaded)return;
+    if(!this.puddleMesh)this.buildPuddleMesh();
+    const {chunks}=this.puddleMesh,gl=this.gl;
+    gl.depthMask(false);
+    for(const chunk of chunks){
+      if(chunkVisible(chunk,this.planes,eye,Math.min(far,120))){
+        this.draw(this.puddleMesh,IDENTITY,1,chunk.first,chunk.count);
+      }
+    }
+    gl.depthMask(true);
+  }
+  buildPuddleMesh(){
+    const {track,environment}=this,geometry=new Geometry(),chunks=[];
+    // Widely spaced pools follow road level and collect along the low shoulder.
+    for(let s=49,index=0;s<track.length-25;s+=87+(index*31)%68,index++){
+      if(environment.tunnels.some(t=>s>t.start-9&&s<t.end+9))continue;
+      const [here,before,after]=[s,s-4,s+4].map(at=>sample(track,at));
+      if(Math.abs(here.curve)>.023||Math.abs(after.y-before.y)>1.7)continue;
+      const shape=this.puddleShapes[index%3],side=Math.abs(here.curve)>.005?Math.sign(here.curve):(index%2?1:-1);
+      const lateral=side*(3.65+(index%3)*.10);
+      const center=visualRoadPose(track,s,lateral),first=geometry.data.length/14;
+      const grade=(after.y-before.y)/8,bank=roadBankHeight(track,here.curve,lateral)/lateral;
+      const dx=Math.sin(center.heading),dz=Math.cos(center.heading);
+      const normal=norm([-grade*dx-bank*dz,1,-grade*dz+bank*dx]);
+      const width=Math.max(-shape.sourceBounds.min[0],shape.sourceBounds.max[0]);
+      for(const {data} of shape.batches)for(let i=0;i<data.length;i+=8){
+        const x=data[i],z=data[i+2],edge=Math.hypot(x,z)<.001?1:0;
+        const p=visualRoadPose(track,s+z*(1.12+index%3*.15),lateral+x*(1.18/width));
+        geometry.data.push(p.x,p.y+.027,p.z,...normal,1,1,1,edge,0,0,-31,-31);
+      }
+      chunks.push({min:[center.x-5,center.y-1,center.z-5],max:[center.x+5,center.y+1,center.z+5],first,count:geometry.data.length/14-first});
+    }
+    this.puddleMesh=geometry.upload(this.gl);
+    this.puddleMesh.chunks=chunks;
+    this.boundBuffer=null;
+  }
+  loadRoadEffects(){
+    if(this.roadEffectsImage)return;
+    const gl=this.gl,img=this.roadEffectsImage=new Image();
+    img.onload=()=>{
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D,this.roadEffects);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+      gl.activeTexture(gl.TEXTURE0);
+      this.roadEffectsLoaded=true;
+    };
+    img.src=new URL('../assets/environment/road-effects.png',import.meta.url).href;
+  }
+  resetTireMarks(){
+    this.skidIndex=0;
+    this.skidCount=0;
+    this.previousTires?.clear();
+  }
+  updateTireMarks(race){
+    if(race.countdown>0){this.resetTireMarks();return;}
+    this.previousTires??=new Map();
+    this.recordTireMarks('player',race,race.wet);
+    if(race.rival&&race.mode!=='time'&&race.eventKind!=='trial'&&race.eventKind!=='grid'){
+      this.recordTireMarks('rival',{
+        s:race.rivalS,lateral:race.rivalLateral,speed:race.rivalSpeed,
+        drift:race.rivalDrift,slipAngle:race.rivalSlip,braking:race.rivalBraking,car:race.opponent?.car
+      },race.wet,race.s);
+    }
+    for(const other of race.netOpponents||[])this.recordTireMarks(other.id,other,race.wet,race.s);
+  }
+  recordTireMarks(id,race,wet,near=race.s){
+    const slipping=Math.abs(race.slipAngle||0)>.16||race.drift>.22;
+    if(!(race.speed>=9)||Math.abs(race.s-near)>75||Math.abs(race.lateral)>4.15||!(race.braking||race.handbrakeDown||slipping)){
+      this.previousTires.delete(id);
+      return;
+    }
+    const current={s:race.s-1.2,lateral:race.lateral,resetId:race.resetId};
+    const previous=this.previousTires.get(id);
+    if(!previous||previous.resetId!==current.resetId||current.s<previous.s||current.s-previous.s>7||Math.abs(current.lateral-previous.lateral)>2){
+      this.previousTires.set(id,current);
+      return;
+    }
+    if(current.s-previous.s<.65)return;
+    this.previousTires.set(id,current);
+    const gl=this.gl,geometry=new Geometry();
+    const at=(pose,lateral)=>{
+      const p=visualRoadPose(this.track,pose.s,pose.lateral+lateral);
+      return V(p.x,p.y+.018,p.z);
+    };
+    const strength=wet?.7:slipping||race.handbrakeDown?.8:.59;
+    for(const side of [-1,1]){
+      const wheel=side*(race.car?.width||1.75)*.42,half=wet?.18:.14;
+      geometry.surface(at(previous,wheel-half),at(previous,wheel+half),at(current,wheel+half),at(current,wheel-half),
+        -32,[[0,.2],[1,.2],[1,.8],[0,.8]],[0,0,0,strength]);
+    }
+    if(!this.skidMesh){
+      this.skidMesh={buffer:gl.createBuffer(),count:0};
+      gl.bindBuffer(gl.ARRAY_BUFFER,this.skidMesh.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER,SKID_SEGMENTS*SKID_BYTES,gl.DYNAMIC_DRAW);
+    }else gl.bindBuffer(gl.ARRAY_BUFFER,this.skidMesh.buffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER,this.skidIndex*SKID_BYTES,new Float32Array(geometry.data));
+    this.boundBuffer=null;
+    this.skidIndex=(this.skidIndex+1)%SKID_SEGMENTS;
+    this.skidCount=Math.min(this.skidCount+1,SKID_SEGMENTS);
+    this.skidMesh.count=this.skidCount*SKID_VERTICES;
   }
   draw(mesh,model=IDENTITY,alpha=1,first=0,count=mesh?.count) {if(!mesh)return;const gl=this.gl,u=this.uniforms;if(this.boundBuffer!==mesh.buffer){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);const a=this.attrs;gl.enableVertexAttribArray(a.aPos);gl.vertexAttribPointer(a.aPos,3,gl.FLOAT,false,56,0);gl.enableVertexAttribArray(a.aNormal);gl.vertexAttribPointer(a.aNormal,3,gl.FLOAT,false,56,12);gl.enableVertexAttribArray(a.aColor);gl.vertexAttribPointer(a.aColor,4,gl.FLOAT,false,56,24);gl.enableVertexAttribArray(a.aSurface);gl.vertexAttribPointer(a.aSurface,4,gl.FLOAT,false,56,40);this.boundBuffer=mesh.buffer;}gl.uniformMatrix4fv(u.uModel,false,model);gl.uniform1f(u.uAlpha,alpha);gl.drawArrays(gl.TRIANGLES,first,count);if(this.stats){this.stats.drawCalls++;this.stats.vertices+=count;}}
   drawScene(view,projection,origin,far){
@@ -607,6 +934,14 @@ export class Renderer {
     gl.uniform1f(u.uCourseSkyReady,this.courseSkyLoaded?1:0);
     gl.uniform1f(u.uBackdrop,1);this.draw(this.backdrop,transform(eye[0],eye[1]-100,eye[2]));gl.uniform1f(u.uBackdrop,0);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2);
+    const car=[p.x,p.y,p.z];
+    this.drawRouteLandmarks(view,projection,eye,{fog:sky,origin:visibility.fromCar?car:eye,car,
+      forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0});
+    this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
+    if(racing&&race?.wet)this.drawPuddles(eye,visibility.far);
+    if(racing&&this.skidCount&&this.roadEffectsLoaded){
+      gl.depthMask(false);this.draw(this.skidMesh);gl.depthMask(true);
+    }
     if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.drawCar(this.car.id,transform(p.x,p.y+.04,p.z,angle),{s:race?.s||0,steer:race?.steer,headlights:!racing||race.headlights});if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
     gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,race?.rivalBraking?1:0);
     if(rival){this.draw(this.shadow,transform(rival.x,rival.y,rival.z,ra),.4);this.drawCar('rival-'+race.rival.id,transform(rival.x,rival.y+.04,rival.z,ra),{s:race.rivalS,steer:race.rivalSteer});this.drawBoss(race,rival,ra);}
@@ -655,6 +990,9 @@ export class Renderer {
     const day=options.day?1:0,sky=raceVisibility(racing?race:null,day).color;
     gl.clearColor(...sky,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.uniform1i(u.uAtlas,1);gl.uniform1f(u.uAtlasReady,this.atlasLoaded?1:0);gl.activeTexture(gl.TEXTURE0);
     if(!racing&&mode!=='title'){this.renderMenu(mode,w,h);return;}
+    if(racing)this.loadRoadEffects();
+    if(mode==='race')this.updateTireMarks(race);
+    gl.uniform1f(u.uRoadEffectsReady,this.roadEffectsLoaded?1:0);
     const s=racing?race.s:340+(this.time*32)%Math.max(100,this.track.length-750),lat=racing?race.lateral:-1.7,p=visualRoadPose(this.track,s,lat),angle=p.heading+(racing?race.yaw:Math.sin(this.time*.5)*.025);
     let eye,target,driverPose,driverUp,cabinFov;
     if(shot){

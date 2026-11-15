@@ -10,7 +10,7 @@ import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {MediaLibrary} from './media.mjs';
 import {CAMPAIGN_CHAPTERS,CAMPAIGN_STAGES,CAMPAIGN_SEASONS,seasonStageId} from '../js/campaign.mjs';
-import {campaignEvents,CAMPAIGN_CHESTS,trialTime} from '../js/campaign-events.mjs';
+import {campaignEvents,CAMPAIGN_CHESTS} from '../js/campaign-events.mjs';
 import {EXPANSION_TRACKS,COURSE_REFERENCE_ROOT} from '../js/expansion-courses.mjs';
 import {ALL_CARS,ALL_TRACKS} from '../js/sim.mjs';
 import {CAMPAIGN_WORLDS} from '../js/campaign-worlds.mjs';
@@ -130,9 +130,9 @@ export class Accounts {
             media.portrait=customPortrait||media.portrait;
             media.driverPortrait=customPortrait||supplied||campaignMedia.stages[base]?.portrait||campaignMedia.stages[related]?.portrait||null;
             const carInfo=driver=>ALL_CARS.find(c=>c.id===driver.car);
-            return {...stage,media,carInfo:carInfo(stage),
-              ...(stage.kind==='trial'?{targetTime:trialTime(stage,ALL_TRACKS.find(t=>t.id===stage.track).length)}:{}),
-              ...(stage.kind==='grid'?{rivals:stage.rivals.map(driver=>({...driver,carInfo:carInfo(driver),portrait:media.portraits[driver.id]||campaignMedia.stages[driver.id]?.portrait}))}:{})};
+            return {...(stage.kind==='duel'?this.runs.targets.rival(stage):stage),media,carInfo:carInfo(stage),
+              ...(stage.kind==='trial'?{targetTime:this.runs.targets.trial(stage,ALL_TRACKS.find(t=>t.id===stage.track).length)}:{}),
+              ...(stage.kind==='grid'?{rivals:stage.rivals.map(driver=>({...this.runs.targets.rival(stage,driver),carInfo:carInfo(driver),portrait:media.portraits[driver.id]||campaignMedia.stages[driver.id]?.portrait}))}:{})};
           }));
           const stories=await Promise.all(CAMPAIGN_WORLDS.map(async world=>[world.id,await this.media.chapterMedia({
             ...world,world:true,season:alternate,fallback:worldStory(world.id,season.id)

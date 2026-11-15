@@ -41,6 +41,15 @@ function paceFor(track,rival,wet){
 }
 export function rivalLevel(rival){return Math.max(1,Math.min(5,Math.round(rival.level||3)));}
 export function rivalStyle(rival){return AI_STYLES[rival.style]?rival.style:'Complete';}
+const timedCarProfiles={
+  Grip:{profile:'power',accel:19.2,max:80,grip:1.09,brakePower:1.34},
+  Complete:{profile:'balanced',accel:17.5,max:74,grip:1.15,brakePower:1.19},
+  Skiller:{profile:'agile',accel:16,max:69,grip:1.27,brakePower:1.10}
+};
+export function timedRivalCar(rival){
+  if(!Number.isFinite(rival.targetTimeSec))return null;
+  return {...timedCarProfiles[rivalStyle(rival)],wheelbase:2.46,aiWetGripRetention:.96};
+}
 export const PASSING=Object.freeze({clearance:CONTACT.width+.72,minimumClearance:CONTACT.width+.37,mergeGap:11,followingGap:8,laneLimit:3.6,laneRate:2.4});
 export const TRAFFIC_LEVELS=Object.freeze([
   null,
@@ -135,12 +144,13 @@ export function planRivalTraffic(r,o,dt,normalLine,target,{sample,clamp}){
 export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,steeringAlignment,clamp}){
   o.aiDriver??=createAIDriver(r.rival);
   const driver=o.aiDriver,styleName=driver.style,style=AI_STYLES[styleName],level=AI_LEVELS[driver.level],v=o.speed,p=sample(o.track,o.s);
-  const boost=driver.counter;
+  const boost=driver.counter,timed=Number.isFinite(r.rival.targetPaceFactor);
   if(!driver.route||driver.routeBoost!==boost){
     const car=boost?{...o.car,max:o.car.max*boost.topSpeed,accel:o.car.accel*boost.acceleration,grip:o.car.grip*boost.grip,brakePower:(o.car.brakePower||1)*boost.braking}:o.car;
-    driver.route=rivalRoute(o.track,car,r.rival,o.wet);driver.routeBoost=boost;
+    driver.route=rivalRoute(o.track,car,timed?{style:styleName,level:5}:r.rival,o.wet);driver.routeBoost=boost;
   }
-  const route=driver.route,ref=routeSample(route,o.s),draft=draftSpeedMultiplier(o),paceLimit=paceFor(o.track,r.rival,o.wet)*(r.rival.gridPace||1);
+  const route=driver.route,ref=routeSample(route,o.s),draft=draftSpeedMultiplier(o);
+  const paceLimit=timed?r.rival.targetPaceFactor:paceFor(o.track,r.rival,o.wet)*(r.rival.gridPace||1);
   const routeSpeed=ref.speed*paceLimit;
   const plan=planRivalTraffic(r,o,dt,ref.line,routeSpeed*(ref.phase==='straight'?draft:1),{sample,clamp});
   const grip=lateralGrip(o.car,o.wet)*(boost?.grip||1),followingRoute=!plan.maneuver;
@@ -162,7 +172,7 @@ export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,steeringAlig
   // The feed-forward command is the road plan's acceleration, not the
   // derivative of traffic corrections, draft or steering error.
   const error=target-v;
-  const profileAcceleration=target<routeSpeed-1.2&&ref.acceleration>0?0:ref.acceleration*(ref.acceleration<0?paceLimit*paceLimit:1);
+  const profileAcceleration=target<routeSpeed-1.2&&ref.acceleration>0?0:ref.acceleration*(timed||ref.acceleration<0?paceLimit*paceLimit:1);
   const pace=profileAcceleration<0?profileAcceleration*clamp(1-error/1.5,0,1):profileAcceleration;
   const drag=.00048*v*v*(1-(o.draft?.strength||0)*SLIPSTREAM.dragReduction);
   const coast=-1.05-drag-o.understeer*3.2-(Math.abs(o.slipAngle)*v*.10+o.drift*1.2)*.7;
@@ -193,6 +203,6 @@ export function driveRival(r,o,dt,{sample,lateralGrip,steeringAngle,steeringAlig
   const previewRate=corner*v*(plan.maneuver?Math.cos(o.travelYaw)/clamp(1-corner*o.lateral,.65,1.35):1);
   const travelRate=previewRate+(desiredTravel-o.travelYaw)*(level.response+.35);
   const desiredBody=o.travelYaw+travelRate/alignment+(driver?.slip||0);
-  const bodyRate=previewRate+(desiredBody-o.yaw)*9+driver.slipRate*.75,wheelbase=o.car.id==='r32'?2.62:o.car.id==='rx7'?2.43:2.4;
+  const bodyRate=previewRate+(desiredBody-o.yaw)*9+driver.slipRate*.75,wheelbase=o.car.wheelbase??(o.car.id==='r32'?2.62:o.car.id==='rx7'?2.43:2.4);
   return {steer:-clamp(Math.atan(bodyRate*wheelbase/Math.max(2,v))/steeringAngle(v),-1,1),throttle,brake,handbrake:false};
 }

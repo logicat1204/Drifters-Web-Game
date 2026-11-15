@@ -124,7 +124,7 @@ def puddle(name,seed,r=1.6,sq=.6):
     m=M(); m.mat('p',(.02,.03,.05,1),metal=1.0,rough=.03); rg=np.random.default_rng(seed); n=18; pts=[]
     for i in range(n):
         a=i/n*2*math.pi; k=1+rg.uniform(-.28,.28)+.18*math.sin(3*a+seed); pts.append((math.cos(a)*r*k,.015,math.sin(a)*r*k*sq))
-    for i in range(n): quadup(m,'p',(0,.015,0),pts[i],pts[(i+1)%n],pts[(i+1)%n],((0,0),(1,0),(1,1),(1,1))) if False else tri(m,'p',(0,.015,0),pts[(i+1)%n],pts[i],out=(0,5,0))
+    for i in range(n): quadup(m,'p',(0,.015,0),pts[i],pts[(i+1)%n],pts[(i+1)%n],((0,0),(1,0),(1,1),(1,1))) if False else tri(m,'p',(0,.015,0),pts[(i+1)%n],pts[i],out=(0,-5,0))
     save(m,name)
 puddle('puddle_a',1,1.4,.6); puddle('puddle_b',2,2.4,.5); puddle('puddle_c',3,3.4,.7)
 def wet_plane(name,tex,mr_,w,l,uv):

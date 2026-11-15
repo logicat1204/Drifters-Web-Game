@@ -1,0 +1,7 @@
+{
+  "style": "Balance",
+  "targetTimeSec": {
+    "dry": 365,
+    "ngplus": 352
+  }
+}

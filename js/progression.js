@@ -9,6 +9,10 @@ import {CAMPAIGN_WORLDS,INITIAL_D_REGIONS,WORLD_DESTINATIONS} from './campaign-w
 const $=id=>document.getElementById(id);
 const node=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e;};
 const duration=seconds=>Math.floor(seconds/60)+':'+String(Math.floor(seconds%60)).padStart(2,'0');
+const targetDuration=seconds=>{
+  const centiseconds=Math.round(seconds*100);
+  return duration(centiseconds/100)+(centiseconds%100?'.'+String(centiseconds%100).padStart(2,'0'):'');
+};
 const portrait=(src,alt,cls)=>{const img=node('img',cls);img.src=src;img.alt=alt;img.loading='lazy';return img;};
 export class ProgressionClient {
   constructor(account,callbacks){
@@ -147,6 +151,19 @@ export class ProgressionClient {
     else if(this.view==='world-map')this.renderWorlds();
     else{this.view=null;this.callbacks.screen('play');}
   }
+  returnToRegion(id){
+    const stage=this.catalog?.stages.find(item=>item.id===id);
+    if(!stage)return;
+    this.chapter=this.destination=stage.chapter;
+    const chest=this.season==='dry'&&this.rootCatalog.chests.find(item=>
+      item.chapter===stage.chapter&&chestAvailable(item,this.cleared())&&!this.user.campaignChests?.includes(item.id));
+    this.selected=chest?chest.id:stage.id;
+    this.callbacks.screen('campaign');
+    this.campaignView('region');
+    this.renderCampaign();
+    $('campaign').scrollTop=0;
+    $('campaign-stages').querySelector('.selected')?.focus({preventScroll:true});
+  }
   renderCampaign(){
     if(!this.catalog||!this.user||this.view!=='region')return;
     const cleared=this.cleared(),chapter=this.catalog.chapters.find(c=>c.id===this.chapter);
@@ -197,7 +214,7 @@ export class ProgressionClient {
       if(stage.signature){const signature=node('div','boss-signature');signature.append(node('b','',stage.signature.name),node('p','',stage.signature.description));copy.append(signature);}
     }else{
       copy.append(node('small','eyebrow',stage.kind==='trial'?'CLASIFICACIÓN':'PARRILLA · '+stage.laps+(stage.laps===1?' VUELTA':' VUELTAS')),node('h2','',stage.name));
-      if(stage.kind==='trial')copy.append(node('p','campaign-model','Marca de clasificación · '+duration(stage.targetTime)),
+      if(stage.kind==='trial')copy.append(node('p','campaign-model','Marca de clasificación · '+targetDuration(stage.targetTime)),
         node('p','','Cruza la meta en ese tiempo o menos para desbloquear el próximo evento.'));
       else {
         copy.append(node('p','','Termina en primer lugar para avanzar.'));

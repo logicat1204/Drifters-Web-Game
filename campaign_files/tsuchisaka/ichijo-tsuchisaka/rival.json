@@ -1,0 +1,8 @@
+{
+  "style": "Balance",
+  "targetTimeSec": {
+    "dry": 183,
+    "rain": 201,
+    "ngplus": 185
+  }
+}

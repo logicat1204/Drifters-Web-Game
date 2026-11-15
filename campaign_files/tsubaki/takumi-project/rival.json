@@ -1,0 +1,8 @@
+{
+  "style": "Skiller",
+  "targetTimeSec": {
+    "dry": 228,
+    "rain": 231,
+    "ngplus": 215
+  }
+}

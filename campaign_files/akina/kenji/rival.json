@@ -1,0 +1,8 @@
+{
+  "style": "Grip",
+  "targetTimeSec": {
+    "dry": 270,
+    "rain": 282,
+    "ngplus": 208
+  }
+}

@@ -1,15 +1,21 @@
 import {randomUUID} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
-import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,createRace,makeTrack,updateRace,repositionRace} from '../js/sim.mjs';
+import {ALL_CARS as CARS,ALL_TRACKS as TRACKS,campaignRivalStart,createRace,makeTrack,updateRace,repositionRace} from '../js/sim.mjs';
 import {activateFocus} from '../js/focus.mjs';
 import {campaignStage,stageAvailable,CAMPAIGN_CHAPTERS,campaignConditions} from '../js/campaign.mjs';
-import {campaignEvent,eventAvailable,trialTime} from '../js/campaign-events.mjs';
+import {campaignEvent,eventAvailable} from '../js/campaign-events.mjs';
 import {stockBuild,campaignPreparationIssue} from '../js/tuning.mjs';
+import {CampaignTargets} from './campaign-targets.mjs';
+import {calibrateRival,calibrationTrack} from './rival-calibration.mjs';
 export class Runs {
-  constructor(store,{now=()=>Date.now()}={}){this.store=store;this.now=now;this.pending=new Map();this.busy=0;}
+  constructor(store,{now=()=>Date.now(),targets=new CampaignTargets()}={}){this.store=store;this.now=now;this.targets=targets;this.pending=new Map();this.starting=new Set();this.busy=0;}
   start(userId,data){
+    if(this.starting.has(userId))throw Object.assign(Error('Se está preparando tu carrera.'),{status:409});
     const user=this.store.user(userId);
-    return this.store.remote?user.then(pilot=>this.prepareStart(userId,data,pilot)):this.prepareStart(userId,data,user);
+    const attempt=this.store.remote?user.then(pilot=>this.prepareStart(userId,data,pilot)):this.prepareStart(userId,data,user);
+    if(!(attempt instanceof Promise))return attempt;
+    this.starting.add(userId);
+    return attempt.finally(()=>this.starting.delete(userId));
   }
   prepareStart(userId,data,user){
     for(const [id,run] of this.pending)if(this.now()-run.created>2*60*60*1000)this.pending.delete(id);
@@ -23,12 +29,26 @@ export class Runs {
     if(preparationIssue)throw Error(preparationIssue);
     const chapter=stage?CAMPAIGN_CHAPTERS.find(c=>c.id===stage.chapter):null;
     const conditions=stage?campaignConditions(stage):null,rematch=!!conditions?.rematch;
-    const driver=rival=>({...rival,code:CARS.find(c=>c.id===rival.car).code});
-    const raceEvent=stage?.kind==='trial'?{targetTime:trialTime(stage,track.length)}:
-      stage?.kind==='grid'?{rivals:stage.rivals.map(driver),laps:stage.laps}:{rival:stage?driver(stage):undefined};
-    const options={build:user.garage[car.id]?.build||stockBuild(),mode:data.mode,manual:data.manual===true,wet:stage?conditions.wet:data.wet===true,night:stage?conditions.night:data.night!==false,focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType),
-      ...(stage?{campaignStage:stage.id,rematch,fog:!!chapter.fog,eventKind:stage.kind,campaignRules:eventRules,...raceEvent}:{})},id=randomUUID();
-    this.pending.set(id,{userId,car,track,options,created:this.now(),busy:false});return {id,track:track.id,options};
+    const driver=(rival,index)=>{
+      const details={...(eventRules?this.targets.rival(stage,rival):rival),code:CARS.find(c=>c.id===rival.car).code};
+      if(details.targetTimeSec==null)return details;
+      const {s,lateral}=campaignRivalStart(index);
+      return calibrateRival(calibrationTrack(track),details,{wet:conditions.wet,laps:stage.laps||1,startS:s,lane:lateral});
+    };
+    const register=raceEvent=>{
+      const options={build:user.garage[car.id]?.build||stockBuild(),mode:data.mode,manual:data.manual===true,wet:stage?conditions.wet:data.wet===true,night:stage?conditions.night:data.night!==false,focusType:user.focusType,focusEnabled:user.focusUnlocked.includes(user.focusType),
+        ...(stage?{campaignStage:stage.id,rematch,fog:!!chapter.fog,eventKind:stage.kind,campaignRules:eventRules,...raceEvent}:{})},id=randomUUID();
+      this.pending.set(id,{userId,car,track,options,created:this.now(),busy:false});return {id,track:track.id,options};
+    };
+    if(!stage)return register({});
+    if(stage.kind==='trial')return register({targetTime:this.targets.trial(stage,track.length)});
+    if(stage.kind==='grid'){
+      const rivals=stage.rivals.map(driver);
+      const grid=resolved=>register({rivals:resolved,laps:stage.laps});
+      return rivals.some(rival=>rival instanceof Promise)?Promise.all(rivals).then(grid):grid(rivals);
+    }
+    const rival=driver(stage);
+    return rival instanceof Promise?rival.then(resolved=>register({rival:resolved})):register({rival});
   }
   async submit(userId,id,frames){
     const existing=await this.store.runResult(id,userId);if(existing)return existing;

@@ -4,7 +4,7 @@ import {FOCUS,focusType,createFocus,cancelFocus,updateFocus} from './focus.mjs';
 import {EXTRA_CARS} from './vehicles.mjs';
 import {CAMPAIGN_TRACKS} from './campaign.mjs';
 import {createBossState,updateBossState} from './bosses.mjs';
-import {driveRival,createAIDriver,rivalLevel,rivalStyle} from './rival-ai.mjs';
+import {driveRival,createAIDriver,rivalLevel,rivalStyle,timedRivalCar} from './rival-ai.mjs';
 import {createDraft,clearDraft,updateSlipstream,draftSpeedMultiplier,SLIPSTREAM,vehiclePose,resolveVehicleContact} from './traffic.mjs';
 import {applyBuild} from './tuning.mjs';
 import {AUTHORED_COURSES as TRACED_COURSES} from './authored-courses.mjs';
@@ -101,6 +101,9 @@ export function worldAt(track, s, lateral = 0) {
   p.x += Math.cos(p.heading) * lateral; p.z -= Math.sin(p.heading) * lateral;
   return p;
 }
+export function campaignRivalStart(gridIndex){
+  return gridIndex===undefined?{s:24,lateral:1.25}:{s:gridIndex<2?22:12,lateral:gridIndex%2===0?1.7:-1.7};
+}
 export function createRace(car, track, opts = {}) {
   if(opts.build)car=applyBuild(car,opts.build);
   const mode=opts.mode||'battle',rival=opts.rival||RIVALS[track.rival];
@@ -111,15 +114,21 @@ export function createRace(car, track, opts = {}) {
     race.boss=null;race.place=opts.rivals.length+1;race.fieldSize=race.place;
     race.grid=opts.rivals.map((driver,index)=>{
       const opponent=createRace(rivalCar(driver),track,{mode:'time',rival:driver,wet:race.wet,night:race.night,focusEnabled:false,aiDriver:driver,laps});
-      return Object.assign(opponent,{s:index<2?22:12,lateral:index%2===0?1.7:-1.7,countdown:0,timeLeft:10000});
+      return Object.assign(opponent,campaignRivalStart(index),{countdown:0,timeLeft:10000});
     });
     race.netOpponents=race.grid.map(gridPose);
+  }
+  if(mode==='campaign'&&opts.eventKind!=='trial'){
+    const times=(opts.rivals||[rival]).map(driver=>driver.estimatedTimeSec??driver.targetTimeSec??0);
+    if(times.some(Boolean))race.timeLeft=Math.max(race.timeLeft,Math.min(830,Math.max(...times)+30));
   }
   return race;
 }
 function gridPose(o){return {...vehiclePose(o),id:'grid-'+o.rival.id,carId:o.car.id,steer:o.steer,headlights:o.headlights,braking:o.braking,drift:o.drift,slipAngle:o.slipAngle};}
 export function rivalCar(rival){
  const base=ALL_CARS.find(c=>c.id===rival.car)||CARS[0],style=rivalStyle(rival);
+ const timed=timedRivalCar(rival);
+ if(timed)return {...base,...timed,color:rival.color||base.color};
  const tune={Grip:{accel:1.15,max:1.09,grip:1,brakes:1.30},Complete:{accel:1.09,max:1.025,grip:1.04,brakes:1.16},Skiller:{accel:1.055,max:.96,grip:1.08,brakes:1.08}}[style];
  const ng=rival.ngplus;
  return {...base,accel:base.accel*tune.accel*(ng?1.22:1),max:base.max*tune.max*(ng?1.10:1),grip:base.grip*tune.grip*(ng?1.16:1),brakePower:(base.brakePower||1)*tune.brakes*(ng?1.20:1),aiWetGripRetention:.96,color:rival.color||base.color};
@@ -131,7 +140,7 @@ export function updateRace(r, input, dt, traffic=null) {
   if (r.countdown > 0) { r.countdown = Math.max(0, r.countdown - dt); return; }
   const beforePlayer=vehiclePose(r),frameStartS=r.s;
   const duel=r.mode!=='time'&&!['trial','grid'].includes(r.eventKind);
-  if(duel&&!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false,aiDriver:r.rival});Object.assign(r.opponent,{s:24,lateral:1.25,countdown:0,timeLeft:10000});}
+  if(duel&&!r.opponent){r.opponent=createRace(rivalCar(r.rival),r.track,{mode:'time',wet:r.wet,night:r.night,focusEnabled:false,aiDriver:r.rival});Object.assign(r.opponent,campaignRivalStart(),{countdown:0,timeLeft:10000});}
   const beforeOpponent=r.opponent?vehiclePose(r.opponent):null;
   const gridBefore=r.grid?.map(vehiclePose);
   r.contactCooldown=Math.max(0,(r.contactCooldown||0)-dt);
@@ -152,7 +161,7 @@ export function updateRace(r, input, dt, traffic=null) {
   r.brakePressure=brake;r.throttlePressure=throttle;
   const baseGrip=lateralGrip(r.car,r.wet)*(counter?.grip||1),technique=cornerTechnique(r,p.curve,handbrake);
   const driftGrip=r.aiDriver?.style==='Skiller'?Math.max(.32,profile.driftGrip):profile.driftGrip;
-  const grip=baseGrip*(1+driftGrip*technique)*(concentrating?power.grip:1),wheelbase=r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4;
+  const grip=baseGrip*(1+driftGrip*technique)*(concentrating?power.grip:1),wheelbase=r.car.wheelbase??(r.car.id==='r32'?2.62:r.car.id==='rx7'?2.43:2.4);
   const brakeInitiation=(ai?brake>.18&&r.aiDriver.style!=='Grip':braking)&&Math.abs(r.steer)>.32&&speed>16;
   if(handbrake&&!r.handbrakeDown&&Math.abs(targetSteer)>.15){r.driftAssist=1;r.yawRate+=Math.sign(targetSteer)*1.1;}
   if(handbrake&&Math.abs(r.steer)>.15)r.driftAssist=1;

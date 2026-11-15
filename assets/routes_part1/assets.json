@@ -1,0 +1,107 @@
+{
+ "part": 1,
+ "assets": [
+  {
+   "course": "Monte Akagi",
+   "folder": "akagi",
+   "file": "akagi/akagi_shrine_bridge.glb",
+   "desc": "Puente rojo arqueado estilo santuario"
+  },
+  {
+   "course": "Monte Haruna",
+   "folder": "akina",
+   "file": "akina/akina_gutter_drain.glb",
+   "desc": "Canaleta de concreto con rejillas (la clásica \"gutter run\")"
+  },
+  {
+   "course": "Enna Skyline",
+   "folder": "ennaskyline",
+   "file": "ennaskyline/enna_viewpoint_deck.glb",
+   "desc": "Mirador de piedra con binoculares y cartel"
+  },
+  {
+   "course": "Happogahara",
+   "folder": "happogahara",
+   "file": "happogahara/happogahara_chairlift.glb",
+   "desc": "Pilones de telesilla con sillas y cable"
+  },
+  {
+   "course": "Irohazaka",
+   "folder": "irohazaka",
+   "file": "irohazaka/irohazaka_hairpin_signs.glb",
+   "desc": "Placas い・ろ・は de las 48 horquillas con guardarraíl"
+  },
+  {
+   "course": "Momiji Line",
+   "folder": "momiji",
+   "file": "momiji/momiji_maple_grove.glb",
+   "desc": "Arboleda de arces rojos con hojas caídas"
+  },
+  {
+   "course": "Monte Myogi",
+   "folder": "myogi",
+   "file": "myogi/myogi_crag_cluster.glb",
+   "desc": "Agujas rocosas con torii de piedra"
+  },
+  {
+   "course": "Paso Nagao",
+   "folder": "nagao",
+   "file": "nagao/nagao_citrus_terrace.glb",
+   "desc": "Terraza de mandarinas con muro de piedra"
+  },
+  {
+   "course": "Nanamagari",
+   "folder": "nanamagari",
+   "file": "nanamagari/nanamagari_chevron_run.glb",
+   "desc": "Chevrones de curva en S y señal \"7 curvas\""
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_turbine_rotor.glb",
+   "desc": "Aerogenerador (torre + rotor separado para animar)"
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_turbine_tower.glb",
+   "desc": "Aerogenerador (torre + rotor separado para animar)"
+  },
+  {
+   "course": "Tsubaki Line",
+   "folder": "tsubaki",
+   "file": "tsubaki/tsubaki_camellia_hedge.glb",
+   "desc": "Seto de camelias con letrero y farol de piedra"
+  },
+  {
+   "course": "Tsuchisaka",
+   "folder": "tsuchisaka",
+   "file": "tsuchisaka/tsuchisaka_tunnel_portal.glb",
+   "desc": "Portal de túnel de concreto"
+  },
+  {
+   "course": "Monte Tsukuba",
+   "folder": "tsukuba",
+   "file": "tsukuba/tsukuba_ropeway_gondola.glb",
+   "desc": "Cabina de teleférico y pilones"
+  },
+  {
+   "course": "Turnpike (Hakone)",
+   "folder": "turnpike",
+   "file": "turnpike/turnpike_toll_plaza.glb",
+   "desc": "Peaje con cabinas, barreras y cartel"
+  },
+  {
+   "course": "Paso Usui",
+   "folder": "usui",
+   "file": "usui/usui_megane_bridge.glb",
+   "desc": "Puente de ladrillo de 4 arcos (Megane-bashi)"
+  },
+  {
+   "course": "Paso Yabitsu",
+   "folder": "yabitsu",
+   "file": "yabitsu/yabitsu_rockfall_fence.glb",
+   "desc": "Valla antiderrumbe con malla y señal"
+  }
+ ]
+}

@@ -4,6 +4,27 @@
 
 Cada rival tiene su propia carpeta: `campaign_files/<capítulo>/<rival>/`. Los identificadores y nombres de los 24 rivales están en [index.json](index.json).
 
+## Ajustar la IA y las marcas
+
+Edita `rival.json` junto a los recursos del duelo. Para una carrera múltiple, cada piloto tiene su propio archivo en `<capítulo>/<evento>/<piloto>/rival.json`. Los estilos disponibles son `Grip`, `Balance` y `Skiller`.
+
+```json
+{
+  "style": "Grip",
+  "targetTimeSec": {
+    "dry": 278,
+    "rain": 282,
+    "ngplus": 208
+  }
+}
+```
+
+El tiempo se expresa en segundos, con decimales opcionales. Por ejemplo, 3:20 equivale a 200. El reloj empieza cuando termina la cuenta regresiva y, en una parrilla, la marca cubre todas las vueltas. El objetivo representa una carrera en pista libre. Los adelantamientos, contactos y habilidades especiales influyen en el resultado real. La IA usa los límites de su estilo y los ajusta por clima. Si está fuera del rango alcanzable, usa el ritmo simulado más cercano que encontró y lo indica al iniciar el evento.
+
+Para cambiar la marca de clasificación, edita `<capítulo>/trial-<capítulo>/trial.json`. Usa la misma estructura `targetTimeSec` y las mismas claves de temporada. Los valores admitidos van de 15 a 800 segundos. Un tiempo omitido o `null` recupera el comportamiento anterior para esa temporada.
+
+Vuelve a abrir Campaña para actualizar las marcas que aparecen en las fichas. El servidor vuelve a leer el archivo al iniciar una carrera y guarda esa configuración para verificar el intento, incluso si el archivo se edita durante la carrera.
+
 Ejemplo para Kenji:
 
 ```text
