@@ -34,6 +34,24 @@ export class AdaptiveResolution {
   }
 }
 
+export class AdaptiveEnvironmentDetail {
+  constructor(compact=false){this.ceiling=compact?1:2;this.level=compact?0:1;this.resetTiming();}
+  resetTiming(){this.last=null;this.slow=0;this.fast=0;}
+  update(now,metrics,active){
+    if(!active||metrics.samples<45){this.resetTiming();return this.level;}
+    const dt=this.last===null?0:Math.min(500,Math.max(0,now-this.last));this.last=now;
+    const slow=metrics.fps<55||metrics.p95Ms>24||metrics.cpuMs>15;
+    const fast=metrics.fps>=59&&metrics.p95Ms<=18.5&&metrics.cpuMs<10;
+    this.slow=slow?this.slow+dt:0;
+    this.fast=fast?this.fast+dt:0;
+    if((this.slow>=1800&&this.level>0)||(this.fast>=12000&&this.level<this.ceiling)){
+      this.level+=slow?-1:1;
+      this.resetTiming();
+    }
+    return this.level;
+  }
+}
+
 // Shared logical layout keeps the GPU image and the transparent cockpit opening
 // aligned at every aspect ratio and device pixel ratio.
 export function mirrorLayout(w,h){

@@ -1,0 +1,197 @@
+{
+ "part": 2,
+ "assets": [
+  {
+   "course": "Monte Akagi",
+   "folder": "akagi",
+   "file": "akagi/akagi_pier_swan_boats.glb",
+   "desc": "Muelle de madera con botes cisne"
+  },
+  {
+   "course": "Monte Akagi",
+   "folder": "akagi",
+   "file": "akagi/akagi_stone_lantern_row.glb",
+   "desc": "Hilera de faroles de piedra (tōrō)"
+  },
+  {
+   "course": "Monte Haruna (Akina)",
+   "folder": "akina",
+   "file": "akina/akina_hairpin_mirror.glb",
+   "desc": "Guardarraíl en horquilla con espejo convexo de curva"
+  },
+  {
+   "course": "Monte Haruna (Akina)",
+   "folder": "akina",
+   "file": "akina/akina_tofu_roadhouse.glb",
+   "desc": "Tienda/casa de carretera con cartel 豆腐 (genérica)"
+  },
+  {
+   "course": "Enna Skyline",
+   "folder": "ennaskyline",
+   "file": "ennaskyline/enna_gazebo_hex.glb",
+   "desc": "Mirador/glorieta hexagonal"
+  },
+  {
+   "course": "Enna Skyline",
+   "folder": "ennaskyline",
+   "file": "ennaskyline/enna_rest_stop_set.glb",
+   "desc": "Bancas, papeleras y mapa de la ruta"
+  },
+  {
+   "course": "Happogahara",
+   "folder": "happogahara",
+   "file": "happogahara/happogahara_ski_lodge.glb",
+   "desc": "Cabaña de esquí con nieve"
+  },
+  {
+   "course": "Happogahara",
+   "folder": "happogahara",
+   "file": "happogahara/happogahara_snow_poles.glb",
+   "desc": "Postes de nieve con montículos"
+  },
+  {
+   "course": "Irohazaka",
+   "folder": "irohazaka",
+   "file": "irohazaka/irohazaka_hairpin_retaining_wall.glb",
+   "desc": "Muro de contención curvo de piedra"
+  },
+  {
+   "course": "Irohazaka",
+   "folder": "irohazaka",
+   "file": "irohazaka/irohazaka_monkey_warning.glb",
+   "desc": "Señal de monos y guardarraíl"
+  },
+  {
+   "course": "Momiji Line",
+   "folder": "momiji",
+   "file": "momiji/momiji_tea_house.glb",
+   "desc": "Casa de té con noren 茶"
+  },
+  {
+   "course": "Momiji Line",
+   "folder": "momiji",
+   "file": "momiji/momiji_torii_path.glb",
+   "desc": "Camino de 4 torii con faroles"
+  },
+  {
+   "course": "Monte Myogi",
+   "folder": "myogi",
+   "file": "myogi/myogi_cliff_wall.glb",
+   "desc": "Pared de roca dentada (telón de fondo)"
+  },
+  {
+   "course": "Monte Myogi",
+   "folder": "myogi",
+   "file": "myogi/myogi_shrine_stairs.glb",
+   "desc": "Escalinata de piedra con torii"
+  },
+  {
+   "course": "Paso Nagao",
+   "folder": "nagao",
+   "file": "nagao/nagao_farm_shed.glb",
+   "desc": "Cobertizo agrícola de chapa"
+  },
+  {
+   "course": "Paso Nagao",
+   "folder": "nagao",
+   "file": "nagao/nagao_utility_poles.glb",
+   "desc": "3 postes de luz con cables"
+  },
+  {
+   "course": "Nanamagari",
+   "folder": "nanamagari",
+   "file": "nanamagari/nanamagari_bus_stop.glb",
+   "desc": "Parada de bus con cartel"
+  },
+  {
+   "course": "Nanamagari",
+   "folder": "nanamagari",
+   "file": "nanamagari/nanamagari_guardrail_arc.glb",
+   "desc": "Guardarraíl curvo con reflectores"
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_power_pylon.glb",
+   "desc": "Torre de alta tensión"
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_radio_mast.glb",
+   "desc": "Mástil de radio rojo/blanco"
+  },
+  {
+   "course": "Tsubaki Line",
+   "folder": "tsubaki",
+   "file": "tsubaki/tsubaki_fallen_petals.glb",
+   "desc": "Decal de pétalos caídos"
+  },
+  {
+   "course": "Tsubaki Line",
+   "folder": "tsubaki",
+   "file": "tsubaki/tsubaki_wooden_gate.glb",
+   "desc": "Pórtico de madera Tsubaki Line"
+  },
+  {
+   "course": "Tsuchisaka",
+   "folder": "tsuchisaka",
+   "file": "tsuchisaka/tsuchisaka_ravine_bridge.glb",
+   "desc": "Puente de concreto sobre barranco"
+  },
+  {
+   "course": "Tsuchisaka",
+   "folder": "tsuchisaka",
+   "file": "tsuchisaka/tsuchisaka_tunnel_section_20m.glb",
+   "desc": "Tramo de túnel de 20 m con luces"
+  },
+  {
+   "course": "Monte Tsukuba",
+   "folder": "tsukuba",
+   "file": "tsukuba/tsukuba_gama_frog_statue.glb",
+   "desc": "Estatua de rana sobre pedestal (diseño propio)"
+  },
+  {
+   "course": "Monte Tsukuba",
+   "folder": "tsukuba",
+   "file": "tsukuba/tsukuba_summit_station.glb",
+   "desc": "Estación de la cima"
+  },
+  {
+   "course": "Turnpike (Hakone)",
+   "folder": "turnpike",
+   "file": "turnpike/turnpike_lane_kit.glb",
+   "desc": "Conos, delineadores y barreras"
+  },
+  {
+   "course": "Turnpike (Hakone)",
+   "folder": "turnpike",
+   "file": "turnpike/turnpike_sign_gantry.glb",
+   "desc": "Pórtico de señalización verde"
+  },
+  {
+   "course": "Paso Usui",
+   "folder": "usui",
+   "file": "usui/usui_brick_tunnel.glb",
+   "desc": "Portal y túnel de ladrillo"
+  },
+  {
+   "course": "Paso Usui",
+   "folder": "usui",
+   "file": "usui/usui_old_railway_track.glb",
+   "desc": "Vía de tren abandonada"
+  },
+  {
+   "course": "Paso Yabitsu",
+   "folder": "yabitsu",
+   "file": "yabitsu/yabitsu_dam_wall.glb",
+   "desc": "Presa de concreto con vertedero"
+  },
+  {
+   "course": "Paso Yabitsu",
+   "folder": "yabitsu",
+   "file": "yabitsu/yabitsu_mountain_hut.glb",
+   "desc": "Refugio de montaña"
+  }
+ ]
+}

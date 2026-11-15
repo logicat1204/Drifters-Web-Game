@@ -370,7 +370,7 @@ export class Renderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
     this.cars={};this.vehicleModels=new VehicleModels(gl);this.cabin=new CabinView(gl);this.driverCamera=new DriverCamera();this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
-    this.resolutionScale=1;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
+    this.resolutionScale=1;this.environmentDetail=2;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
     const shadow=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2;shadow.triangle(V(0,.045,0),V(Math.cos(a)*1.22,.045,Math.sin(a)*2.55),V(Math.cos(b)*1.22,.045,Math.sin(b)*2.55),'#000000');}this.shadow=shadow.upload(gl);
     const moon=new Geometry();for(let i=0;i<32;i++){const a=i/32*Math.PI*2,b=(i+1)/32*Math.PI*2;moon.triangle(V(0,0,0),V(Math.cos(a)*30,Math.sin(a)*30,0),V(Math.cos(b)*30,Math.sin(b)*30,0),[.92,.94,.81,1]);}this.moon=moon.upload(gl);
     const smoke=new Geometry();smoke.box(0,0,0,1,1,1,'#b7c2bd');this.smoke=smoke.upload(gl);
@@ -505,7 +505,7 @@ export class Renderer {
     const dealership=mode==='shop'&&this.shopSection==='dealer',collection=mode==='collection',showroom=dealership||collection,indoors=garage||workshop||showroom;
     if(exhibition&&!this.menuModel){this.menuModel=new MenuModel(gl);this.menuModel.load().then(()=>{this.boundBuffer=null;});}
     let garageModels;
-    if(garage||workshop){
+    if((garage||workshop)&&this.environmentDetail>0){
       this.garageModels??=new Map();
       const load=(name,scale,offset)=>{
         if(!this.garageModels.has(name)){
@@ -517,7 +517,7 @@ export class Renderer {
       };
       const room=load(workshop?'garage_room_tuning':'garage_room_day',1.8);
       const shared=GARAGE_FIXTURES.map(([name,scale,offset])=>load(name,scale,offset));
-      const equipment=workshop?WORKSHOP_FIXTURES.map(([name,scale,offset])=>load(name,scale,offset)):[];
+      const equipment=workshop&&this.environmentDetail===2?WORKSHOP_FIXTURES.map(([name,scale,offset])=>load(name,scale,offset)):[];
       if(room.status==='ready')garageModels=[room,...shared,...equipment];
     }
     const drift=this.reducedMotion?.matches?0:Math.sin(this.time*.08)*.24;
@@ -605,6 +605,9 @@ export class Renderer {
   setRival(rival){this.rival=rival;const key='rival-'+rival.id;if(!this.cars[key])this.cars[key]=meshCar(this.gl,rival.color,rival.car);}
   setTrack(track) {
     this.track=track;const gl=this.gl;
+    this.clearRouteModels();
+    for(const mesh of this.landmarkFallbacks?.values()||[])gl.deleteBuffer(mesh.buffer);
+    this.landmarkFallbacks?.clear();
     this.resetTireMarks();
     if(this.puddleMesh)gl.deleteBuffer(this.puddleMesh.buffer);
     this.puddleMesh=null;
@@ -743,28 +746,90 @@ export class Renderer {
       this.draw(this.spectatorMesh(name),spot.model);
     }
   }
-  drawRouteLandmarks(view,projection,eye,weather){
+  warmRouteModels(race,origin){
+    if(!this.environmentDetail||this.routeLoading||this.time<this.routeWarmAt)return;
+    this.routeWarmAt=this.time+.22;
+    const {track,environment}=this;
+    const range=this.environmentDetail===2?390:245;
+    let nearest=null,distance=range+1;
+    this.routeModels??=new Map();
+    for(const spot of environment.landmarks){
+      if(spot.detail>this.environmentDetail)continue;
+      let ahead=spot.s-(race?.s??0);
+      if(track.closed)ahead=((ahead+track.length/2)%track.length+track.length)%track.length-track.length/2;
+      const planar=Math.hypot(spot.x-origin[0],spot.z-origin[2]);
+      const proximity=Math.min(planar,Math.abs(ahead)+(ahead<0?90:0));
+      if(proximity>=distance)continue;
+      const rotor=spot.rotor&&this.routeModels.has(spot.file);
+      const file=rotor?TURBINE_ROTOR:spot.file;
+      if(this.routeModels.has(file))continue;
+      nearest={...spot,file,portal:!rotor&&spot.portal};
+      distance=proximity;
+    }
+    if(!nearest)return;
+    if(this.routeModels.size>=8){
+      const activeFiles=new Set(environment.landmarks.filter(spot=>Math.hypot(spot.x-origin[0],spot.z-origin[2])<range).map(spot=>spot.file));
+      if(activeFiles.has('sadamine/sadamine_turbine_tower'))activeFiles.add(TURBINE_ROTOR);
+      const stale=[...this.routeModels.keys()].find(file=>!activeFiles.has(file));
+      if(!stale)return;
+      this.routeModels.get(stale).dispose();this.routeModels.delete(stale);
+    }
+    const model=new MenuModel(this.gl,landmarkUrl(nearest.file,nearest.pack),1,undefined,
+      {preserveHeight:true,omitGround:nearest.portal,background:true,textureLimit:this.environmentDetail===2?1024:512});
+    model.detail=nearest.detail;
+    this.routeLoading=model;
+    this.routeModels.set(nearest.file,model);
+    model.load().then(()=>{
+      if(this.routeLoading===model)this.routeLoading=null;
+      this.boundBuffer=null;
+    });
+  }
+  drawLandmarkFallback(spot){
+    const bridge=spot.file==='usui/usui_megane_bridge';
+    if(!spot.portal&&!bridge)return;
+    const key=bridge?'bridge':'portal';
+    this.landmarkFallbacks??=new Map();
+    if(!this.landmarkFallbacks.has(key)){
+      const g=new Geometry();
+      if(bridge){
+        g.box(0,10.7,0,28.6,2.4,3.8,'#82554a');
+        for(const x of [-14,-7,0,7,14])g.box(x,3.5,0,1.65,7,3.8,'#785044');
+        for(const x of [-10.5,-3.5,3.5,10.5])for(let i=0;i<8;i++){
+          const a=i/8*Math.PI,b=(i+1)/8*Math.PI,p=(r,t)=>[x+Math.cos(t)*r,6+Math.sin(t)*r,1.9];
+          g.quad(p(2.75,a),p(3.55,a),p(3.55,b),p(2.75,b),'#986552');
+        }
+      }else for(let i=0;i<12;i++){
+        const a=i/12*Math.PI,b=(i+1)/12*Math.PI,p=(r,h,t)=>[r*Math.cos(t),h*Math.sin(t),0];
+        g.quad(p(7.4,6.2,a),p(8.8,7.6,a),p(8.8,7.6,b),p(7.4,6.2,b),'#798184');
+      }
+      this.landmarkFallbacks.set(key,g.upload(this.gl));
+      this.boundBuffer=null;
+    }
+    this.draw(this.landmarkFallbacks.get(key),transform(spot.x,spot.y,spot.z,spot.angle));
+  }
+  drawRouteLandmarks(view,projection,eye,weather,level,mirror){
     const spots=this.environment.landmarks;
     if(!spots.length)return;
     const gl=this.gl,planes=this.culling===false?viewPlanes(view,projection,this.planes):this.planes;
-    this.routeModels??=new Map();
+    const visible=[];
+    for(const spot of spots){
+      const range=mirror?80:level===2?(spot.height>10?315:165):(spot.height>10?185:100);
+      if(!chunkVisible(spot,planes,weather.origin,Math.min(weather.far,range)))continue;
+      if(spot.detail<=level&&this.routeModels?.get(spot.file)?.status==='ready')visible.push(spot);
+      else this.drawLandmarkFallback(spot);
+    }
     let changedProgram=false;
-    const draw=(file,matrix,portal=false)=>{
-      if(!this.routeModels.has(file)){
-        const model=new MenuModel(gl,landmarkUrl(file),1,undefined,{preserveHeight:true,omitGround:portal});
-        this.routeModels.set(file,model);
-        model.load().then(()=>{this.boundBuffer=null;});
-      }
+    const draw=(file,matrix)=>{
       const model=this.routeModels.get(file);
-      if(model.status!=='ready')return;
+      if(model?.status!=='ready')return;
       const stats=model.draw(view,projection,eye,matrix,weather);
       this.stats.drawCalls+=stats.drawCalls;
       this.stats.vertices+=stats.vertices;
+      this.stats.landmarkDraws+=stats.drawCalls;
       changedProgram=true;
     };
-    for(const spot of spots){
-      if(!chunkVisible(spot,planes,weather.origin,Math.min(weather.far,spot.height>10?330:180)))continue;
-      draw(spot.file,spot.matrix,spot.portal);
+    for(const spot of visible){
+      draw(spot.file,spot.matrix);
       if(spot.rotor){
         const {x,y,z,angle}=spot;
         const rotor=transform(x+Math.sin(angle)*2.5,y+30.6,z+Math.cos(angle)*2.5,angle);
@@ -893,22 +958,25 @@ export class Renderer {
     this.skidMesh.count=this.skidCount*SKID_VERTICES;
   }
   draw(mesh,model=IDENTITY,alpha=1,first=0,count=mesh?.count) {if(!mesh)return;const gl=this.gl,u=this.uniforms;if(this.boundBuffer!==mesh.buffer){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);const a=this.attrs;gl.enableVertexAttribArray(a.aPos);gl.vertexAttribPointer(a.aPos,3,gl.FLOAT,false,56,0);gl.enableVertexAttribArray(a.aNormal);gl.vertexAttribPointer(a.aNormal,3,gl.FLOAT,false,56,12);gl.enableVertexAttribArray(a.aColor);gl.vertexAttribPointer(a.aColor,4,gl.FLOAT,false,56,24);gl.enableVertexAttribArray(a.aSurface);gl.vertexAttribPointer(a.aSurface,4,gl.FLOAT,false,56,40);this.boundBuffer=mesh.buffer;}gl.uniformMatrix4fv(u.uModel,false,model);gl.uniform1f(u.uAlpha,alpha);gl.drawArrays(gl.TRIANGLES,first,count);if(this.stats){this.stats.drawCalls++;this.stats.vertices+=count;}}
-  drawScene(view,projection,origin,far){
+  drawScene(view,projection,origin,far,mirror=false){
     if(this.culling===false||!this.scene.chunks){this.draw(this.scene);return;}
     const planes=viewPlanes(view,projection,this.planes);this.draw(this.scene,IDENTITY,1,0,6);
     let range=null;
     const flush=()=>{if(range){this.gl.uniform1f(this.uniforms.uTerrain,range.kind==='terrain'?1:0);if(range.kind==='terrain'){this.gl.enable(this.gl.CULL_FACE);this.gl.cullFace(this.gl.BACK);}this.draw(this.scene,IDENTITY,range.alpha,range.first,range.count);if(range.kind==='terrain')this.gl.disable(this.gl.CULL_FACE);}range=null;this.gl.uniform1f(this.uniforms.uTerrain,0);};
     for(const chunk of this.scene.chunks){
-      const limit=Math.min(far,chunk.distance??Infinity),distance=boundsDistance(chunk,origin);
+      const decorLimit=chunk.kind==='detail'?(mirror?130:this.environmentDetail===0?210:Infinity):
+        chunk.kind==='foliage'?(mirror?195:this.environmentDetail===0?325:Infinity):Infinity;
+      const limit=Math.min(far,chunk.distance??Infinity,decorLimit),distance=boundsDistance(chunk,origin);
       if(!chunkVisible(chunk,planes,origin,limit))continue;
-      const alpha=chunkOpacity(chunk,origin,distance);
+      const fade=Number.isFinite(decorLimit)?Math.round(clamp((decorLimit-distance)/30,0,1)*4)/4:1;
+      const alpha=chunkOpacity(chunk,origin,distance)*fade;
       if(alpha<=0)continue;
       if(range&&range.first+range.count===chunk.first&&range.alpha===alpha&&range.kind===chunk.kind)range.count+=chunk.count;
       else{flush();range={first:chunk.first,count:chunk.count,alpha,kind:chunk.kind};}this.stats.chunks++;
     }flush();
     this.stats.totalChunks+=this.scene.chunks.length;
   }
-  drawWorld(race,racing,p,angle,eye,target,aspect,fov,day,sky,hidePlayer=false,up){
+  drawWorld(race,racing,p,angle,eye,target,aspect,fov,day,sky,hidePlayer=false,up,mirror=false){
     const gl=this.gl,u=this.uniforms,rival=racing&&race.mode!=='time'&&race.eventKind!=='trial'&&race.eventKind!=='grid'?visualRoadPose(this.track,race.rivalS,race.rivalLateral):null;
     const others=racing?(race.netOpponents||[]).slice(0,3).map(o=>({...o,world:visualRoadPose(this.track,o.s,o.lateral)})):[],netCars=new Float32Array(12),netForward=new Float32Array(6);
     const slopeAt=s=>{const lo=this.track.closed?s-6:Math.max(0,s-6),hi=this.track.closed?s+6:Math.min(this.track.length,s+6);return (sample(this.track,hi).y-sample(this.track,lo).y)/Math.max(1,hi-lo);};
@@ -933,13 +1001,15 @@ export class Renderer {
     this.selectCourseSky(courseSky(this.track.id,day,racing&&race?.wet));
     gl.uniform1f(u.uCourseSkyReady,this.courseSkyLoaded?1:0);
     gl.uniform1f(u.uBackdrop,1);this.draw(this.backdrop,transform(eye[0],eye[1]-100,eye[2]));gl.uniform1f(u.uBackdrop,0);
-    gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2);
+    gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2,mirror);
     const car=[p.x,p.y,p.z];
+    if(!mirror)this.warmRouteModels(race,car);
+    const detail=mirror?Math.min(1,this.environmentDetail):this.environmentDetail;
     this.drawRouteLandmarks(view,projection,eye,{fog:sky,origin:visibility.fromCar?car:eye,car,
-      forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0});
-    this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
-    if(racing&&race?.wet)this.drawPuddles(eye,visibility.far);
-    if(racing&&this.skidCount&&this.roadEffectsLoaded){
+      forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0},detail,mirror);
+    if(detail>0&&!mirror)this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
+    if(detail>0&&!mirror&&racing&&race?.wet)this.drawPuddles(eye,visibility.far);
+    if(!mirror&&racing&&this.skidCount&&this.roadEffectsLoaded){
       gl.depthMask(false);this.draw(this.skidMesh);gl.depthMask(true);
     }
     if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.drawCar(this.car.id,transform(p.x,p.y+.04,p.z,angle),{s:race?.s||0,steer:race?.steer,headlights:!racing||race.headlights});if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
@@ -966,10 +1036,10 @@ export class Renderer {
   renderMirror(race,p,angle,day,sky,w,h,compose=true){
     if(!this.mirrorFbo)this.initMirror();if(!this.mirrorReady)return;
     const gl=this.gl,mw=this.mirrorWidth,mh=this.mirrorHeight;
-    if(this.time-(this.mirrorTime??-1)>=1/(this.quality<=1||this.resolutionScale<.85?16:24)){
+    if(this.time-(this.mirrorTime??-1)>=1/(this.environmentDetail===0?12:this.quality<=1||this.resolutionScale<.85?16:24)){
     this.mirrorTime=this.time;const pose=rearCameraPose(this.track,race);
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.mirrorFbo);gl.viewport(0,0,mw,mh);gl.clearColor(...sky,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    this.drawWorld(race,true,p,angle,pose.eye,pose.target,mw/mh,23,day,sky,true);
+    this.drawWorld(race,true,p,angle,pose.eye,pose.target,mw/mh,23,day,sky,true,undefined,true);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,w,h);this.stats.mirrorPasses++;
     }
     if(!compose)return;
@@ -981,7 +1051,7 @@ export class Renderer {
   render(race,mode,dt,options={}) {
     if(!this.track||!this.car)return;
     this.time+=dt;const gl=this.gl,u=this.uniforms,canvas=this.canvas;
-    this.showcaseActive=false;this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
+    this.showcaseActive=false;this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0,landmarkDraws:0};
     const dpr=Math.min(window.devicePixelRatio||1,this.quality)*this.resolutionScale,w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
     Object.assign(this.stats,{width:w,height:h,scale:this.resolutionScale});
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);
@@ -1027,5 +1097,22 @@ export class Renderer {
     }
     gl.depthMask(false);this.particles=this.particles.filter(v=>v.life>0);for(const v of this.particles){v.life-=dt*(v.wet?2.8:.85);v.y+=dt*(v.wet?.13:.35);v.size+=dt*(v.wet?1.4:v.thin?.32:.65);this.draw(v.wet?this.spray:this.smoke,transform(v.x,v.y,v.z,v.life,v.size),v.life*(v.wet?.10:.13));}gl.depthMask(true);
     if(!shot&&racing&&this.cameraMode===3){const use3D=this.cabin.status!=='error';this.renderMirror(race,p,angle,day,sky,w,h,!use3D);if(use3D)this.cabinActive=this.cabin.draw(this,race,driverPose,{day,fov:cabinFov,hands:options.cabinHands,song:options.song,reducedMotion:this.reducedMotion?.matches},this.mirrorTexture);if(use3D&&!this.cabinActive)this.renderMirror(race,p,angle,day,sky,w,h);document.body.classList.toggle('cabin-3d',this.cabinActive);}
+  }
+  setEnvironmentDetail(level){
+    if(this.environmentDetail===level)return;
+    this.environmentDetail=level;
+    this.routeWarmAt=-Infinity;
+    if(level===0){this.clearRouteModels();return;}
+    for(const [key,model] of this.routeModels||[]){
+      if(model.detail<=level)continue;
+      model.dispose();this.routeModels.delete(key);
+      if(this.routeLoading===model)this.routeLoading=null;
+    }
+  }
+  clearRouteModels(){
+    for(const model of this.routeModels?.values()||[])model.dispose();
+    this.routeModels?.clear();
+    this.routeLoading=null;
+    this.routeWarmAt=-Infinity;
   }
 }

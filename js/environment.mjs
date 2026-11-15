@@ -51,7 +51,7 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   if(neighbors(p,r+30).some(o=>!(o.reservation&&o.allow.includes(kind))&&(solid||o.solid)&&Math.hypot(o.x-p[0],o.z-p[2])<r+o.radius+.8))return false;
   const entry={kind,x:p[0],y:p[1],z:p[2],radius:r,solid};props.push(entry);sceneryBounds.push(entry);const key=Math.floor(p[0]/32)+','+Math.floor(p[2]/32);if(!occupied.has(key))occupied.set(key,[]);occupied.get(key).push(entry);inc(kind);return true;
  };
- const patch=(kind,vertices,tile,uv,tint)=>{if(ground&&kind==='rest-stop')vertices=vertices.map(p=>[p[0],ground.heightAt(p[0],p[2]),p[2]]);if(!roadIndex.polygonClear(vertices))return false;if(['terrain','shoulder'].includes(kind)){const a=vertices[0],b=vertices[1],c=vertices[2],normalY=(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]);if(normalY<0){vertices=[vertices[0],vertices[3],vertices[2],vertices[1]];if(uv)uv=[uv[0],uv[3],uv[2],uv[1]];}}g.surface(...vertices,T[tile],uv,tint);surfaces.push({kind,vertices});if(kind==='rest-stop')ground?.register(vertices,kind);inc(kind);return true;};
+ const patch=(kind,vertices,tile,uv,tint,checked=false)=>{if(ground&&kind==='rest-stop')vertices=vertices.map(p=>[p[0],ground.heightAt(p[0],p[2]),p[2]]);if(!checked&&!roadIndex.polygonClear(vertices))return false;if(['terrain','shoulder'].includes(kind)){const a=vertices[0],b=vertices[1],c=vertices[2],normalY=(b[2]-a[2])*(c[0]-a[0])-(b[0]-a[0])*(c[2]-a[2]);if(normalY<0){vertices=[vertices[0],vertices[3],vertices[2],vertices[1]];if(uv)uv=[uv[0],uv[3],uv[2],uv[1]];}}g.surface(...vertices,T[tile],uv,tint);surfaces.push({kind,vertices});if(kind==='rest-stop')ground?.register(vertices,kind);inc(kind);return true;};
  function stamp(name,p,heading=0,scale=1,kind=name){
   const model=MODELS[name],sx=Array.isArray(scale)?scale[0]:scale,sy=Array.isArray(scale)?scale[1]:scale,sz=Array.isArray(scale)?scale[2]:scale,c=Math.cos(heading),s=Math.sin(heading);
   const radius=Math.hypot(Math.max(Math.abs(model.min[0]),Math.abs(model.max[0]))*sx,Math.max(Math.abs(model.min[2]),Math.abs(model.max[2]))*sz);
@@ -88,11 +88,30 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   for(let i=start;i<=end&&clear;i+=3)for(let j=0;j<(track.renderSegments??track.points.length);j++){if(j>=start-7&&j<=end+7)continue;if(Math.hypot(track.points[i].x-track.points[j].x,track.points[i].z-track.points[j].z)<25){clear=false;break;}}
   if(clear)tunnels.push({start:track.points[start].s,end:track.points[end].s,first:start,last:end,clearance:5.65});
  }
- const landmarks=planRouteLandmarks(track,roadIndex,ground,tunnels);
+ function slopeAt(a,b,i){
+  const zone=environmentZone(track.id,Math.min(1,a.s/track.length));
+  if(['urban','village','lakeside'].includes(zone)||Math.floor(a.s/140)%5===4||tunnels.some(t=>i>=t.first&&i<=t.last))return null;
+  const side=profile.uphill,height=3.6+Math.sin(a.s/100)*.8;
+  const surface=(near,far,y0,y1)=>[point(a,side*near,y0),point(b,side*near,y0),point(b,side*far,y1),point(a,side*far,y1)];
+  return {wall:surface(7.7,10.4,-.35,height),cap:surface(10.1,10.7,height+.05,height+.05),
+   wallBounds:surface(7.7,10.7,-.35,height+.05),rock:Math.floor(a.s/180)%4===2?surface(12,21,height,height+8):null};
+ }
+ const blockers=[],slopes=new Map();
+ const block=vertices=>blockers.push({vertices,min:[0,1,2].map(axis=>Math.min(...vertices.map(p=>p[axis]))),max:[0,1,2].map(axis=>Math.max(...vertices.map(p=>p[axis])))});
+ for(let i=0;i<(track.renderSegments??track.points.length-1);i++){
+  const slope=slopeAt(track.points[i],track.points[i+1],i);
+  if(!slope)continue;
+  if(roadIndex.polygonClear(slope.wall))block(slope.wallBounds);
+  else slope.wall=null;
+  if(slope.rock&&roadIndex.polygonClear(slope.rock))block(slope.rock);
+  else slope.rock=null;
+  slopes.set(i,slope);
+ }
+ const landmarks=planRouteLandmarks(track,roadIndex,ground,tunnels,blockers);
  for(const spot of landmarks){
   if(spot.portal)continue;
   reserve([spot.x,spot.y,spot.z],spot.radius,[]);
-  if(track.id==='usui'){
+  if(track.id==='usui'&&spot.pack===1){
    const entry={kind:'railway-bridge',x:spot.x,y:spot.y,z:spot.z,radius:spot.radius,solid:true};
    props.push(entry);sceneryBounds.push(entry);inc(entry.kind);
   }
@@ -108,17 +127,15 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   if(track.id!=='tsuchisaka'&&(i===zone.first||i===zone.last)){for(let k=0;k<12;k++){const u=k/12*Math.PI,v=(k+1)/12*Math.PI;g.quad(point(a,Math.cos(u)*radius,Math.sin(u)*height),point(a,Math.cos(u)*(radius+1.2),Math.sin(u)*(height+1)),point(a,Math.cos(v)*(radius+1.2),Math.sin(v)*(height+1)),point(a,Math.cos(v)*radius,Math.sin(v)*height),'#7b817a');}}
   inc('tunnel-segment');
  }
- return {profile,props,surfaces,ground,counts,tunnels,lights,landmarks,step(i,a,b){
+ return {profile,props,surfaces,ground,counts,tunnels,lights,landmarks,blockers,step(i,a,b){
   layer('terrain');
   const t=Math.min(1,a.s/track.length),zone=environmentZone(track.id,t),city=zone==='urban',village=['village','lakeside'].includes(zone),inside=tunnels.find(z=>i>=z.first&&i<=z.last),uphill=profile.uphill;
   const landHeight=(side,distance)=>{if(city||village)return 0;const high=side===uphill,near=high?3.6+Math.sin(a.s/100)*.8:-3.5,mid=high?near+5:-3.5,far=high?18+Math.sin(a.s/120)*4:-19;if(distance<11&&high)return -.35+(distance-8)/3*(near+.35);if(distance<=30)return high?near+(distance-11)/19*(mid-near):-.35+(distance-8)/22*(mid+.35);return mid+(distance-30)/36*(far-mid);};
   layer('road');
   if(inside){tunnel(a,b,i,inside);return;}
-  if(!city&&!village&&Math.floor(a.s/140)%5!==4){
-   const side=uphill,height=3.6+Math.sin(a.s/100)*.8,vertices=[point(a,side*7.7,-.35),point(b,side*7.7,-.35),point(b,side*10.4,height),point(a,side*10.4,height)];
-   if(patch('retaining-wall',vertices,'concrete_wall',[[a.s/4,0],[b.s/4,0],[b.s/4,1.5],[a.s/4,1.5]])){g.quad(point(a,side*10.1,height+.05),point(b,side*10.1,height+.05),point(b,side*10.7,height+.05),point(a,side*10.7,height+.05),'#7b8376');}
-   if(Math.floor(a.s/180)%4===2)patch('rock-face',[point(a,side*12,height),point(b,side*12,height),point(b,side*21,height+8),point(a,side*21,height+8)],'rock_cliff',[[a.s/7,0],[b.s/7,0],[b.s/7,2],[a.s/7,2]],[.85,.9,.82,0]);
-  }
+  const slope=slopes.get(i);
+  if(slope?.wall){patch('retaining-wall',slope.wall,'concrete_wall',[[a.s/4,0],[b.s/4,0],[b.s/4,1.5],[a.s/4,1.5]],undefined,true);g.quad(...slope.cap,'#7b8376');}
+  if(slope?.rock)patch('rock-face',slope.rock,'rock_cliff',[[a.s/7,0],[b.s/7,0],[b.s/7,2],[a.s/7,2]],[.85,.9,.82,0],true);
   // Preserve the previous 8m decoration spacing with denser road geometry.
   if(i%Math.max(1,Math.round(8/track.step))!==0)return;
   layer('detail');

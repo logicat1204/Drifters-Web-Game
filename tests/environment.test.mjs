@@ -6,6 +6,7 @@ import {makeTrack,ALL_TRACKS} from '../js/sim.mjs';
 import {createRoadIndex} from '../js/scenery.mjs';
 import {TEXTURES,SCENERY_MODELS} from '../js/scenery-assets.mjs';
 import {ENVIRONMENTS,environmentZone} from '../js/environment.mjs';
+import {wallClear} from '../js/route-landmarks.mjs';
 
 const routePack=new URL('../assets/routes_part1/',import.meta.url);
 const landmarks=JSON.parse(readFileSync(new URL('assets.json',routePack))).assets;
@@ -36,9 +37,13 @@ test('all decorated maps retain safe road corridors and sector culling, includin
   const env=renderer.environment;assert.ok(env.profile.name);assert.ok(env.props.length>800);assert.equal(uploads,2,'one world buffer and one backdrop buffer');
   const folder={iroha:'irohazaka',enna:'ennaskyline'}[config.id]??config.id;
   const expected=landmarks.filter(asset=>asset.folder===folder&&!asset.file.endsWith('_rotor.glb')).map(asset=>asset.file);
-  assert.deepEqual([...new Set(env.landmarks.map(spot=>spot.file+'.glb'))],expected,config.id+' route landmarks');
+  assert.deepEqual([...new Set(env.landmarks.filter(spot=>spot.pack===1).map(spot=>spot.file+'.glb'))],expected,config.id+' route landmarks');
+  if(expected.length)assert.ok(env.landmarks.some(spot=>spot.pack===3),config.id+' newer landmark');
   if(config.id==='tsuchisaka')assert.equal(env.landmarks.filter(spot=>spot.portal).length,2);
-  for(const spot of env.landmarks)if(!spot.portal)assert.ok(index.distance(spot.x,spot.z)>6.2,config.id+' landmark inside the guardrail');
+  for(const spot of env.landmarks)if(!spot.portal){
+   assert.ok(index.polygonClear(spot.footprint,.5),config.id+' landmark inside the guardrail');
+   assert.ok(wallClear(spot.footprint,spot.y,spot.height,env.blockers),config.id+' landmark intersects a wall');
+  }
   const sections=renderer.spectatorSpots.map(spot=>spot.section);
   assert.ok(sections.includes(0)&&sections.includes(1)&&sections.some(section=>section>=2),config.id+' spectator coverage');
   for(const spot of renderer.spectatorSpots){

@@ -20,12 +20,13 @@ import {ProgressionClient} from './progression.js';
 import {campaignEvent} from './campaign-events.mjs';
 import {RunRecorder} from './replay.mjs';
 import {RaceReplay,ReplayPlayer} from './race-replay.mjs';
-import {FrameMonitor,AdaptiveResolution} from './render-performance.mjs';
+import {FrameMonitor,AdaptiveResolution,AdaptiveEnvironmentDetail} from './render-performance.mjs';
 import {RacePresentation,PHYSICS_STEP,presentationPose} from './presentation.mjs';
 
 const $ = id => document.getElementById(id);
 let stored={};try{stored=JSON.parse(localStorage.getItem('touge-settings')||'{}');}catch{}
-const settings={car:0,track:0,arcadeStage:0,camera:'0',transmission:'auto',daytime:'night',weather:'dry',quality:'1.4',autoQuality:true,performanceDisplay:'compact',musicVolume:50,engineVolume:55,tireVolume:60,weatherVolume:35,shake:true,cabinMotion:65,cabinFov:65,cabinHands:true,stableHorizon:true,song:'synth',...stored};
+const compactDevice=matchMedia('(pointer: coarse)').matches||navigator.deviceMemory<=4;
+const settings={car:0,track:0,arcadeStage:0,camera:'0',transmission:'auto',daytime:'night',weather:'dry',quality:compactDevice?'1':'1.4',autoQuality:true,performanceDisplay:'compact',musicVolume:50,engineVolume:55,tireVolume:60,weatherVolume:35,shake:true,cabinMotion:65,cabinFov:65,cabinHands:true,stableHorizon:true,song:'synth',...stored};
 if(!['off','compact','detailed'].includes(settings.performanceDisplay))settings.performanceDisplay='compact';
 settings.autoQuality=settings.autoQuality!==false;
 settings.cabinMotion=clamp(Number(settings.cabinMotion)||0,0,100);settings.cabinFov=clamp(Number(settings.cabinFov)||65,55,80);settings.cabinHands=settings.cabinHands!==false;settings.stableHorizon=settings.stableHorizon!==false;
@@ -43,6 +44,19 @@ renderer.setTrack(track);renderer.setCar(CARS[settings.car]);renderer.quality=Nu
 const cockpit=new Cockpit($('cockpit'));
 const cornerEffects=new CornerEffects($('race-fx'));
 const frameMonitor=new FrameMonitor(),adaptiveResolution=new AdaptiveResolution();
+const detailLevels={low:0,medium:1,high:2};
+const environmentMode=$('environment-detail');
+settings.environmentDetail=Object.hasOwn(detailLevels,settings.environmentDetail)?settings.environmentDetail:'auto';
+const adaptiveEnvironment=new AdaptiveEnvironmentDetail(compactDevice);
+environmentMode.value=settings.environmentDetail;
+renderer.setEnvironmentDetail(detailLevels[settings.environmentDetail]??adaptiveEnvironment.level);
+environmentMode.addEventListener('change',()=>{
+  settings.environmentDetail=environmentMode.value;
+  adaptiveEnvironment.resetTiming();
+  frameMonitor.reset();
+  renderer.setEnvironmentDetail(detailLevels[settings.environmentDetail]??adaptiveEnvironment.level);
+  save();
+});
 const racePresentation=new RacePresentation();
 let performanceAt=0,performanceSnapshot={};
 function performanceDisplay(){
@@ -52,7 +66,7 @@ function performanceDisplay(){
   $('performance-fps').textContent=m.samples?`${Math.round(m.fps)} FPS`:'MIDIENDO FPS';
   $('performance-time').textContent=m.samples?`${m.frameMs.toFixed(1)} ms`:'OBJETIVO 60';
   $('performance-overlay').dataset.slow=String(m.samples>30&&m.fps<55);
-  if(detailed&&m.samples)$('performance-details').textContent=`P95 ${m.p95Ms.toFixed(1)} ms · CPU ${m.cpuMs.toFixed(1)} ms\n${m.width} × ${m.height} · ESCALA ${Math.round(m.scale*100)}%${settings.autoQuality?' AUTO':''}\n${m.drawCalls} DIBUJOS · ${Math.round(m.vertices/1000)}k VÉRTICES`;
+  if(detailed&&m.samples)$('performance-details').textContent=`P95 ${m.p95Ms.toFixed(1)} ms · CPU ${m.cpuMs.toFixed(1)} ms\n${m.width} × ${m.height} · ESCALA ${Math.round(m.scale*100)}%${settings.autoQuality?' AUTO':''}\nENTORNO ${['BAJO','MEDIO','ALTO'][renderer.environmentDetail]} · ${m.drawCalls} DIBUJOS · ${Math.round(m.vertices/1000)}k VÉRTICES`;
 }
 $('performance-display').value=settings.performanceDisplay;$('auto-quality').checked=settings.autoQuality;
 $('performance-display').addEventListener('change',e=>{settings.performanceDisplay=e.target.value;performanceDisplay();save();});
@@ -685,7 +699,13 @@ function frame(now){
   cockpit.draw(visualRace,['race','paused','results'].includes(screen)&&!race?.introRemaining&&renderer.cameraMode===3,Math.min(dt,.05),{song:raceSong().name,gpuMirror:renderer.mirrorReady,time:renderer.time});
   cornerEffects.draw(visualRace,['race','paused','results'].includes(screen),screen==='race'?Math.min(dt,.05):0,settings.shake,renderer.cameraMode===3,renderer.time,renderer.cabinActive?renderer.cabin.mirrorBounds:null);
   if(document.hidden)frameMonitor.reset();else frameMonitor.record(now,performance.now()-workStart,renderer.stats);
-  if(now-performanceAt>=250){performanceAt=now;performanceSnapshot=frameMonitor.snapshot();if(settings.autoQuality)renderer.resolutionScale=adaptiveResolution.update(now,performanceSnapshot,screen==='race'&&race?.countdown===0&&!race?.finished);performanceDisplay();}
+  if(now-performanceAt>=250){
+    performanceAt=now;performanceSnapshot=frameMonitor.snapshot();
+    const running=screen==='race'&&race?.countdown===0&&!race?.finished&&!document.hidden;
+    if(settings.autoQuality)renderer.resolutionScale=adaptiveResolution.update(now,performanceSnapshot,running);
+    if(settings.environmentDetail==='auto')renderer.setEnvironmentDetail(adaptiveEnvironment.update(now,performanceSnapshot,running));
+    performanceDisplay();
+  }
   requestAnimationFrame(frame);
 }
 document.addEventListener('visibilitychange',()=>{frameMonitor.reset();performanceSnapshot={};adaptiveResolution.last=null;previous=performance.now();accumulator=0;racePresentation.reset(race);});

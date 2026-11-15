@@ -1,0 +1,20 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Rutas Parte 2 — visor</title>
+<body style="margin:0;background:#0d1117;overflow:hidden;font:13px sans-serif;color:#cde">
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
+<div style="position:fixed;left:10px;top:10px;z-index:2;display:flex;gap:8px;align-items:center"><select id="sel" style="padding:4px"></select><span id="info"></span></div>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+const list=await (await fetch('assets.json')).json();
+const sel=document.getElementById('sel');list.assets.forEach(a=>{const o=document.createElement('option');o.value=a.file;o.textContent=`${a.course} — ${a.file.split('/').pop().replace('.glb','')}`;sel.appendChild(o)});
+const r=new THREE.WebGLRenderer({antialias:true});r.setSize(innerWidth,innerHeight);r.setPixelRatio(devicePixelRatio);document.body.appendChild(r.domElement);r.toneMapping=THREE.ACESFilmicToneMapping;
+const s=new THREE.Scene();s.background=new THREE.Color(0x9fc0de);s.add(new THREE.HemisphereLight(0xffffff,0x556644,1.5));const d=new THREE.DirectionalLight(0xfff0d0,2);d.position.set(30,60,40);s.add(d);
+const grid=new THREE.GridHelper(200,100,0x6688aa,0x7a99b8);grid.material.opacity=.35;grid.material.transparent=true;s.add(grid);
+const c=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,.1,2000);const oc=new OrbitControls(c,r.domElement);oc.enableDamping=true;
+const L=new GLTFLoader();let cur;
+function load(f){L.load(f,g=>{if(cur)s.remove(cur);cur=g.scene;s.add(cur);const bb=new THREE.Box3().setFromObject(cur),sz=bb.getSize(new THREE.Vector3()),ce=bb.getCenter(new THREE.Vector3());const dd=Math.max(sz.x,sz.y,sz.z)*1.3;c.position.set(ce.x+dd*.6,ce.y+dd*.45,ce.z+dd*.9);oc.target.copy(ce);oc.update();document.getElementById('info').textContent=`${sz.x.toFixed(1)} × ${sz.y.toFixed(1)} × ${sz.z.toFixed(1)} m`},undefined,e=>console.error(f,e))}
+sel.onchange=()=>load(sel.value);load(list.assets[0].file);
+addEventListener('resize',()=>{c.aspect=innerWidth/innerHeight;c.updateProjectionMatrix();r.setSize(innerWidth,innerHeight)});
+(function loop(){requestAnimationFrame(loop);oc.update();r.render(s,c)})();
+</script>

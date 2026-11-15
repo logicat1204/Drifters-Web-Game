@@ -1,0 +1,197 @@
+{
+ "part": 3,
+ "assets": [
+  {
+   "course": "Monte Akagi",
+   "folder": "akagi",
+   "file": "akagi/akagi_info_board.glb",
+   "desc": "Panel de información con techo"
+  },
+  {
+   "course": "Monte Akagi",
+   "folder": "akagi",
+   "file": "akagi/akagi_road_lake_curve.glb",
+   "desc": "Curva amplia con muro de piedra y guardarraíl"
+  },
+  {
+   "course": "Monte Haruna (Akina)",
+   "folder": "akina",
+   "file": "akina/akina_road_hairpin.glb",
+   "desc": "Horquilla 180° con canaleta de concreto y guardarraíl"
+  },
+  {
+   "course": "Monte Haruna (Akina)",
+   "folder": "akina",
+   "file": "akina/akina_sign_hairpin5.glb",
+   "desc": "Señal amarilla \"ヘアピン 5連続\""
+  },
+  {
+   "course": "Enna Skyline",
+   "folder": "ennaskyline",
+   "file": "ennaskyline/enna_flag_poles.glb",
+   "desc": "3 astas con banderas"
+  },
+  {
+   "course": "Enna Skyline",
+   "folder": "ennaskyline",
+   "file": "ennaskyline/enna_road_s_curve.glb",
+   "desc": "Curva en S con parapeto de piedra"
+  },
+  {
+   "course": "Happogahara",
+   "folder": "happogahara",
+   "file": "happogahara/happogahara_road_snow.glb",
+   "desc": "Tramo nevado con bancos de nieve y postes"
+  },
+  {
+   "course": "Happogahara",
+   "folder": "happogahara",
+   "file": "happogahara/happogahara_snowman.glb",
+   "desc": "Muñeco de nieve con bufanda"
+  },
+  {
+   "course": "Irohazaka",
+   "folder": "irohazaka",
+   "file": "irohazaka/irohazaka_road_double_hairpin.glb",
+   "desc": "Doble horquilla con muro de piedra y placa い"
+  },
+  {
+   "course": "Irohazaka",
+   "folder": "irohazaka",
+   "file": "irohazaka/irohazaka_stone_marker.glb",
+   "desc": "Mojón de piedra con い"
+  },
+  {
+   "course": "Momiji Line",
+   "folder": "momiji",
+   "file": "momiji/momiji_bench_leaves.glb",
+   "desc": "Banca de madera con hojas"
+  },
+  {
+   "course": "Momiji Line",
+   "folder": "momiji",
+   "file": "momiji/momiji_road_maple_bend.glb",
+   "desc": "Curva 90° con arces y hojas"
+  },
+  {
+   "course": "Monte Myogi",
+   "folder": "myogi",
+   "file": "myogi/myogi_boulder_pile.glb",
+   "desc": "Montón de rocas"
+  },
+  {
+   "course": "Monte Myogi",
+   "folder": "myogi",
+   "file": "myogi/myogi_road_rock_cut.glb",
+   "desc": "Corte en roca a un lado y guardarraíl al otro"
+  },
+  {
+   "course": "Paso Nagao",
+   "folder": "nagao",
+   "file": "nagao/nagao_mikan_stand.glb",
+   "desc": "Puesto de mandarinas con sombrilla"
+  },
+  {
+   "course": "Paso Nagao",
+   "folder": "nagao",
+   "file": "nagao/nagao_road_stone_lane.glb",
+   "desc": "Camino con muros de piedra a ambos lados"
+  },
+  {
+   "course": "Nanamagari",
+   "folder": "nanamagari",
+   "file": "nanamagari/nanamagari_cone_barrier_set.glb",
+   "desc": "Conos y barrera de obra"
+  },
+  {
+   "course": "Nanamagari",
+   "folder": "nanamagari",
+   "file": "nanamagari/nanamagari_road_s_chain.glb",
+   "desc": "4 curvas encadenadas con guardarraíles y chevrones"
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_road_ridge.glb",
+   "desc": "Carretera de cresta con postes y aerogenerador"
+  },
+  {
+   "course": "Sadamine",
+   "folder": "sadamine",
+   "file": "sadamine/sadamine_small_turbine.glb",
+   "desc": "Aerogenerador pequeño estático (14 m)"
+  },
+  {
+   "course": "Tsubaki Line",
+   "folder": "tsubaki",
+   "file": "tsubaki/tsubaki_camellia_tree.glb",
+   "desc": "Camelia grande con flores"
+  },
+  {
+   "course": "Tsubaki Line",
+   "folder": "tsubaki",
+   "file": "tsubaki/tsubaki_road_camellia_bend.glb",
+   "desc": "Curva 90° con seto de camelias a ambos lados"
+  },
+  {
+   "course": "Tsuchisaka",
+   "folder": "tsuchisaka",
+   "file": "tsuchisaka/tsuchisaka_road_concrete_cut.glb",
+   "desc": "Corte de concreto de 4.5 m con drenajes"
+  },
+  {
+   "course": "Tsuchisaka",
+   "folder": "tsuchisaka",
+   "file": "tsuchisaka/tsuchisaka_signal_light.glb",
+   "desc": "Semáforo de túnel rojo/verde"
+  },
+  {
+   "course": "Monte Tsukuba",
+   "folder": "tsukuba",
+   "file": "tsukuba/tsukuba_road_blossom_s.glb",
+   "desc": "Curva en S con guardarraíles y cerezos"
+  },
+  {
+   "course": "Monte Tsukuba",
+   "folder": "tsukuba",
+   "file": "tsukuba/tsukuba_souvenir_stall.glb",
+   "desc": "Puesto de recuerdos con letrero"
+  },
+  {
+   "course": "Turnpike (Hakone)",
+   "folder": "turnpike",
+   "file": "turnpike/turnpike_road_three_lane.glb",
+   "desc": "Autopista de 3 carriles con barrera tipo Jersey"
+  },
+  {
+   "course": "Turnpike (Hakone)",
+   "folder": "turnpike",
+   "file": "turnpike/turnpike_service_sign.glb",
+   "desc": "Señal de área de servicio"
+  },
+  {
+   "course": "Paso Usui",
+   "folder": "usui",
+   "file": "usui/usui_gas_lamp.glb",
+   "desc": "Farol de gas antiguo con base de piedra"
+  },
+  {
+   "course": "Paso Usui",
+   "folder": "usui",
+   "file": "usui/usui_road_brick_wall.glb",
+   "desc": "Curva con muro de ladrillo y contrafuertes"
+  },
+  {
+   "course": "Paso Yabitsu",
+   "folder": "yabitsu",
+   "file": "yabitsu/yabitsu_log_pile.glb",
+   "desc": "Pila de troncos"
+  },
+  {
+   "course": "Paso Yabitsu",
+   "folder": "yabitsu",
+   "file": "yabitsu/yabitsu_road_netted_slope.glb",
+   "desc": "Tramo con valla antiderrumbe y guardarraíl"
+  }
+ ]
+}

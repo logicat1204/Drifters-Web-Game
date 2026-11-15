@@ -44,23 +44,35 @@ export function parseMenuModel(buffer,{assetUrl,worldScale,offset=[0,0,0],preser
 }
 
 export class MenuModel {
- constructor(gl,url=EXHIBITION_URL,worldScale,offset,{preserveHeight=false,omitGround=false}={}){this.gl=gl;this.url=url;this.worldScale=worldScale;this.offset=offset;this.preserveHeight=preserveHeight;this.omitGround=omitGround;this.status='idle';this.active=false;this.draws=0;this.maxAttribs=gl.getParameter(gl.MAX_VERTEX_ATTRIBS);}
+ constructor(gl,url=EXHIBITION_URL,worldScale,offset,{preserveHeight=false,omitGround=false,background=false,textureLimit=2048}={}){this.gl=gl;this.url=url;this.worldScale=worldScale;this.offset=offset;this.preserveHeight=preserveHeight;this.omitGround=omitGround;this.background=background;this.textureLimit=textureLimit;this.status='idle';this.active=false;this.draws=0;this.maxAttribs=gl.getParameter(gl.MAX_VERTEX_ATTRIBS);}
  load(){
   if(this.promise)return this.promise;this.status='loading';
+  this.controller=new AbortController();
   this.promise=this.loadAsset().then(()=>{this.status='ready';return true;}).catch(error=>{this.status='error';this.error=error.message;return false;});return this.promise;
  }
  async loadAsset(){
-  const response=await fetch(this.url);if(!response.ok)throw Error('No se pudo cargar el modelo');const model=parseMenuModel(await response.arrayBuffer(),{assetUrl:this.worldScale?this.url:undefined,worldScale:this.worldScale,offset:this.offset,preserveHeight:this.preserveHeight,omitGround:this.omitGround}),gl=this.gl;this.model=model;
+  const signal=this.controller.signal;
+  const waitForIdle=()=>this.background?new Promise(resolve=>{
+   if(globalThis.requestIdleCallback)globalThis.requestIdleCallback(resolve,{timeout:260});
+   else setTimeout(resolve,0);
+  }):Promise.resolve();
+  const response=await fetch(this.url,{signal});if(!response.ok)throw Error('No se pudo cargar el modelo');
+  const data=await response.arrayBuffer();
+  await waitForIdle();if(signal.aborted)throw signal.reason;
+  const model=parseMenuModel(data,{assetUrl:this.worldScale?this.url:undefined,worldScale:this.worldScale,offset:this.offset,preserveHeight:this.preserveHeight,omitGround:this.omitGround}),gl=this.gl;this.model=model;
   const used=new Set(model.batches.flatMap(({material})=>{const mat=model.materials[material],p=mat?.pbrMetallicRoughness;return [p?.baseColorTexture,mat?.normalTexture,p?.metallicRoughnessTexture,mat?.emissiveTexture].filter(Boolean).map(info=>model.textures[info.index].source);}));
-  const bitmaps=await Promise.all(model.images.map(async (image,index)=>{if(!used.has(index))return null;const blob=image.url?await fetch(image.url).then(r=>{if(!r.ok)throw Error('No se pudo cargar una textura');return r.blob();}):new Blob([image.bytes],{type:image.mimeType});return createImageBitmap(blob,{premultiplyAlpha:'none',colorSpaceConversion:'none'});}));
+  const images=await Promise.allSettled(model.images.map(async (image,index)=>{if(!used.has(index))return null;const blob=image.url?await fetch(image.url,{signal}).then(r=>{if(!r.ok)throw Error('No se pudo cargar una textura');return r.blob();}):new Blob([image.bytes],{type:image.mimeType});return createImageBitmap(blob,{premultiplyAlpha:'none',colorSpaceConversion:'none'});}));
+  const bitmaps=images.map(result=>result.value);
+  try{await waitForIdle();if(signal.aborted)throw signal.reason;const error=images.find(result=>result.status==='rejected');if(error)throw error.reason;}
+  catch(error){for(const bitmap of bitmaps)bitmap?.close();throw error;}
   this.textures=bitmaps.map(image=>{
    if(!image)return null;
    const texture=gl.createTexture();
    gl.bindTexture(gl.TEXTURE_2D,texture);
    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
    let source=image;
-   if(Math.max(image.width,image.height)>2048){
-    const canvas=document.createElement('canvas'),ratio=2048/Math.max(image.width,image.height);
+   if(Math.max(image.width,image.height)>this.textureLimit){
+    const canvas=document.createElement('canvas'),ratio=this.textureLimit/Math.max(image.width,image.height);
     canvas.width=Math.round(image.width*ratio);canvas.height=Math.round(image.height*ratio);
     canvas.getContext('2d').drawImage(image,0,0,canvas.width,canvas.height);source=canvas;
    }
@@ -84,6 +96,15 @@ export class MenuModel {
   this.batches=model.batches.map(batch=>{const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,batch.data,gl.STATIC_DRAW);return {...batch,buffer,data:null};});
   model.batches=[];model.images=[];
   this.compile();
+ }
+ dispose(){
+  this.controller?.abort();
+  if(!this.textures)return;
+  const gl=this.gl;
+  for(const texture of new Set([...this.textures,this.fallbackTexture]))if(texture)gl.deleteTexture(texture);
+  for(const batch of this.batches||[])gl.deleteBuffer(batch.buffer);
+  this.textures=null;
+  this.batches=[];
  }
  compile(){
   const gl=this.gl,cached=programs.get(gl);

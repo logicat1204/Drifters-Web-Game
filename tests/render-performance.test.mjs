@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {FrameMonitor,AdaptiveResolution,mirrorLayout,viewPlanes,chunkVisible} from '../js/render-performance.mjs';
+import {FrameMonitor,AdaptiveResolution,AdaptiveEnvironmentDetail,mirrorLayout,viewPlanes,chunkVisible} from '../js/render-performance.mjs';
 
 test('FPS uses actual presentation intervals, retains slow frames and resets after visibility changes',()=>{
  const monitor=new FrameMonitor(60);
@@ -22,6 +22,20 @@ test('automatic resolution needs sustained misses, has a bounded floor and recov
  for(let now=49250;now<=120000;now+=250)controller.update(now,fast);assert.equal(controller.scale,1);
  controller.reset();controller.update(0,slow);controller.update(100000,slow);assert.equal(controller.scale,1,'a resumed tab cannot trigger an immediate downscale');
  for(let i=0;i<30;i++)controller.update(100250+i*250,slow,false);assert.equal(controller.scale,1,'menus and countdowns do not lower quality');
+});
+
+test('automatic scenery reacts to sustained frame spikes and starts conservatively on touch devices',()=>{
+ const phone=new AdaptiveEnvironmentDetail(true),desktop=new AdaptiveEnvironmentDetail();
+ const fast={fps:60,p95Ms:17,cpuMs:6,samples:100},spikes={...fast,p95Ms:32};
+ assert.equal(phone.level,0);assert.equal(desktop.level,1);
+ for(let now=0;now<=3000;now+=250)desktop.update(now,spikes,true);
+ assert.equal(desktop.level,0);
+ for(let now=0;now<=30000;now+=250)phone.update(now,fast,true);
+ assert.equal(phone.level,1);
+ for(let now=30250;now<=35000;now+=250)phone.update(now,spikes,false);
+ assert.equal(phone.level,1);
+ for(let now=35250;now<=38000;now+=250)phone.update(now,spikes,true);
+ assert.equal(phone.level,0);
 });
 
 test('clip and fog culling preserve crossing geometry, including nearby folded hairpins',()=>{
