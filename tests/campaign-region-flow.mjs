@@ -39,11 +39,11 @@ try{
     await page.locator('#main-menu-actions [data-action=play]').waitFor();
     await openPlayMode(page,'campaign',{world,travel:false});
     if(world==='initial-d'){
-      await page.getByRole('button',{name:'Pasos finales'}).click();
-      assert.equal(await page.locator('#campaign-map-destinations [data-chapter]').count(),4);
+      await page.getByRole('button',{name:'Project D (Parte dos)'}).click();
+      assert.equal(await page.locator('#campaign-map-destinations [data-chapter]').count(),5);
       await page.locator('[data-chapter=turnpike]').click();
       assert.ok(await page.locator('#campaign-travel').isDisabled());
-      await page.getByRole('button',{name:'Primeras montañas'}).click();
+      await page.getByRole('button',{name:'Primeros pasos'}).click();
       assert.ok(await page.locator('[data-chapter=myogi]').isVisible());
     }
     await page.locator('#campaign-travel').click();

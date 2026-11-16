@@ -1,5 +1,6 @@
 // Dedicated static exhibition asset. It never enters the race car registry.
 import {textureInsideModelRoot} from './scenery-models.mjs';
+import {HEADLIGHT_GLSL} from './headlights.mjs';
 
 export const EXHIBITION_URL=new URL('../assets/cars/1985_toyota_sprinter_trueno_ae86_project_d.glb',import.meta.url).href;
 const identity=()=>[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
@@ -116,7 +117,8 @@ export class MenuModel {
   const vertex='attribute vec3 aPosition,aNormal;attribute vec2 aUv;uniform mat4 uModel,uView,uProjection;varying vec3 vPosition,vNormal;varying vec2 vUv;void main(){vec4 p=uModel*vec4(aPosition,1.);vPosition=p.xyz;vNormal=mat3(uModel)*aNormal;vUv=aUv;gl_Position=uProjection*uView*p;}';
   const fragment=`${derivatives?'#extension GL_OES_standard_derivatives : enable':''}
    precision highp float;varying vec3 vPosition,vNormal;varying vec2 vUv;
-   uniform vec3 uEye,uEmission,uFog,uFogOrigin,uRoadCar;uniform vec2 uLightDir;uniform vec4 uColor,uAtmosphere;uniform float uMetallic,uRoughness,uTransmission,uClearcoat,uSpecular,uHasBase,uHasNormal,uHasMr,uHasEmission,uAlphaCutoff,uCoverage;
+   uniform vec3 uEye,uEmission,uFog,uFogOrigin,uRoadCar;uniform vec2 uLightDir;uniform vec4 uColor,uAtmosphere;uniform float uMetallic,uRoughness,uTransmission,uClearcoat,uSpecular,uHasBase,uHasNormal,uHasMr,uHasEmission,uAlphaCutoff,uCoverage,uRoadSlope;
+   ${HEADLIGHT_GLSL}
    uniform sampler2D uBase,uNormal,uMr,uEmissive;
    void main(){if(uCoverage<1.&&fract(dot(floor(gl_FragCoord.xy),vec2(.75487766,.56984029)))>=uCoverage)discard;vec4 texel=uHasBase>.5?texture2D(uBase,vUv):vec4(1.);vec4 base=vec4(pow(texel.rgb,vec3(2.2))*uColor.rgb,texel.a*uColor.a);if(uAlphaCutoff>0.&&base.a<uAlphaCutoff)discard;vec3 n=normalize(vNormal);if(!gl_FrontFacing)n=-n;
    ${derivatives?'if(uHasNormal>.5){vec3 q1=dFdx(vPosition),q2=dFdy(vPosition);vec2 st1=dFdx(vUv),st2=dFdy(vUv);vec3 tangent=q1*st2.y-q2*st1.y,bitangent=-q1*st2.x+q2*st1.x;float inv=inversesqrt(max(dot(tangent,tangent),dot(bitangent,bitangent))+.000001);vec3 map=texture2D(uNormal,vUv).xyz*2.-1.;n=normalize(mat3(tangent*inv,bitangent*inv,n)*map);}':''}
@@ -129,16 +131,15 @@ export class MenuModel {
    vec3 emission=uHasEmission>.5?pow(texture2D(uEmissive,vUv).rgb,vec3(2.2)):vec3(1.);color+=emission*uEmission*.12;
    color*=1.25;color=color/(color+vec3(.65));color=pow(max(color,vec3(0.)),vec3(1./2.2));
    if(uAtmosphere.y>0.){
-     vec2 delta=vPosition.xz-uRoadCar.xz;float ahead=dot(delta,uLightDir),across=abs(delta.x*uLightDir.y-delta.y*uLightDir.x);
-     float light=smoothstep(0.,5.,ahead)*(1.-smoothstep(48.,115.,ahead))*(1.-smoothstep(2.,4.+max(0.,ahead)*.22,across))*(1.-smoothstep(3.,11.,abs(vPosition.y-uRoadCar.y)));
-     color*=mix(.22+uAtmosphere.w*light*.86,1.,uAtmosphere.z);
+     float light=uAtmosphere.w>.5?headlightBeam(vPosition,uRoadCar,uLightDir,uRoadSlope):0.;
+     color*=mix(.22+light*.86,1.,uAtmosphere.z);
      color=mix(color,uFog,smoothstep(uAtmosphere.x,uAtmosphere.y,distance(vPosition,uFogOrigin)));
    }
    gl_FragColor=vec4(color,uAlphaCutoff>0.?1.:alpha);}`;
   const compile=(type,source)=>{const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));return shader;};
   this.program=gl.createProgram();const vs=compile(gl.VERTEX_SHADER,vertex),fs=compile(gl.FRAGMENT_SHADER,fragment);gl.attachShader(this.program,vs);gl.attachShader(this.program,fs);gl.linkProgram(this.program);if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));gl.deleteShader(vs);gl.deleteShader(fs);
   this.attrs={};for(const name of ['aPosition','aNormal','aUv'])this.attrs[name]=gl.getAttribLocation(this.program,name);
-  this.uniforms={};for(const name of ['uView','uProjection','uModel','uEye','uEmission','uColor','uMetallic','uRoughness','uTransmission','uClearcoat','uSpecular','uHasBase','uHasNormal','uHasMr','uHasEmission','uBase','uNormal','uMr','uEmissive','uFog','uFogOrigin','uRoadCar','uLightDir','uAtmosphere','uAlphaCutoff','uCoverage'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+  this.uniforms={};for(const name of ['uView','uProjection','uModel','uEye','uEmission','uColor','uMetallic','uRoughness','uTransmission','uClearcoat','uSpecular','uHasBase','uHasNormal','uHasMr','uHasEmission','uBase','uNormal','uMr','uEmissive','uFog','uFogOrigin','uRoadCar','uLightDir','uAtmosphere','uRoadSlope','uAlphaCutoff','uCoverage'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
   programs.set(gl,{program:this.program,attrs:this.attrs,uniforms:this.uniforms});
  }
  draw(view,projection,eye,matrix=IDENTITY,weather,coverage=1){
@@ -148,7 +149,7 @@ export class MenuModel {
   gl.uniform1f(u.uCoverage,coverage);
   if(weather){
    gl.uniform3fv(u.uFog,weather.fog);gl.uniform3fv(u.uFogOrigin,weather.origin);gl.uniform3fv(u.uRoadCar,weather.car);
-   gl.uniform2fv(u.uLightDir,weather.forward);gl.uniform4f(u.uAtmosphere,weather.near,weather.far,weather.day,weather.lamps);
+   gl.uniform2fv(u.uLightDir,weather.forward);gl.uniform1f(u.uRoadSlope,weather.slope);gl.uniform4f(u.uAtmosphere,weather.near,weather.far,weather.day,weather.lamps);
   }else gl.uniform4f(u.uAtmosphere,0,0,0,0);
   const transparent=batch=>this.model.materials[batch.material]?.alphaMode==='BLEND';
   const distance=({center:[x,y,z]})=>eye.reduce((d,v,i)=>d+(matrix[i]*x+matrix[4+i]*y+matrix[8+i]*z+matrix[12+i]-v)**2,0);

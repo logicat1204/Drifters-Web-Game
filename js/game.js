@@ -379,7 +379,20 @@ async function startRace(){
     hud();
   }catch(error){toast(error.message);if(screen==='campaign')$('campaign-status').textContent=error.message;if(error.status===401){await account.init();}}finally{startRace.busy=false;document.body.classList.remove('starting-race');$('start').disabled=false;}
 }
-function nextArcade(){if(race?.campaignStage){const id=race.campaignStage,next=progression.nextStage(id);if(next)progression.begin(next);else if(!race.awaitingRecord){closeModal();sound.stop();race=null;keys.clear();progression.returnToRegion(id);}return;}if(!race?.won||race.mode!=='arcade')return;settings.arcadeStage=settings.track===TRACKS.length-1?0:settings.track+1;save();account.preferences({arcadeStage:settings.arcadeStage});updateModeDescription();if(settings.track===TRACKS.length-1){quit();return;}startRace();}
+function nextArcade(){
+  if(race?.campaignStage){
+    if(race.awaitingRecord||!(race.savedRecord?.won??race.won))return;
+    const id=race.campaignStage;
+    closeModal();sound.stop();race=null;keys.clear();driving.clear();
+    progression.returnToRegion(id);
+    return;
+  }
+  if(!race?.won||race.mode!=='arcade')return;
+  settings.arcadeStage=settings.track===TRACKS.length-1?0:settings.track+1;
+  save();account.preferences({arcadeStage:settings.arcadeStage});updateModeDescription();
+  if(settings.track===TRACKS.length-1){quit();return;}
+  startRace();
+}
 const actions={collection:()=>{closeModal();collectibles.open();},replay:startReplay,'replay-exit':stopReplay,'replay-pause':toggleReplay,'replay-restart':()=>{seekReplay(0);if(replayPlayer?.paused)toggleReplay();},'replay-camera':cycleReplayCamera,play:()=>{currentCampaign=null;closeModal();showScreen('play');document.querySelector('[data-play-mode]')?.focus();},ranking:()=>ranking.open(),home:()=>{closeModal();showScreen('menu');},back:navigateBack,campaign:()=>{closeModal();progression.openCampaign();},shop:()=>{account.close();closeModal();progression.openShop();},offline:()=>openRaceSetup('offline'),profile:()=>{if(account?.require())account.open();},exit:()=>openModal('exit'),'exit-confirm':leaveToTitle,garage:()=>{closeModal();showScreen('garage');},workshop:()=>{closeModal();workshop.open(CARS[settings.car]);},music:()=>openModal('music'),settings:openOptions,'gamepad-config':()=>{if(driving.gamepad)openModal('gamepad-config');},controls:()=>openModal('controls'),'control-layout':opener=>{driving.openEditor();openModal('control-layout',opener);},online:()=>{closeModal();showScreen('online');},'online-rematch':()=>net.send({type:'rematch'}),'online-exit':()=>net.leave(),camera:cycleCamera,headlights:switchLights,reposition:repositionPlayer,focus:useFocus,next:nextArcade,close:()=>screen==='settings'&&!modal?closeOptions():closeModal(),pause,resume,restart:()=>{if(race?.awaitingRecord)return;if(race?.campaignStage)progression.begin(progression.catalog.stages.find(s=>s.id===race.campaignStage));else startRace();},quit,fullscreen:()=>requestFullscreen(),mute:()=>{sound.muted=!sound.muted;sound.volume();toast(sound.muted?'Música silenciada. Pulsa M para activarla.':'Música activada.');}};
 document.querySelectorAll('[data-action]').forEach(b=>b.addEventListener('click',()=>actions[b.dataset.action]?.(b)));$('start').addEventListener('click',startRace);$('modal-backdrop').addEventListener('click',()=>{if(!['pause','results','online-results'].includes(modal))closeModal();});
 for(const [id,key] of [['camera','camera'],['daytime','daytime'],['quality','quality']]){$(id).value=settings[key];$(id).addEventListener('change',()=>{settings[key]=$(id).value;save();if(id==='quality'){adaptiveResolution.reset();renderer.resolutionScale=1;frameMonitor.reset();}renderer.quality=Number(settings.quality);renderer.cameraMode=Number(settings.camera);renderer.resetCamera=true;});}
@@ -565,7 +578,7 @@ let previous=performance.now(),accumulator=0,hudTimer=0;
 function prepareCampaign(stage){if(race?.awaitingRecord)return false;if(net?.room){toast('Sal de la sala online antes de iniciar la campaña.');return false;}currentCampaign=stage.id;closeModal();sound.stop();sound.update(race,false);race=null;keys.clear();driving.clear();showScreen('campaign');return true;}
 function finishCampaign(){
   showScreen('results');sound.stop();sound.update(race,false);
-  const stage=campaignEvent(race.campaignStage),next=progression.nextStage(stage.id),reached=race.s>=race.finishDistance;
+  const stage=campaignEvent(race.campaignStage),reached=race.s>=race.finishDistance;
   $('result-eyebrow').textContent=(stage.season==='ngplus'?'NG+ / ':stage.season==='rain'?'TEMPORADA LLUVIOSA / ':'')+stage.chapter.toUpperCase();
   $('results-title').textContent=race.won?'EVENTO SUPERADO.':stage.kind==='trial'?'SIGUE BUSCANDO TU MARCA.':'VUELVE AL VÉRTICE.';
   $('result-message').textContent=stage.kind==='trial'?'Marca exigida '+fmtTime(race.targetTime):
@@ -574,7 +587,7 @@ function finishCampaign(){
   $('result-time').textContent=fmtTime(race.elapsed);$('result-drift').textContent=Math.floor(race.driftPoints).toLocaleString();
   $('result-apex').textContent=Math.floor(race.skill.points).toLocaleString();$('result-best').textContent='VERIFICANDO…';
   $('result-reward').textContent='';$('next-arcade').classList.toggle('hidden',!race.won);$('next-arcade').disabled=true;
-  $('next-arcade-label').textContent=next?'SIGUIENTE / '+next.short:'VOLVER AL MAPA';
+  $('next-arcade-label').textContent='CONTINUAR';
   openModal('results');saveRun(race);
 }
 function restoreSoloScene(){track=makeTrack(TRACKS[settings.track]);renderer.setTrack(track);renderer.setCar(ownedCar());updateSceneLabels();}

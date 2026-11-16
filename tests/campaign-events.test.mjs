@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {campaignEvent,campaignEvents,eventAvailable,worldSeasonAvailable} from '../js/campaign-events.mjs';
+import {INITIAL_D_REGIONS} from '../js/campaign-worlds.mjs';
 import {Store} from '../server/store.mjs';
 import {Runs} from '../server/runs.mjs';
 import {ALL_CARS,ALL_TRACKS,createRace,makeTrack,updateRace,sample} from '../js/sim.mjs';
@@ -58,6 +59,29 @@ test('each Initial D chapter opens with a trial while mid-chapter saves can cont
   assert.equal(eventAvailable(campaignEvent('trial-myogi'),['kenji','iketani-akina','event-takumi-initial']),false);
   assert.equal(campaignEvent('iketani-akina').level,1);
   assert.equal(campaignEvent('iketani-usui').level,2);
+});
+
+test('Initial D map order and event unlocks follow the three chronological chapters',()=>{
+  const regions=[
+    {name:'Primeros pasos',ids:['akina','myogi','usui','akagi','iroha']},
+    {name:'Project D (Parte uno)',ids:['momiji','happogahara','enna','sadamine','tsuchisaka','tsukuba']},
+    {name:'Project D (Parte dos)',ids:['yabitsu','nagao','nanamagari','turnpike','tsubaki']}
+  ];
+  assert.deepEqual(INITIAL_D_REGIONS,regions);
+  const dryWins=campaignEvents().map(event=>event.id);
+  for(const season of ['dry','rain','ngplus']){
+    const events=campaignEvents(season).filter(event=>event.world==='initial-d');
+    assert.deepEqual([...new Set(events.map(event=>event.chapter))],regions.flatMap(region=>region.ids));
+    const cleared=season==='dry'?[]:[...dryWins];
+    for(const [index,event] of events.entries()){
+      if(index>0&&event.kind==='trial')assert.equal(eventAvailable(event,cleared.slice(0,-1)),false,event.id);
+      assert.equal(eventAvailable(event,cleared),true,event.id);
+      cleared.push(event.id);
+    }
+  }
+  assert.equal(eventAvailable(campaignEvent('trial-akagi'),['trial-akagi']),true);
+  assert.deepEqual([...new Set(campaignEvents().filter(event=>event.world==='mf-ghost').map(event=>event.chapter))],
+    ['odawara','ashinoko','manazuru']);
 });
 
 test('a grid retains race progress across the lap seam and simulates each rival',()=>{

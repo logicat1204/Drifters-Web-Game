@@ -17,6 +17,7 @@ import {DriverCamera} from './driver-camera.mjs';
 import {TURBINE_ROTOR} from './route-landmarks.mjs';
 import {placementModelKey,sceneryAssetUrl,sceneryModelRoot} from './scenery-models.mjs';
 import {layoutUrl,readTrackLayout} from './track-layout.mjs';
+import {HEADLIGHT_GLSL} from './headlights.mjs';
 
 const V = (x=0,y=0,z=0) => [x,y,z];
 const sceneryModel=(pack,name)=>new URL(`../assets/touge_city_assets_part${pack}/models/${name}.glb`,import.meta.url);
@@ -256,13 +257,7 @@ export class Renderer {
       uniform float uCarSlope,uRivalSlope;
       uniform float uDay,uWet,uWeatherTime,uAlpha,uFogStart,uFogEnd,uFogFromCar,uHeadlights,uRivalLights,uLampState,uBrake;
       uniform float uVehicle,uCarbon;uniform vec3 uVehiclePaint,uWheelColor;
-      float beam(vec3 car,vec2 forward,float slope){
-        vec2 delta=vWorld.xz-car.xz;float ahead=dot(delta,forward);
-        float across=abs(delta.x*forward.y-delta.y*forward.x);
-        float cone=smoothstep(1.,4.,ahead)*(1.-smoothstep(48.,140.,ahead))*(1.-smoothstep(1.7+ahead*.055,2.5+ahead*.24,across));
-        float height=1.-smoothstep(1.5,6.,abs(vWorld.y-car.y-ahead*slope));
-        return cone*height;
-      }
+      ${HEADLIGHT_GLSL}
       float hashRain(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}
       #ifdef ROUTE_EXTRAS
       // Dry rubber, wet rubber and four ripple frames.
@@ -302,7 +297,7 @@ export class Renderer {
           vec3 view=normalize(uEye-vWorld);
           vec3 normal=normalize(vNormal),reflection=reflect(-view,normal);
           float grazing=pow(1.-clamp(abs(dot(normal,view)),0.,1.),2.);
-          float glare=beam(uCar,uForward,uCarSlope)*uHeadlights;
+          float glare=uHeadlights>.5?headlightBeam(vWorld,uCar,uForward,uCarSlope):0.;
           vec2 skyUV=vec2(atan(reflection.z,reflection.x)/6.2831853+.5,.5-asin(clamp(reflection.y,-1.,1.))/3.1415927);
           vec3 water=mix(vec3(.035,.052,.068),vec3(.16,.23,.27),uDay);
           water=mix(water,texture2D(uCourseSky,skyUV).rgb,.67*grazing*uCourseSkyReady);
@@ -336,10 +331,20 @@ export class Renderer {
         if(f>=1.){if(vSurface.z<-19.5&&vSurface.z>-20.5)discard;gl_FragColor=vec4(uFog,uAlpha);return;}
         vec3 n=normalize(vNormal);float sun=max(0.,dot(n,normalize(vec3(-.35,.85,.4))));
         float daylight=uDay*(1.-uTunnel*.85),light=mix(.075+sun*.065,.48+sun*.52,daylight)*(1.-uWet*daylight*.14);
-        if(uTerrain>.5){float head=beam(uCar,uForward,uCarSlope)*uHeadlights*(1.-daylight)*1.85;vec3 c=vColor.rgb*texel.rgb*(light+head);gl_FragColor=vec4(mix(c,uFog,f),uAlpha);return;}
-        float headlights=0.;if(daylight<.999){headlights=max(beam(uCar,uForward,uCarSlope)*uHeadlights,beam(uRivalCar,uRivalForward,uRivalSlope)*uRivalLights)*(1.-daylight)*1.85;
-        for(int i=0;i<3;i++)headlights=max(headlights,beam(uNetCars[i].xyz,uNetForward[i],uNetSlopes[i])*uNetCars[i].w*(1.-daylight)*1.85);
-        for(int i=0;i<3;i++){float falloff=max(0.,1.-length(vWorld.xz-uStreetLights[i].xz)/14.);light+=falloff*falloff*uStreetLights[i].w*(1.-daylight)*(1.-smoothstep(3.,10.,abs(vWorld.y-uStreetLights[i].y)));}}
+        float headlights=0.;
+        if(daylight<.999&&uHeadlights>.5)headlights=headlightBeam(vWorld,uCar,uForward,uCarSlope);
+        if(uTerrain>.5){
+          vec3 c=vColor.rgb*texel.rgb*(light+headlights*(1.-daylight)*1.85);
+          gl_FragColor=vec4(mix(c,uFog,f),uAlpha);return;
+        }
+        if(daylight<.999){
+          if(uRivalLights>.5)headlights=max(headlights,headlightBeam(vWorld,uRivalCar,uRivalForward,uRivalSlope));
+          for(int i=0;i<3;i++){
+            if(uNetCars[i].w>.5)headlights=max(headlights,headlightBeam(vWorld,uNetCars[i].xyz,uNetForward[i],uNetSlopes[i]));
+          }
+          headlights*=(1.-daylight)*1.85;
+          for(int i=0;i<3;i++){float falloff=max(0.,1.-length(vWorld.xz-uStreetLights[i].xz)/14.);light+=falloff*falloff*uStreetLights[i].w*(1.-daylight)*(1.-smoothstep(3.,10.,abs(vWorld.y-uStreetLights[i].y)));}
+        }
         float noise=fract(sin(dot(floor(vWorld.xz*13.),vec2(12.9898,78.233)))*43758.5453);
         float grain=abs(n.y)>.7?.96+noise*.08:1.;
         float lamp=1.;if(vColor.a>.8&&vColor.r>.6&&vColor.g>.6&&vColor.b>.5)lamp=uLampState;
@@ -1141,7 +1146,8 @@ export class Renderer {
     const others=racing?(race.netOpponents||[]).slice(0,3).map(o=>({...o,world:visualRoadPose(this.track,o.s,o.lateral)})):[],netCars=new Float32Array(12),netForward=new Float32Array(6);
     const slopeAt=s=>{const lo=this.track.closed?s-6:Math.max(0,s-6),hi=this.track.closed?s+6:Math.min(this.track.length,s+6);return (sample(this.track,hi).y-sample(this.track,lo).y)/Math.max(1,hi-lo);};
     const slopes=this.headlightSlopes??=new Float32Array(3);slopes.fill(0);
-    gl.uniform1f(u.uCarSlope,slopeAt(race?.s||0));gl.uniform1f(u.uRivalSlope,rival?slopeAt(race.rivalS):0);
+    const playerSlope=slopeAt(race?.s||0);
+    gl.uniform1f(u.uCarSlope,playerSlope);gl.uniform1f(u.uRivalSlope,rival?slopeAt(race.rivalS):0);
     others.forEach((o,i)=>{slopes[i]=slopeAt(o.s);const q=o.world,a=q.heading+o.yaw;netCars.set([q.x,q.y,q.z,o.headlights?1:0],i*4);netForward.set([Math.sin(a),Math.cos(a)],i*2);});
     gl.uniform3fv(u.uNetSlopes,slopes);gl.uniform4fv(u['uNetCars[0]'],netCars);gl.uniform2fv(u['uNetForward[0]'],netForward);
     const view=lookAt(eye,target,up),projection=perspective(fov*Math.PI/180,aspect,.15,2200);
@@ -1167,7 +1173,7 @@ export class Renderer {
       if(!mirror)this.warmRouteModels(race,car);
       const detail=mirror?Math.min(1,this.environmentDetail):this.environmentDetail;
       this.drawRouteLandmarks(view,projection,eye,{fog:sky,origin:visibility.fromCar?car:eye,car,
-        forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0},detail,mirror);
+        forward:[Math.sin(angle),Math.cos(angle)],slope:playerSlope,near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0},detail,mirror);
       if(detail>0&&!mirror)this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
       if(detail>0&&!mirror&&racing&&race?.wet)this.drawPuddles(eye,visibility.far);
       if(!mirror&&racing&&this.skidCount&&this.roadEffectsLoaded){

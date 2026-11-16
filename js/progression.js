@@ -343,10 +343,6 @@ export class ProgressionClient {
     const chapterEnd=()=>{if(!this.maybeChapterStory('end',worldEnd))worldEnd();};
     if(!this.openStory(stage,'end',chapterEnd))chapterEnd();
   }
-  nextStage(id){
-    const stages=this.catalog?.stages,index=stages?.findIndex(stage=>stage.id===id)??-1;
-    return index>=0&&stages[index+1]?.chapter===stages[index].chapter?stages[index+1]:null;
-  }
   async openShop(category){
     if(!this.account.require())return;
     this.callbacks.screen('shop');
