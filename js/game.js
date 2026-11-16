@@ -20,7 +20,7 @@ import {ProgressionClient} from './progression.js';
 import {campaignEvent} from './campaign-events.mjs';
 import {RunRecorder} from './replay.mjs';
 import {RaceReplay,ReplayPlayer} from './race-replay.mjs';
-import {FrameMonitor,AdaptiveResolution,AdaptiveEnvironmentDetail} from './render-performance.mjs';
+import {FrameMonitor,AdaptiveResolution,AdaptiveEnvironmentDetail,SCENERY_DISTANCES} from './render-performance.mjs';
 import {RacePresentation,PHYSICS_STEP,presentationPose} from './presentation.mjs';
 
 const $ = id => document.getElementById(id);
@@ -29,6 +29,7 @@ const compactDevice=matchMedia('(pointer: coarse)').matches||navigator.deviceMem
 const settings={car:0,track:0,arcadeStage:0,camera:'0',transmission:'auto',daytime:'night',weather:'dry',quality:compactDevice?'1':'1.4',autoQuality:true,performanceDisplay:'compact',musicVolume:50,engineVolume:55,tireVolume:60,weatherVolume:35,shake:true,cabinMotion:65,cabinFov:65,cabinHands:true,stableHorizon:true,song:'synth',...stored};
 if(!['off','compact','detailed'].includes(settings.performanceDisplay))settings.performanceDisplay='compact';
 settings.autoQuality=settings.autoQuality!==false;
+settings.detailedScenery=settings.detailedScenery===true;
 settings.cabinMotion=clamp(Number(settings.cabinMotion)||0,0,100);settings.cabinFov=clamp(Number(settings.cabinFov)||65,55,80);settings.cabinHands=settings.cabinHands!==false;settings.stableHorizon=settings.stableHorizon!==false;
 delete settings.difficulty;
 settings.car=clamp(Number(settings.car)||0,0,CARS.length-1);settings.track=clamp(Number(settings.track)||0,0,TRACKS.length-1);
@@ -36,7 +37,7 @@ function save(){try{localStorage.setItem('touge-settings',JSON.stringify(setting
 function toast(message){$('toast').textContent=message;$('toast').classList.remove('hidden');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('toast').classList.add('hidden'),4200);}
 const fmtTime=s=>{const ms=Math.floor(Math.max(0,s)*1000);return `${String(Math.floor(ms/60000)).padStart(2,'0')}′${String(Math.floor(ms/1000)%60).padStart(2,'0')}″${String(ms%1000).padStart(3,'0')}`;};
 let renderer;
-try{renderer=new Renderer($('world'));}catch(e){$('fatal').classList.remove('hidden');$('fatal').textContent=e.message;throw e;}
+try{renderer=new Renderer($('world'),{detailedScenery:settings.detailedScenery});}catch(e){$('fatal').classList.remove('hidden');$('fatal').textContent=e.message;throw e;}
 let track=makeTrack(TRACKS[settings.track]),race=null,screen='title',modal=null,returnFocus=null;
 let optionsReturn='menu';
 let replayPlayer=null;
@@ -50,6 +51,24 @@ settings.environmentDetail=Object.hasOwn(detailLevels,settings.environmentDetail
 const adaptiveEnvironment=new AdaptiveEnvironmentDetail(compactDevice);
 environmentMode.value=settings.environmentDetail;
 renderer.setEnvironmentDetail(detailLevels[settings.environmentDetail]??adaptiveEnvironment.level);
+const renderDistance=$('render-distance');
+settings.renderDistance=Object.hasOwn(SCENERY_DISTANCES,settings.renderDistance)?settings.renderDistance:'normal';
+renderDistance.value=settings.renderDistance;
+renderer.renderDistance=settings.renderDistance;
+renderDistance.addEventListener('change',()=>{
+  settings.renderDistance=renderer.renderDistance=renderDistance.value;
+  save();
+});
+const extrasToggle=$('detailed-scenery');
+extrasToggle.checked=settings.detailedScenery;
+extrasToggle.addEventListener('change',()=>{
+  renderer.setDetailedScenery(extrasToggle.checked);
+  if(extrasToggle.checked)void renderer.prepareScenery();
+  settings.detailedScenery=extrasToggle.checked;
+  frameMonitor.reset();
+  adaptiveEnvironment.resetTiming();
+  save();
+});
 environmentMode.addEventListener('change',()=>{
   settings.environmentDetail=environmentMode.value;
   adaptiveEnvironment.resetTiming();
@@ -66,7 +85,7 @@ function performanceDisplay(){
   $('performance-fps').textContent=m.samples?`${Math.round(m.fps)} FPS`:'MIDIENDO FPS';
   $('performance-time').textContent=m.samples?`${m.frameMs.toFixed(1)} ms`:'OBJETIVO 60';
   $('performance-overlay').dataset.slow=String(m.samples>30&&m.fps<55);
-  if(detailed&&m.samples)$('performance-details').textContent=`P95 ${m.p95Ms.toFixed(1)} ms · CPU ${m.cpuMs.toFixed(1)} ms\n${m.width} × ${m.height} · ESCALA ${Math.round(m.scale*100)}%${settings.autoQuality?' AUTO':''}\nENTORNO ${['BAJO','MEDIO','ALTO'][renderer.environmentDetail]} · ${m.drawCalls} DIBUJOS · ${Math.round(m.vertices/1000)}k VÉRTICES`;
+  if(detailed&&m.samples)$('performance-details').textContent=`P95 ${m.p95Ms.toFixed(1)} ms · CPU ${m.cpuMs.toFixed(1)} ms\n${m.width} × ${m.height} · ESCALA ${Math.round(m.scale*100)}%${settings.autoQuality?' AUTO':''}\n${settings.detailedScenery?'EXTRAS ACTIVOS':'ESCENARIO BASE'} · ${['BAJO','MEDIO','ALTO'][renderer.environmentDetail]}\n${m.drawCalls} DIBUJOS · ${Math.round(m.vertices/1000)}k VÉRTICES`;
 }
 $('performance-display').value=settings.performanceDisplay;$('auto-quality').checked=settings.autoQuality;
 $('performance-display').addEventListener('change',e=>{settings.performanceDisplay=e.target.value;performanceDisplay();save();});
@@ -336,7 +355,7 @@ $('replay-speed').addEventListener('change',event=>{if(replayPlayer)replayPlayer
 async function startRace(){
   if(race?.awaitingRecord||!account?.require()||startRace.busy)return;if(net?.room){showScreen('online');toast('Sal de la sala online antes de iniciar una carrera individual.');return;}
   startRace.busy=true;document.body.classList.add('starting-race');$('start').disabled=true;
-  try{await account.preferenceTail;const stage=campaignEvent(currentCampaign),mode=stage?'campaign':'time';if(stage)selectCourse(TRACKS.findIndex(t=>t.id===stage.track));else if(mode==='arcade')selectCourse(clamp(Number(settings.arcadeStage)||0,0,6));const transmissionMode=driving.choice,car=CARS[settings.car],course=track,opts={mode,manual:transmissionMode!=='auto',wet:settings.weather==='wet',night:settings.daytime==='night',...(stage?{campaignStage:stage.id}:{})};const attempt=await account.request('/api/runs/start',{method:'POST',body:JSON.stringify({car:car.id,track:course.id,...opts})});
+  try{await account.preferenceTail;const stage=campaignEvent(currentCampaign),mode=stage?'campaign':'time';if(stage)selectCourse(TRACKS.findIndex(t=>t.id===stage.track));else if(mode==='arcade')selectCourse(clamp(Number(settings.arcadeStage)||0,0,6));const transmissionMode=driving.choice,car=CARS[settings.car],course=track,opts={mode,manual:transmissionMode!=='auto',wet:settings.weather==='wet',night:settings.daytime==='night',...(stage?{campaignStage:stage.id}:{})};const [attempt]=await Promise.all([account.request('/api/runs/start',{method:'POST',body:JSON.stringify({car:car.id,track:course.id,...opts})}),renderer.prepareScenery()]);
     const paced=attempt.options.rivals||[attempt.options.rival];
     const mismatches=paced.filter(rival=>rival?.targetTimeReachable===false);
     if(mismatches.length){
@@ -583,7 +602,7 @@ async function loadOnline(room){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   if(net.room?.runId!==room.runId||net.room.phase!=='loading')return;
   prepareOnlineScene(room);
-  const models=Promise.all([...new Set(room.players.map(p=>p.car))].map(id=>renderer.vehicleModels.load(id)));
+  const models=Promise.all([renderer.prepareScenery(),...[...new Set(room.players.map(p=>p.car))].map(id=>renderer.vehicleModels.load(id))]);
   // The game already has lightweight fallback meshes if a GLB takes longer.
   let deadline;
   try{await Promise.race([models,new Promise(resolve=>{deadline=setTimeout(resolve,4500);})]);}

@@ -23,6 +23,15 @@ try{
   const renderer=new Renderer(document.getElementById('world')),cockpit=new Cockpit(document.getElementById('cab')),effects=new CornerEffects(document.getElementById('fx'));renderer.quality=1;await renderer.atlasReady;
   const gl=renderer.gl,draw=gl.drawArrays.bind(gl),read=gl.readPixels.bind(gl);let calls=0,vertices=0,reads=0;
   gl.drawArrays=(mode,first,count)=>{calls++;vertices+=count;return draw(mode,first,count);};gl.readPixels=(...args)=>{reads++;return read(...args);};
+  const multi=renderer.sceneMultiDraw;
+  if(multi){
+   const submit=multi.multiDrawArraysWEBGL.bind(multi);
+   multi.multiDrawArraysWEBGL=(mode,firsts,firstOffset,counts,countOffset,drawCount)=>{
+    calls++;
+    for(let i=0;i<drawCount;i++)vertices+=counts[countOffset+i];
+    return submit(mode,firsts,firstOffset,counts,countOffset,drawCount);
+   };
+  }
   window.benchmark=async config=>{
    const track=sim.makeTrack(sim.ALL_TRACKS.find(t=>t.id===config.track)),rival=campaign.CAMPAIGN_STAGES.find(s=>s.id===config.rival)||campaign.CAMPAIGN_STAGES[0];
    renderer.setTrack(track);renderer.setCar(sim.CARS[0]);renderer.setRival(rival);renderer.cameraMode=config.camera||0;renderer.resetCamera=true;

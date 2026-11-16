@@ -1,0 +1,275 @@
+{
+ "part": 4,
+ "assets": [
+  {
+   "course": "Montañas y cielo",
+   "folder": "mountains",
+   "file": "mountains/cloud_bank_sprites.glb",
+   "desc": "Banco de 4 nubes (sprites)"
+  },
+  {
+   "course": "Montañas y cielo",
+   "folder": "mountains",
+   "file": "mountains/mist_valley_layers.glb",
+   "desc": "Capas de niebla de valle"
+  },
+  {
+   "course": "Montañas y cielo",
+   "folder": "mountains",
+   "file": "mountains/mountain_caldera_lake.glb",
+   "desc": "Caldera con lago (estilo Haruna/Akagi)"
+  },
+  {
+   "course": "Montañas y cielo",
+   "folder": "mountains",
+   "file": "mountains/mountain_jagged_peaks.glb",
+   "desc": "Picos rocosos dentados (estilo Myogi), 110 m"
+  },
+  {
+   "course": "Montañas y cielo",
+   "folder": "mountains",
+   "file": "mountains/mountain_volcano_cone.glb",
+   "desc": "Volcán cónico con nieve (estilo Fuji), 380 m"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/bamboo_grove_clump.glb",
+   "desc": "Bambú (take), 16 cañas"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/fallen_log_and_stump.glb",
+   "desc": "Tronco caído con musgo y tocón"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/hydrangea_bush.glb",
+   "desc": "Hortensias (ajisai)"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/jizo_statue_trio.glb",
+   "desc": "Estatuas Jizo con baberos rojos"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/matsu_pine_tree.glb",
+   "desc": "Pino japonés (matsu) retorcido"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/moss_rock_large.glb",
+   "desc": "Roca grande con musgo"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/onsen_hot_spring.glb",
+   "desc": "Onsen de roca con vapor y cerca de madera"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/rice_terrace_tanada.glb",
+   "desc": "Arrozales en terraza (3 niveles)"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/sakura_cherry_tree.glb",
+   "desc": "Cerezo en flor"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/stream_stepping_stones.glb",
+   "desc": "Arroyo con piedras de paso"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/sugi_cedar_tall.glb",
+   "desc": "Cedro japonés (sugi) alto, 22 m"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/sugi_grove_cluster.glb",
+   "desc": "Grupo de 7 cedros"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/susuki_pampas_grass.glb",
+   "desc": "Pasto susuki (otoño)"
+  },
+  {
+   "course": "Naturaleza",
+   "folder": "nature",
+   "file": "nature/waterfall_pool.glb",
+   "desc": "Cascada con poza"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/hokora_roadside_shrine.glb",
+   "desc": "Santuario de camino (hokora) con torii"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/kominka_farmhouse.glb",
+   "desc": "Casa rural tradicional con tejado de paja"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/michi_no_eki_kiosk.glb",
+   "desc": "Quiosco de parada de carretera (道の駅)"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/pagoda_three_tier.glb",
+   "desc": "Pagoda de tres pisos"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/ryokan_inn_lodge.glb",
+   "desc": "Posada japonesa (ryokan) de dos pisos con faroles"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/shrine_honden_small.glb",
+   "desc": "Santuario pequeño (honden) sobre base de piedra"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/stone_stairs_shortcut.glb",
+   "desc": "Escalera de piedra con pasamanos de madera"
+  },
+  {
+   "course": "Estructuras",
+   "folder": "structures",
+   "file": "structures/wooden_footbridge.glb",
+   "desc": "Puente peatonal de madera"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/concrete_utility_pole.glb",
+   "desc": "Poste de concreto con transformador"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/culvert_box_concrete.glb",
+   "desc": "Alcantarilla de concreto"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/delineator_post_set.glb",
+   "desc": "4 postes delineadores con reflectores"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/guardrail_end_terminal.glb",
+   "desc": "Terminal de guardarraíl"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/guardrail_module_4m.glb",
+   "desc": "Módulo de guardarraíl de 4 m"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/japan_post_box.glb",
+   "desc": "Buzón de correos rojo"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/kilometer_post.glb",
+   "desc": "Mojón de kilometraje"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/retaining_wall_panel_5m.glb",
+   "desc": "Muro de contención de concreto 5 m"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_chain_required.glb",
+   "desc": "Cartel de cadenas obligatorias"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_ice_warning.glb",
+   "desc": "Aviso de hielo 凍結注意"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_road_closed.glb",
+   "desc": "Cartel de camino cerrado 通行止め"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_sharp_curve.glb",
+   "desc": "Aviso de curva cerrada 急カーブ"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_slippery.glb",
+   "desc": "Aviso de calzada resbaladiza"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_speed_30.glb",
+   "desc": "Límite 30 km/h"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/sign_speed_40.glb",
+   "desc": "Límite 40 km/h"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/slope_grid_frame_panel.glb",
+   "desc": "Panel de talud con marco de concreto (法面)"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/tire_wall_barrier.glb",
+   "desc": "Muro de neumáticos rojo/blanco"
+  },
+  {
+   "course": "Touge / carretera",
+   "folder": "touge",
+   "file": "touge/vending_machine_trio_canopy.glb",
+   "desc": "3 máquinas expendedoras bajo techo"
+  }
+ ]
+}

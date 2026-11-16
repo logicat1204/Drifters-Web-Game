@@ -33,6 +33,7 @@ test('all decorated maps retain safe road corridors and sector culling, includin
  const summary={};
  for(const config of ALL_TRACKS){
   const track=makeTrack(config),index=createRoadIndex(track),renderer=Object.create(Renderer.prototype);let uploads=0;
+  renderer.detailedScenery=true;
   renderer.gl={createBuffer:()=>({}),bindBuffer(){},bufferData(_target,data){assert.ok(data.every(Number.isFinite),config.id);uploads++;},deleteBuffer(){},ARRAY_BUFFER:1,STATIC_DRAW:2};renderer.setTrack(track);
   const env=renderer.environment;assert.ok(env.profile.name);assert.ok(env.props.length>800);assert.equal(uploads,2,'one world buffer and one backdrop buffer');
   const folder={iroha:'irohazaka',enna:'ennaskyline'}[config.id]??config.id;
@@ -52,6 +53,7 @@ test('all decorated maps retain safe road corridors and sector culling, includin
    assert.ok(Math.abs(spot.y+.10-y)<1e-5,config.id+' crowd without ground support');
   }
   assert.equal(renderer.scene.chunks.reduce((n,c)=>n+c.count,6),renderer.scene.count);
+  assert.ok(renderer.scene.frontChunks.some(chunk=>chunk.farLod?.count<chunk.count),config.id+' missing lighter foliage');
   for(const prop of env.props)assert.ok(index.distance(prop.x,prop.z,prop.radius+32)>track.width/2+prop.radius+1.79,config.id+' '+prop.kind);
   for(const prop of env.props)if(!['dock','railway-bridge'].includes(prop.kind)){
    const y=env.ground.groundAt(prop.x,prop.z);assert.notEqual(y,null,config.id+' unsupported '+prop.kind);assert.ok(Math.abs(prop.y-y-(prop.kind==='bench'?.5:0))<1e-5,config.id+' floating '+prop.kind);
@@ -63,6 +65,16 @@ test('all decorated maps retain safe road corridors and sector culling, includin
   summary[config.id]=env.counts;
  }
  assert.equal(Object.keys(summary).length,20);assert.ok(summary.iroha['tree-autumn']>1500);assert.ok(summary.atami.building>100);assert.equal(summary.usui['railway-bridge'],1);assert.ok(summary.ashinoko.dock>=1);assert.ok(summary.akagi['tunnel-segment']>10);
+});
+
+test('the default scene builds the original structures without preparing route extras',()=>{
+ const renderer=Object.create(Renderer.prototype);
+ renderer.gl={createBuffer:()=>({}),bindBuffer(){},bufferData(){},deleteBuffer(){},ARRAY_BUFFER:1,STATIC_DRAW:2};
+ renderer.setTrack(makeTrack(ALL_TRACKS.find(config=>config.id==='usui')));
+ assert.deepEqual(renderer.environment.landmarks,[]);
+ assert.deepEqual(renderer.spectatorSpots,[]);
+ assert.equal(renderer.environment.counts['railway-bridge'],1);
+ assert.ok(renderer.scene.nearCount<renderer.scene.count);
 });
 
 test('course identities and inhabited areas follow authored regional patterns',()=>{

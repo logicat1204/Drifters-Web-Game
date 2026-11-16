@@ -1,12 +1,12 @@
 import {COMPLEMENT_MODELS} from './roadside-complements.mjs';
 import {createTerrainField} from './terrain-field.mjs';
 import {PART2_MODELS} from './scenery-part2.mjs';
-import {packScene,boundsDistance,chunkOpacity} from './scene-batches.mjs';
+import {packScene,boundsDistance} from './scene-batches.mjs';
 import {applyBuild,appearanceKey} from './tuning.mjs';
 import { ALL_CARS as CARS, sample, worldAt, mix, clamp } from './sim.mjs';
 import { createRoadIndex } from './scenery.mjs';
 import {FOCUS_TYPES} from './focus.mjs';
-import {chunkVisible,viewPlanes,mirrorLayout} from './render-performance.mjs';
+import {chunkVisible,viewPlanes,mirrorLayout,SCENERY_DISTANCES,fadeBetween} from './render-performance.mjs';
 import {createEnvironment} from './environment.mjs';
 import {TEXTURES} from './scenery-assets.mjs';
 import {MenuModel,parseMenuModel} from './menu-model.mjs';
@@ -14,7 +14,9 @@ import {VehicleModels,ORIGINAL_CARS} from './vehicle-model.mjs';
 import {CabinView} from './cabin-view.js';
 import {cabinProfile} from './cabin-geometry.mjs';
 import {DriverCamera} from './driver-camera.mjs';
-import {landmarkUrl,TURBINE_ROTOR} from './route-landmarks.mjs';
+import {TURBINE_ROTOR} from './route-landmarks.mjs';
+import {placementModelKey,sceneryAssetUrl,sceneryModelRoot} from './scenery-models.mjs';
+import {layoutUrl,readTrackLayout} from './track-layout.mjs';
 
 const V = (x=0,y=0,z=0) => [x,y,z];
 const sceneryModel=(pack,name)=>new URL(`../assets/touge_city_assets_part${pack}/models/${name}.glb`,import.meta.url);
@@ -193,21 +195,62 @@ function meshCar(gl,color,modelId,build={}) {
 }
 
 export class Renderer {
-  constructor(canvas) {
+  constructor(canvas,{detailedScenery=false}={}) {
     this.canvas=canvas;
     const gl=this.gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
     if(!gl) throw new Error('Tu navegador no ofrece WebGL. Activa la aceleración gráfica y vuelve a cargar.');
-    const vertex=`attribute vec3 aPos;attribute vec3 aNormal;attribute vec4 aColor,aSurface;uniform mat4 uModel,uView,uProjection;varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;void main(){vec4 p=uModel*vec4(aPos,1.);vWorld=p.xyz;vNormal=mat3(uModel)*aNormal;vColor=aColor;vSurface=aSurface;gl_Position=uProjection*uView*p;}`;
+    this.detailedScenery=detailedScenery===true;
+    this.scenePrograms=new Map();
     this.textureGrad=!!(gl.getExtension('OES_standard_derivatives')&&gl.getExtension('EXT_shader_texture_lod'));
+    this.sceneMultiDraw=gl.getExtension('WEBGL_multi_draw');
+    this.selectSceneProgram();
+    this.initAtlas();
+    this.courseSkyTexture=gl.createTexture();
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D,this.courseSkyTexture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0]));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    this.cars={};this.vehicleModels=new VehicleModels(gl);this.cabin=new CabinView(gl);this.driverCamera=new DriverCamera();this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
+    this.resolutionScale=1;this.environmentDetail=2;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
+    const shadow=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2;shadow.triangle(V(0,.045,0),V(Math.cos(a)*1.22,.045,Math.sin(a)*2.55),V(Math.cos(b)*1.22,.045,Math.sin(b)*2.55),'#000000');}this.shadow=shadow.upload(gl);
+    const moon=new Geometry();for(let i=0;i<32;i++){const a=i/32*Math.PI*2,b=(i+1)/32*Math.PI*2;moon.triangle(V(0,0,0),V(Math.cos(a)*30,Math.sin(a)*30,0),V(Math.cos(b)*30,Math.sin(b)*30,0),[.92,.94,.81,1]);}this.moon=moon.upload(gl);
+    const smoke=new Geometry();smoke.box(0,0,0,1,1,1,'#b7c2bd');this.smoke=smoke.upload(gl);
+    const spray=new Geometry();spray.box(0,0,0,1,.3,1,'#bfd6e2');this.spray=spray.upload(gl);
+    this.particles=[];
+    this.focusAuras={};for(const type of Object.values(FOCUS_TYPES)){
+      const aura=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2,tip=(a+b)/2;const color=type.id==='time'&&i%3===0?type.color:type.aura;const col=[parseInt(color.slice(1,3),16)/255,parseInt(color.slice(3,5),16)/255,parseInt(color.slice(5,7),16)/255,1];aura.triangle(V(Math.cos(a)*1.18,0,Math.sin(a)*2.35),V(Math.cos(b)*1.18,0,Math.sin(b)*2.35),V(Math.cos(tip)*1.04,.65+i%3*.22,Math.sin(tip)*2.15),col);}
+      if(type.id==='drift')for(const side of [-1,1])for(let i=0;i<5;i++)aura.triangle(V(side*.7,.6,-1),V(side*(2+i*.13),1.5-i*.15,-1.5),V(side*1.2,.45,-1.65),[.65,.94,1,1]);this.focusAuras[type.id]=aura.upload(gl);
+    }
+    this.reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    this.buildBossMeshes();
+    this.buildMenuScene();
+    this.setNetworkPlayers([{car:'rx7'},{car:'r32'}]);
+  }
+  selectSceneProgram(){
+    const gl=this.gl,key=this.detailedScenery;
+    const previous=this.scenePrograms.get(key);
+    this.boundBuffer=null;
+    if(previous){Object.assign(this,previous);return;}
+    const vertex=`attribute vec3 aPos;attribute vec3 aNormal;attribute vec4 aColor,aSurface;uniform mat4 uModel,uView,uProjection;varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;void main(){vec4 p=uModel*vec4(aPos,1.);vWorld=p.xyz;vNormal=mat3(uModel)*aNormal;vColor=aColor;vSurface=aSurface;gl_Position=uProjection*uView*p;}`;
     const fragment=`${this.textureGrad?'#extension GL_OES_standard_derivatives : enable\n#extension GL_EXT_shader_texture_lod : enable':''}
+      ${this.detailedScenery?'#define ROUTE_EXTRAS 1':''}
       #ifdef GL_FRAGMENT_PRECISION_HIGH
       precision highp float;
       #else
       precision mediump float;
       #endif
       varying vec4 vColor,vSurface;varying vec3 vNormal,vWorld;
-      uniform sampler2D uAtlas,uCourseSky,uRoadEffects;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain,uCourseSkyReady,uRoadEffectsReady;
+      uniform sampler2D uAtlas,uCourseSky;uniform float uAtlasReady,uTunnel,uBackdrop,uTerrain,uCourseSkyReady;
+      #ifdef ROUTE_EXTRAS
+      uniform sampler2D uRoadEffects;uniform float uRoadEffectsReady;
+      #endif
       uniform vec4 uStreetLights[3];
+      uniform float uFoliageFade;
       uniform vec3 uFog,uEye,uCar,uRivalCar;uniform vec2 uForward,uRivalForward;
       uniform vec4 uNetCars[3];uniform vec2 uNetForward[3];uniform vec3 uNetSlopes;
       uniform float uCarSlope,uRivalSlope;
@@ -221,10 +264,12 @@ export class Renderer {
         return cone*height;
       }
       float hashRain(vec2 p){return fract(52.9829189*fract(dot(p,vec2(.06711056,.00583715))));}
+      #ifdef ROUTE_EXTRAS
       // Dry rubber, wet rubber and four ripple frames.
       vec4 roadEffect(float tile,vec2 uv){
         return texture2D(uRoadEffects,(vec2(tile*256.+2.5,2.5)+uv*251.)/vec2(1024.,256.));
       }
+      #endif
       float rearReflection(vec3 car,vec2 forward){
         vec2 delta=vWorld.xz-car.xz;
         float depth=-dot(delta,forward),offset=abs(delta.x*forward.y-delta.y*forward.x);
@@ -232,6 +277,10 @@ export class Renderer {
         return streak*smoothstep(1.,3.,depth)*(1.-smoothstep(7.,27.,depth))*(1.-smoothstep(1.1,4.,abs(vWorld.y-car.y)));
       }
       void main(){
+        if(uFoliageFade!=0.){
+          float pattern=fract(dot(floor(gl_FragCoord.xy),vec2(.75487766,.56984029)));
+          if((uFoliageFade>0.&&pattern<uFoliageFade)||(uFoliageFade<0.&&pattern>=-uFoliageFade))discard;
+        }
         if(uBackdrop>.5&&uBackdrop<1.5&&vSurface.z<-29.5){
           vec3 dir=normalize(vWorld-uEye);
           float elevation=asin(clamp(dir.y,-1.,1.));
@@ -242,6 +291,7 @@ export class Renderer {
           gl_FragColor=vec4(mix(sky,uFog,haze),1.);return;
         }
         float f=smoothstep(uFogStart,uFogEnd,distance(vWorld,mix(uEye,uCar,uFogFromCar)));
+        #ifdef ROUTE_EXTRAS
         if(vSurface.z<-31.5){
           vec2 uv=vec2(mix(vSurface.x,.135+vSurface.x*.312,uWet),vSurface.y);
           vec4 rubber=roadEffect(uWet,uv);
@@ -267,9 +317,10 @@ export class Renderer {
             water+=roadEffect(3.,frame).a*vec3(.51,.66,.78)*near*(.45+uDay*.3+glare*.38);
           }
           float edge=smoothstep(0.,.19,vColor.a);
-          gl_FragColor=vec4(water,(.48+.29*grazing)*edge*(1.-f)*uRoadEffectsReady);
+          gl_FragColor=vec4(water,(.48+.29*grazing)*edge*(1.-f)*uRoadEffectsReady*uAlpha);
           return;
         }
+        #endif
         vec4 texel=vec4(1.);float tile=-1.;if(vSurface.z>=0.){tile=floor((uDay>.5?vSurface.z:vSurface.w)+.5);if(uAtlasReady<.5){if(tile>=29.&&tile<=32.)discard;texel=vec4(.6,.65,.55,1.);}else {vec2 cell=vec2(mod(tile,8.),floor(tile/8.)),uv=(cell*256.+8.+vec2(fract(vSurface.x),1.-fract(vSurface.y))*240.)/2048.;
         ${this.textureGrad?'vec2 dx=dFdx(vSurface.xy)*vec2(240./2048.,-240./2048.),dy=dFdy(vSurface.xy)*vec2(240./2048.,-240./2048.);dx*=min(1.,.0078125/max(length(dx),.000001));dy*=min(1.,.0078125/max(length(dy),.000001));texel=texture2DGradEXT(uAtlas,uv,dx,dy);':'texel=texture2D(uAtlas,uv);'}
         if(texel.a<.45)discard;}}
@@ -306,7 +357,12 @@ export class Renderer {
           vec3 view=toEye/max(.001,eyeDistance);
           vec2 road=vSurface.xy;
           float grazing=pow(1.-clamp(abs(dot(n,view)),0.,1.),2.);
-          float water=.44;
+          #ifdef ROUTE_EXTRAS
+          float water=.44,pool=water;
+          #else
+          float poolShape=sin(road.y*.91+cos(road.x*3.3))+sin(road.x*5.4-road.y*.41)*.58;
+          float pool=smoothstep(.22,.80,poolShape),water=.27+pool*.73;
+          #endif
           float ripple=0.;
           float nearRoad=1.-smoothstep(12.,32.,eyeDistance);
           if(nearRoad>.01){
@@ -321,7 +377,11 @@ export class Renderer {
           float skyBand=smoothstep(.07,.61,reflect(-view,n).y);
           vec3 reflectedSky=mix(vec3(.028,.053,.083),vec3(.19,.30,.41),daylight);
           reflectedSky+=skyBand*mix(vec3(.020,.028,.040),vec3(.23,.24,.25),daylight);
+          #ifdef ROUTE_EXTRAS
           c=mix(c*.75,reflectedSky,water*(.17+grazing*.66));
+          #else
+          c=mix(c*(.79-pool*.19),reflectedSky,water*(.17+grazing*.66));
+          #endif
           float streak=.88+.12*sin(road.y*42.+road.x*8.);
           c+=vec3(.72,.84,1.)*headlights*water*(.06+grazing*.16)*streak;
           float tail=0.;
@@ -333,7 +393,11 @@ export class Renderer {
             float glint=1.-smoothstep(.16,1.85,length(offset));
             c+=vec3(.55,.38,.18)*glint*glint*uStreetLights[i].w*water*grazing*(1.-daylight);
           }
+          #ifdef ROUTE_EXTRAS
           c+=vec3(.31,.40,.50)*ripple*(.22+headlights*.31+daylight*.24)*.44;
+          #else
+          c+=vec3(.31,.40,.50)*ripple*(.22+headlights*.31+daylight*.24)*(.30+pool*.70);
+          #endif
         }
         if(uVehicle>.5){vec3 view=normalize(uEye-vWorld),h=normalize(view+normalize(vec3(-.35,.85,.4)));float fresnel=pow(1.-abs(dot(n,view)),4.),shine=pow(max(0.,dot(n,h)),kind==4.?70.:100.);float visibility=mix(.075,1.,daylight)+headlights*.22;
          if(kind==2.||kind==8.||kind==7.||kind==4.)c+=vec3(.66,.80,1.)*(fresnel*(.18+uWet*.07)+shine*(.38+uWet*.24))*visibility;
@@ -342,49 +406,18 @@ export class Renderer {
         if(uDay<.5&&((tile>=5.&&tile<=10.)||tile==17.)){float window=smoothstep(.55,.8,texel.r)*smoothstep(.5,.7,texel.g)*(1.-smoothstep(.75,.95,texel.b));c+=texel.rgb*window*.65;}
         gl_FragColor=vec4(mix(c,uFog,f),opacity);}`;
     const compile=(type,src)=>{const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;};
-    this.program=gl.createProgram();gl.attachShader(this.program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(this.program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(this.program);
+    const vs=compile(gl.VERTEX_SHADER,vertex),fs=compile(gl.FRAGMENT_SHADER,fragment);
+    this.program=gl.createProgram();gl.attachShader(this.program,vs);gl.attachShader(this.program,fs);gl.linkProgram(this.program);gl.deleteShader(vs);gl.deleteShader(fs);
     if(!gl.getProgramParameter(this.program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(this.program));gl.useProgram(this.program);
     this.attrs={};for(const name of ['aPos','aNormal','aColor','aSurface'])this.attrs[name]=gl.getAttribLocation(this.program,name);
     this.uniforms={};for(const name of ['uCarSlope','uRivalSlope','uNetSlopes','uTerrain','uModel','uView','uProjection','uFog','uEye','uDay','uAlpha','uFogStart','uFogEnd','uFogFromCar','uCar','uForward','uHeadlights','uRivalCar','uRivalForward','uRivalLights','uLampState','uBrake','uNetCars[0]','uNetForward[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
-    for(const name of ['uAtlas','uAtlasReady','uCourseSky','uCourseSkyReady','uTunnel','uBackdrop','uStreetLights[0]'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
+    for(const name of ['uAtlas','uAtlasReady','uCourseSky','uCourseSkyReady','uTunnel','uBackdrop','uStreetLights[0]','uFoliageFade'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
     for(const name of ['uVehicle','uCarbon','uVehiclePaint','uWheelColor','uWet','uWeatherTime','uRoadEffects','uRoadEffectsReady'])this.uniforms[name]=gl.getUniformLocation(this.program,name);
-    this.initAtlas();
-    this.courseSkyTexture=gl.createTexture();
     gl.uniform1i(this.uniforms.uCourseSky,4);
-    gl.uniform1i(this.uniforms.uRoadEffects,5);
-    gl.activeTexture(gl.TEXTURE4);
-    gl.bindTexture(gl.TEXTURE_2D,this.courseSkyTexture);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,1,1,0,gl.RGB,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0]));
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    this.roadEffects=gl.createTexture();
-    gl.activeTexture(gl.TEXTURE5);
-    gl.bindTexture(gl.TEXTURE_2D,this.roadEffects);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-    this.cars={};this.vehicleModels=new VehicleModels(gl);this.cabin=new CabinView(gl);this.driverCamera=new DriverCamera();this.eye=[0,0,0];this.target=[0,0,0];this.time=0;this.quality=1.4;this.cameraMode=0;
-    this.resolutionScale=1;this.environmentDetail=2;this.culling=true;this.planes=new Float32Array(24);this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0};
-    const shadow=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2;shadow.triangle(V(0,.045,0),V(Math.cos(a)*1.22,.045,Math.sin(a)*2.55),V(Math.cos(b)*1.22,.045,Math.sin(b)*2.55),'#000000');}this.shadow=shadow.upload(gl);
-    const moon=new Geometry();for(let i=0;i<32;i++){const a=i/32*Math.PI*2,b=(i+1)/32*Math.PI*2;moon.triangle(V(0,0,0),V(Math.cos(a)*30,Math.sin(a)*30,0),V(Math.cos(b)*30,Math.sin(b)*30,0),[.92,.94,.81,1]);}this.moon=moon.upload(gl);
-    const smoke=new Geometry();smoke.box(0,0,0,1,1,1,'#b7c2bd');this.smoke=smoke.upload(gl);
-    const spray=new Geometry();spray.box(0,0,0,1,.3,1,'#bfd6e2');this.spray=spray.upload(gl);
-    this.particles=[];
-    this.focusAuras={};for(const type of Object.values(FOCUS_TYPES)){
-      const aura=new Geometry();for(let i=0;i<24;i++){const a=i/24*Math.PI*2,b=(i+1)/24*Math.PI*2,tip=(a+b)/2;const color=type.id==='time'&&i%3===0?type.color:type.aura;const col=[parseInt(color.slice(1,3),16)/255,parseInt(color.slice(3,5),16)/255,parseInt(color.slice(5,7),16)/255,1];aura.triangle(V(Math.cos(a)*1.18,0,Math.sin(a)*2.35),V(Math.cos(b)*1.18,0,Math.sin(b)*2.35),V(Math.cos(tip)*1.04,.65+i%3*.22,Math.sin(tip)*2.15),col);}
-      if(type.id==='drift')for(const side of [-1,1])for(let i=0;i<5;i++)aura.triangle(V(side*.7,.6,-1),V(side*(2+i*.13),1.5-i*.15,-1.5),V(side*1.2,.45,-1.65),[.65,.94,1,1]);this.focusAuras[type.id]=aura.upload(gl);
-    }
-    this.reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    this.buildBossMeshes();
-    this.buildMenuScene();
-    this.setNetworkPlayers([{car:'rx7'},{car:'r32'}]);
+    if(key)gl.uniform1i(this.uniforms.uRoadEffects,5);
+    this.scenePrograms.set(key,{program:this.program,attrs:this.attrs,uniforms:this.uniforms});
   }
+
   initAtlas(){
     const gl=this.gl;this.atlas=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.activeTexture(gl.TEXTURE0);
     this.atlasReady=new Promise(resolve=>{const img=new Image();img.onload=()=>{gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);gl.generateMipmap(gl.TEXTURE_2D);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,this.textureGrad?gl.LINEAR_MIPMAP_LINEAR:gl.LINEAR);const anisotropy=gl.getExtension('EXT_texture_filter_anisotropic');if(anisotropy)gl.texParameterf(gl.TEXTURE_2D,anisotropy.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(4,gl.getParameter(anisotropy.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));gl.activeTexture(gl.TEXTURE0);this.atlasLoaded=true;resolve(true);};img.onerror=()=>{this.atlasError=true;resolve(false);};img.src=new URL('../assets/environment/atlas.png',import.meta.url).href;});
@@ -603,8 +636,24 @@ export class Renderer {
     for(const key of this.networkKeys||[])if(!keep.has(key)&&!CARS.some(c=>key==='network-'+c.id)){this.gl.deleteBuffer?.(this.cars[key]?.buffer);this.vehicleModels?.forget(key);delete this.cars[key];delete this.meshLooks[key];}this.networkKeys=keep;
   }
   setRival(rival){this.rival=rival;const key='rival-'+rival.id;if(!this.cars[key])this.cars[key]=meshCar(this.gl,rival.color,rival.car);}
-  setTrack(track) {
+  async prepareScenery(){
+    if(!this.track)return;
+    const {track}=this;
+    this.layoutRequests??=new Map();
+    if(!this.layoutRequests.has(track.id)){
+      const request=fetch(layoutUrl(track.id),{signal:AbortSignal.timeout(3500)}).then(async response=>response.ok?readTrackLayout(await response.json(),track):null)
+        .catch(()=>{this.layoutRequests.delete(track.id);return null;});
+      this.layoutRequests.set(track.id,request);
+    }
+    const layout=await this.layoutRequests.get(track.id);
+    if(layout&&this.track===track&&this.trackLayout!==layout){
+      if(this.detailedScenery||layout.fills.length)this.setTrack(track,layout);
+      else this.trackLayout=layout;
+    }
+  }
+  setTrack(track,layout=this.track?.id===track.id?this.trackLayout:null) {
     this.track=track;const gl=this.gl;
+    this.trackLayout=layout;
     this.clearRouteModels();
     for(const mesh of this.landmarkFallbacks?.values()||[])gl.deleteBuffer(mesh.buffer);
     this.landmarkFallbacks?.clear();
@@ -619,14 +668,17 @@ export class Renderer {
     const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
     const point=(p,l,y=0)=>V(p.x+Math.cos(p.heading)*l,p.y+y+roadBankHeight(track,p.curve,l),p.z-Math.sin(p.heading)*l);
     const strip=(a,b,l1,l2,y,color)=>g.quad(point(a,l1,y),point(b,l1,y),point(b,l2,y),point(a,l2,y),color);
-    const ground=createTerrainField(track,roadIndex);
+    const ground=createTerrainField(track,roadIndex,{fills:layout?.fills}),detailed=this.detailedScenery===true;
+    const farFoliage=new Geometry(),farSpans=[];
+    const createScenery=()=>createEnvironment(track,g,roadIndex,this.sceneryBounds,{layer,ground,detailed,farFoliage,layout});
+    const basicEnvironment=detailed?null:createScenery();
     const water=['atami','tsubaki','odawara','manazuru','ashinoko'].includes(track.id);
     const minY=Math.min(...track.points.map(p=>p.y))-(water?12:35);
     const minX=Math.min(...track.points.map(p=>p.x))-1500,maxX=Math.max(...track.points.map(p=>p.x))+1500,minZ=Math.min(...track.points.map(p=>p.z))-1500,maxZ=Math.max(...track.points.map(p=>p.z))+1500;
     if(water)g.surface(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),TEXTURES.water,[[0,0],[0,40],[40,40],[40,0]]);else g.quad(V(minX,minY,minZ),V(minX,minY,maxZ),V(maxX,minY,maxZ),V(maxX,minY,minZ),'#22372d');
     ground.build(g,(id,y)=>{layer('terrain');sector=-id-1;baseY=y;},TEXTURES.grass);
     layer('road');sector=0;baseY=0;
-    const environment=this.environment=createEnvironment(track,g,roadIndex,this.sceneryBounds,{layer,ground});
+    const environment=this.environment=basicEnvironment??createScenery();
     for(let i=0;i<(track.renderSegments??track.points.length-1);i++) {
       const a=track.points[i],b=track.points[i+1];layer('road');baseY=a.y;
       for(const side of [-1,1]){strip(a,b,side*5.3,side*6.05,-.015,'#747972');g.quad(point(a,side*6.05,-.015),point(b,side*6.05,-.015),point(b,side*6.05,-.48),point(a,side*6.05,-.48),'#5f655f');}
@@ -642,21 +694,29 @@ export class Renderer {
         g.quad(point(a,side*5.68,.75),point(b,side*5.68,.75),point(b,side*5.68,.97),point(a,side*5.68,.97),'#a6b0a8');
         if(i%Math.max(1,Math.round(32/track.step))===0){const p=point(a,side*5.68,.45);g.box(...p,.09,.9,.10,'#808c87');const q=point(a,side*5.62,.99);g.box(...q,.09,.10,.18,side<0?[.95,.18,.08,.12]:[.9,.88,.6,.12]);}
       }
+      const firstFar=farFoliage.data.length/14;
       environment.step(i,a,b);
+      if(farFoliage.data.length/14>firstFar)farSpans.push({first:firstFar,count:farFoliage.data.length/14-firstFar,kind:'foliage-far',sector,baseY});
       layer('road');
       if(i===Math.round(32/track.step)){for(const side of [-1,1]){const p=point(a,side*6.5,2.8);g.box(...p,.2,5.6,.2,'#747e83');}g.surface(point(a,-6.5,5.1),point(a,6.5,5.1),point(a,6.5,6.5),point(a,-6.5,6.5),TEXTURES.billboard_generic);}
       if(i===(track.renderSegments?track.renderSegments-1:Math.floor(track.length/track.step)))for(let k=0;k<12;k++)strip(a,b,-5.2+k*.87,-5.2+(k+1)*.87,.04,k%2?'#d1d2bd':'#171f22');
       if((i+1)%Math.max(1,Math.round(96/track.step))===0)endChunk();
     }
-    this.spectatorSpots=this.findSpectatorSpots(track,ground,roadIndex,environment);
-    for(const spot of environment.landmarks){
-      const radius=spot.rotor?18:spot.radius;
-      spot.min=[spot.x-radius,spot.y-1,spot.z-radius];
-      spot.max=[spot.x+radius,spot.y+spot.height+(spot.rotor?16:0),spot.z+radius];
-      spot.matrix=transform(spot.x,spot.y,spot.z,spot.angle);
-      for(const [axis,scale] of spot.scale.entries())for(let row=0;row<3;row++)spot.matrix[axis*4+row]*=scale;
+    this.spectatorSpots=detailed?this.findSpectatorSpots(track,ground,roadIndex,environment):[];
+    this.setLandmarkPreview(environment.landmarks);
+    endChunk();
+    const farFirst=g.data.length/14;
+    for(const value of farFoliage.data)g.data.push(value);
+    farFoliage.data.length=0;
+    for(const span of farSpans)spans.push({...span,first:farFirst+span.first});
+    const chunks=packScene(g.data,spans);
+    this.scene=g.upload(gl);this.scene.chunks=chunks;
+    this.scene.frontChunks=chunks.filter(chunk=>chunk.kind!=='foliage-far');
+    this.scene.nearCount=chunks.find(chunk=>chunk.kind==='foliage-far')?.first??this.scene.count;
+    if(this.sceneMultiDraw){
+      this.scene.firsts=new Int32Array(this.scene.frontChunks.length);
+      this.scene.counts=new Int32Array(this.scene.frontChunks.length);
     }
-    endChunk();const chunks=packScene(g.data,spans);this.scene=g.upload(gl);this.scene.chunks=chunks;
     const bg=new Geometry();
     bg.box(0,100,0,2000,2000,2000,'#ffffff',[-30,-30]);
     for(let layer=0;layer<2;layer++)for(let i=0;i<12;i++){const a=i/12*Math.PI*2,b=(i+1)/12*Math.PI*2,r=1000-layer*150,y=-100-layer*30,p=(angle,height)=>V(Math.sin(angle)*r,height,Math.cos(angle)*r);bg.surface(p(a,y),p(b,y),p(b,y+260-layer*20),p(a,y+260-layer*20),TEXTURES[layer?'mountains_mid':'mountains_far'],[[i%3/3,0],[(i%3+1)/3,0],[(i%3+1)/3,1],[i%3/3,1]],[.8,.88,.89,0]);}
@@ -666,6 +726,26 @@ export class Renderer {
     if(['tsubaki','odawara','ashinoko','manazuru','atami'].includes(track.id))horizon('bg_mountain_fuji',650,-180,-1050,2,1.4,2);
     this.backdrop=bg.upload(gl);
     this.resetCamera=true;
+  }
+  setLandmarkPreview(spots){
+    this.environment.landmarks=spots;
+    for(const spot of spots){
+      const radius=spot.radius,base=spot.base??spot.y;
+      spot.min=[spot.x-radius,base-1,spot.z-radius];
+      spot.max=[spot.x+radius,base+spot.height,spot.z+radius];
+      if(!spot.matrix){
+        spot.matrix=transform(spot.x,spot.y,spot.z,spot.angle);
+        for(const [axis,scale] of spot.scale.entries())for(let row=0;row<3;row++)spot.matrix[axis*4+row]*=scale;
+      }
+      if(spot.rotor){
+        const rotorRadius=18*Math.max(...spot.scale),m=spot.matrix;
+        for(let axis=0;axis<3;axis++){
+          const center=m[axis+12]+m[axis+4]*30.6+m[axis+8]*2.5;
+          spot.min[axis]=Math.min(spot.min[axis],center-rotorRadius);
+          spot.max[axis]=Math.max(spot.max[axis],center+rotorRadius);
+        }
+      }
+    }
   }
   findSpectatorSpots(track,ground,roadIndex,environment){
     const spots=[];
@@ -722,6 +802,7 @@ export class Renderer {
         if(!response.ok)throw Error('No se pudo cargar el público');
         return response.arrayBuffer();
       }).then(buffer=>{
+        if(this.spectatorMeshes.get(name)!==entry)return;
         const model=parseMenuModel(buffer,{assetUrl:url,worldScale:1});
         const geometry=new Geometry();
         for(const batch of model.batches){
@@ -732,6 +813,7 @@ export class Renderer {
           }
         }
         entry.mesh=geometry.upload(this.gl);
+        entry.mesh.readyAt=this.time;
         this.boundBuffer=null;
       }).catch(error=>{entry.error=error.message;});
     }
@@ -743,49 +825,57 @@ export class Renderer {
     for(const spot of this.spectatorSpots||[]){
       if(!chunkVisible(spot,planes,eye,Math.min(far,115)))continue;
       const name=wet&&spot.roomForRainRow?'crowd_rain_row':spot.section%2?'crowd_fans_group_a':'crowd_fans_group_b';
-      this.draw(this.spectatorMesh(name),spot.model);
+      const mesh=this.spectatorMesh(name);
+      if(mesh){
+        const alpha=(1-fadeBetween(boundsDistance(spot,eye),72,115))*fadeBetween(this.time-mesh.readyAt,0,.4);
+        if(alpha>0)this.draw(mesh,spot.model,alpha);
+      }
     }
   }
   warmRouteModels(race,origin){
     if(!this.environmentDetail||this.routeLoading||this.time<this.routeWarmAt)return;
     this.routeWarmAt=this.time+.22;
     const {track,environment}=this;
-    const range=this.environmentDetail===2?390:245;
-    let nearest=null,distance=range+1;
+    const distanceSetting=SCENERY_DISTANCES[this.renderDistance]??SCENERY_DISTANCES.normal;
+    const range=(this.environmentDetail===2?460:310)*distanceSetting.scale;
+    const candidates=new Map(),capacity=this.editorPreview?16:8;
+    const consider=(pack,file,detail,portal,proximity)=>{
+      const key=placementModelKey({pack,file,portal});
+      if(proximity>range||proximity>=(candidates.get(key)?.proximity??Infinity))return;
+      candidates.set(key,{key,file,pack,detail,portal,proximity});
+    };
     this.routeModels??=new Map();
     for(const spot of environment.landmarks){
       if(spot.detail>this.environmentDetail)continue;
       let ahead=spot.s-(race?.s??0);
       if(track.closed)ahead=((ahead+track.length/2)%track.length+track.length)%track.length-track.length/2;
       const planar=Math.hypot(spot.x-origin[0],spot.z-origin[2]);
-      const proximity=Math.min(planar,Math.abs(ahead)+(ahead<0?90:0));
-      if(proximity>=distance)continue;
-      const rotor=spot.rotor&&this.routeModels.has(spot.file);
-      const file=rotor?TURBINE_ROTOR:spot.file;
-      if(this.routeModels.has(file))continue;
-      nearest={...spot,file,portal:!rotor&&spot.portal};
-      distance=proximity;
+      const proximity=placementModelKey(spot)===this.editorFocusModel?-1:Math.min(planar,Math.abs(ahead)+(ahead<0?90:0));
+      consider(spot.pack,spot.file,spot.detail,spot.portal,proximity);
+      if(spot.rotor)consider(1,TURBINE_ROTOR,spot.detail,false,proximity+.5);
     }
+    const wanted=[...candidates.values()].sort((a,b)=>a.proximity-b.proximity).slice(0,capacity);
+    const nearest=wanted.find(asset=>!this.routeModels.has(asset.key));
     if(!nearest)return;
-    if(this.routeModels.size>=8){
-      const activeFiles=new Set(environment.landmarks.filter(spot=>Math.hypot(spot.x-origin[0],spot.z-origin[2])<range).map(spot=>spot.file));
-      if(activeFiles.has('sadamine/sadamine_turbine_tower'))activeFiles.add(TURBINE_ROTOR);
+    if(this.routeModels.size>=capacity){
+      const activeFiles=new Set(wanted.map(asset=>asset.key));
       const stale=[...this.routeModels.keys()].find(file=>!activeFiles.has(file));
       if(!stale)return;
       this.routeModels.get(stale).dispose();this.routeModels.delete(stale);
     }
-    const model=new MenuModel(this.gl,landmarkUrl(nearest.file,nearest.pack),1,undefined,
-      {preserveHeight:true,omitGround:nearest.portal,background:true,textureLimit:this.environmentDetail===2?1024:512});
+    const model=new MenuModel(this.gl,sceneryAssetUrl(nearest.pack,nearest.file),1,undefined,
+      {preserveHeight:true,omitGround:nearest.portal,background:true,textureLimit:this.environmentDetail===2?1024:512,textureRoot:sceneryModelRoot(nearest.pack)});
     model.detail=nearest.detail;
     this.routeLoading=model;
-    this.routeModels.set(nearest.file,model);
+    this.routeModels.set(nearest.key,model);
     model.load().then(()=>{
+      model.readyAt=this.time;
       if(this.routeLoading===model)this.routeLoading=null;
       this.boundBuffer=null;
     });
   }
-  drawLandmarkFallback(spot){
-    const bridge=spot.file==='usui/usui_megane_bridge';
+  drawLandmarkFallback(spot,alpha,coverage){
+    const bridge=spot.pack===1&&spot.file==='usui/usui_megane_bridge';
     if(!spot.portal&&!bridge)return;
     const key=bridge?'bridge':'portal';
     this.landmarkFallbacks??=new Map();
@@ -805,39 +895,48 @@ export class Renderer {
       this.landmarkFallbacks.set(key,g.upload(this.gl));
       this.boundBuffer=null;
     }
-    this.draw(this.landmarkFallbacks.get(key),transform(spot.x,spot.y,spot.z,spot.angle));
+    const matrix=spot.matrix.slice(),base=bridge?[1,1,1]:[2.12,1,.32];
+    for(let axis=0;axis<3;axis++)for(let row=0;row<3;row++)matrix[axis*4+row]/=base[axis];
+    this.gl.uniform1f(this.uniforms.uFoliageFade,coverage);
+    this.draw(this.landmarkFallbacks.get(key),matrix,alpha);
+    this.gl.uniform1f(this.uniforms.uFoliageFade,0);
   }
   drawRouteLandmarks(view,projection,eye,weather,level,mirror){
     const spots=this.environment.landmarks;
     if(!spots.length)return;
     const gl=this.gl,planes=this.culling===false?viewPlanes(view,projection,this.planes):this.planes;
     const visible=[];
+    const distanceSetting=SCENERY_DISTANCES[this.renderDistance]??SCENERY_DISTANCES.normal;
     for(const spot of spots){
-      const range=mirror?80:level===2?(spot.height>10?315:165):(spot.height>10?185:100);
+      const range=mirror?80:(level===2?(spot.height>10?315:165):(spot.height>10?185:100))*distanceSetting.scale;
       if(!chunkVisible(spot,planes,weather.origin,Math.min(weather.far,range)))continue;
-      if(spot.detail<=level&&this.routeModels?.get(spot.file)?.status==='ready')visible.push(spot);
-      else this.drawLandmarkFallback(spot);
+      const model=this.routeModels?.get(placementModelKey(spot));
+      const edge=1-fadeBetween(boundsDistance(spot,weather.origin),range*.64,range);
+      const coverage=spot.detail<=level&&model?.status==='ready'?edge*fadeBetween(this.time-(model.readyAt??-1),0,.42):0;
+      if(edge>0&&coverage<1)this.drawLandmarkFallback(spot,edge,coverage);
+      if(coverage>0)visible.push({spot,coverage});
     }
     let changedProgram=false;
-    const draw=(file,matrix)=>{
-      const model=this.routeModels.get(file);
+    const draw=(key,matrix,coverage)=>{
+      const model=this.routeModels.get(key);
       if(model?.status!=='ready')return;
-      const stats=model.draw(view,projection,eye,matrix,weather);
+      const stats=model.draw(view,projection,eye,matrix,weather,coverage);
       this.stats.drawCalls+=stats.drawCalls;
       this.stats.vertices+=stats.vertices;
       this.stats.landmarkDraws+=stats.drawCalls;
       changedProgram=true;
     };
-    for(const spot of visible){
-      draw(spot.file,spot.matrix);
+    for(const {spot,coverage} of visible){
+      draw(placementModelKey(spot),spot.matrix,coverage);
       if(spot.rotor){
-        const {x,y,z,angle}=spot;
-        const rotor=transform(x+Math.sin(angle)*2.5,y+30.6,z+Math.cos(angle)*2.5,angle);
+        const parent=spot.matrix,rotor=parent.slice();
         const phase=this.reducedMotion?.matches?0:this.time*.54,cos=Math.cos(phase),sin=Math.sin(phase);
-        const rx=rotor[0],rz=rotor[2];
-        rotor[0]=rx*cos;rotor[1]=sin;rotor[2]=rz*cos;
-        rotor[4]=-rx*sin;rotor[5]=cos;rotor[6]=-rz*sin;
-        draw(TURBINE_ROTOR,rotor);
+        for(let axis=0;axis<3;axis++){
+          rotor[axis]=parent[axis]*cos+parent[axis+4]*sin;
+          rotor[axis+4]=-parent[axis]*sin+parent[axis+4]*cos;
+          rotor[axis+12]=parent[axis+12]+parent[axis+4]*30.6+parent[axis+8]*2.5;
+        }
+        draw(placementModelKey({pack:1,file:TURBINE_ROTOR}),rotor,coverage);
       }
     }
     if(changedProgram){
@@ -848,12 +947,15 @@ export class Renderer {
   }
   drawPuddles(eye,far){
     if(!this.puddleAssetRequest){
-      this.puddleAssetRequest=Promise.all(['a','b','c'].map(async suffix=>{
+      const request=Promise.all(['a','b','c'].map(async suffix=>{
         const assetUrl=sceneryModel(4,'puddle_'+suffix);
         const response=await fetch(assetUrl);
         if(!response.ok)throw Error('No se pudo cargar el charco');
         return parseMenuModel(await response.arrayBuffer(),{assetUrl,worldScale:1});
-      })).then(shapes=>{this.puddleShapes=shapes;}).catch(error=>{this.puddleAssetError=error.message;});
+      }));
+      this.puddleAssetRequest=request;
+      request.then(shapes=>{if(this.puddleAssetRequest===request)this.puddleShapes=shapes;})
+        .catch(error=>{if(this.puddleAssetRequest===request)this.puddleAssetError=error.message;});
     }
     if(!this.puddleShapes||!this.roadEffectsLoaded)return;
     if(!this.puddleMesh)this.buildPuddleMesh();
@@ -861,7 +963,8 @@ export class Renderer {
     gl.depthMask(false);
     for(const chunk of chunks){
       if(chunkVisible(chunk,this.planes,eye,Math.min(far,120))){
-        this.draw(this.puddleMesh,IDENTITY,1,chunk.first,chunk.count);
+        const alpha=1-fadeBetween(boundsDistance(chunk,eye),86,120);
+        if(alpha>0)this.draw(this.puddleMesh,IDENTITY,alpha,chunk.first,chunk.count);
       }
     }
     gl.depthMask(true);
@@ -894,7 +997,17 @@ export class Renderer {
   loadRoadEffects(){
     if(this.roadEffectsImage)return;
     const gl=this.gl,img=this.roadEffectsImage=new Image();
+    this.roadEffects=gl.createTexture();
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D,this.roadEffects);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(4));
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
     img.onload=()=>{
+      if(this.roadEffectsImage!==img)return;
       gl.activeTexture(gl.TEXTURE5);
       gl.bindTexture(gl.TEXTURE_2D,this.roadEffects);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
@@ -958,23 +1071,70 @@ export class Renderer {
     this.skidMesh.count=this.skidCount*SKID_VERTICES;
   }
   draw(mesh,model=IDENTITY,alpha=1,first=0,count=mesh?.count) {if(!mesh)return;const gl=this.gl,u=this.uniforms;if(this.boundBuffer!==mesh.buffer){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);const a=this.attrs;gl.enableVertexAttribArray(a.aPos);gl.vertexAttribPointer(a.aPos,3,gl.FLOAT,false,56,0);gl.enableVertexAttribArray(a.aNormal);gl.vertexAttribPointer(a.aNormal,3,gl.FLOAT,false,56,12);gl.enableVertexAttribArray(a.aColor);gl.vertexAttribPointer(a.aColor,4,gl.FLOAT,false,56,24);gl.enableVertexAttribArray(a.aSurface);gl.vertexAttribPointer(a.aSurface,4,gl.FLOAT,false,56,40);this.boundBuffer=mesh.buffer;}gl.uniformMatrix4fv(u.uModel,false,model);gl.uniform1f(u.uAlpha,alpha);gl.drawArrays(gl.TRIANGLES,first,count);if(this.stats){this.stats.drawCalls++;this.stats.vertices+=count;}}
+  updateSceneryRange(dt){
+    const setting=SCENERY_DISTANCES[this.renderDistance]??SCENERY_DISTANCES.normal;
+    const budget=this.environmentDetail===0?.52:1;
+    const lodDistance=(this.environmentDetail===2?168:this.environmentDetail===1?128:92)*setting.scale;
+    const target={detail:setting.detail*budget,foliage:setting.foliage*budget,lodDistance};
+    const current=this.sceneryRange??={...target};
+    const step=1-Math.exp(-dt*5);
+    for(const key of ['detail','foliage','lodDistance']){
+      current[key]=Math.abs(current[key]-target[key])<.1?target[key]:mix(current[key],target[key],step);
+    }
+  }
   drawScene(view,projection,origin,far,mirror=false){
-    if(this.culling===false||!this.scene.chunks){this.draw(this.scene);return;}
-    const planes=viewPlanes(view,projection,this.planes);this.draw(this.scene,IDENTITY,1,0,6);
-    let range=null;
-    const flush=()=>{if(range){this.gl.uniform1f(this.uniforms.uTerrain,range.kind==='terrain'?1:0);if(range.kind==='terrain'){this.gl.enable(this.gl.CULL_FACE);this.gl.cullFace(this.gl.BACK);}this.draw(this.scene,IDENTITY,range.alpha,range.first,range.count);if(range.kind==='terrain')this.gl.disable(this.gl.CULL_FACE);}range=null;this.gl.uniform1f(this.uniforms.uTerrain,0);};
-    for(const chunk of this.scene.chunks){
-      const decorLimit=chunk.kind==='detail'?(mirror?130:this.environmentDetail===0?210:Infinity):
-        chunk.kind==='foliage'?(mirror?195:this.environmentDetail===0?325:Infinity):Infinity;
-      const limit=Math.min(far,chunk.distance??Infinity,decorLimit),distance=boundsDistance(chunk,origin);
+    if(this.culling===false||!this.scene.chunks){this.draw(this.scene,IDENTITY,1,0,this.scene.nearCount??this.scene.count);return;}
+    const gl=this.gl,u=this.uniforms,scene=this.scene,multi=this.sceneMultiDraw;
+    const planes=viewPlanes(view,projection,this.planes);this.draw(scene,IDENTITY,1,0,6);
+    let range=null,queued=0,vertices=0;
+    const push=()=>{
+      scene.firsts[queued]=range.first;scene.counts[queued++]=range.count;vertices+=range.count;
+    };
+    const flush=()=>{
+      if(!range)return;
+      const terrain=range.kind==='terrain';
+      gl.uniform1f(u.uTerrain,terrain?1:0);
+      gl.uniform1f(u.uFoliageFade,range.coverage);
+      if(terrain){gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);}
+      if(multi&&queued){
+        push();
+        gl.uniform1f(u.uAlpha,range.alpha);
+        multi.multiDrawArraysWEBGL(gl.TRIANGLES,scene.firsts,0,scene.counts,0,queued);
+        this.stats.drawCalls++;
+        this.stats.vertices+=vertices;
+      }else this.draw(scene,IDENTITY,range.alpha,range.first,range.count);
+      if(terrain)gl.disable(gl.CULL_FACE);
+      range=null;queued=0;vertices=0;
+    };
+    const queue=(geometry,kind,alpha,coverage=0)=>{
+      if(range&&range.alpha===alpha&&range.kind===kind&&range.coverage===coverage){
+        if(range.first+range.count===geometry.first){range.count+=geometry.count;return;}
+        if(multi)push();
+        else flush();
+      }else flush();
+      range={first:geometry.first,count:geometry.count,alpha,kind,coverage};
+    };
+    const rangeSetting=this.sceneryRange,lodDistance=mirror?70:rangeSetting.lodDistance;
+    for(const chunk of this.scene.frontChunks){
+      const decorLimit=chunk.kind==='detail'?(mirror?130:rangeSetting.detail):
+        chunk.kind==='foliage'?(mirror?195:rangeSetting.foliage):Infinity;
+      const limit=Math.min(far,decorLimit);
       if(!chunkVisible(chunk,planes,origin,limit))continue;
-      const fade=Number.isFinite(decorLimit)?Math.round(clamp((decorLimit-distance)/30,0,1)*4)/4:1;
-      const alpha=chunkOpacity(chunk,origin,distance)*fade;
+      const distance=boundsDistance(chunk,origin);
+      const fadeWidth=mirror?45:Math.min(180,decorLimit*.29);
+      const alpha=Number.isFinite(decorLimit)?Math.round((1-fadeBetween(distance,decorLimit-fadeWidth,decorLimit))*32)/32:1;
       if(alpha<=0)continue;
-      if(range&&range.first+range.count===chunk.first&&range.alpha===alpha&&range.kind===chunk.kind)range.count+=chunk.count;
-      else{flush();range={first:chunk.first,count:chunk.count,alpha,kind:chunk.kind};}this.stats.chunks++;
-    }flush();
-    this.stats.totalChunks+=this.scene.chunks.length;
+      const farLod=this.foliageLod!==false&&chunk.farLod?.count<chunk.count?chunk.farLod:null;
+      const blend=farLod?Math.round(fadeBetween(distance,lodDistance,lodDistance+(mirror?30:65))*32)/32:0;
+      if(blend<1)queue(chunk,chunk.kind,alpha,blend);
+      if(blend>0)queue(farLod,chunk.kind,alpha,blend<1?-blend:0);
+      if(blend===1)this.stats.foliageLodVerticesSaved+=chunk.count-farLod.count;
+      this.stats.chunks++;
+    }
+    flush();
+    gl.uniform1f(u.uTerrain,0);
+    gl.uniform1f(u.uFoliageFade,0);
+    this.stats.totalChunks+=this.scene.frontChunks.length;
   }
   drawWorld(race,racing,p,angle,eye,target,aspect,fov,day,sky,hidePlayer=false,up,mirror=false){
     const gl=this.gl,u=this.uniforms,rival=racing&&race.mode!=='time'&&race.eventKind!=='trial'&&race.eventKind!=='grid'?visualRoadPose(this.track,race.rivalS,race.rivalLateral):null;
@@ -1002,15 +1162,17 @@ export class Renderer {
     gl.uniform1f(u.uCourseSkyReady,this.courseSkyLoaded?1:0);
     gl.uniform1f(u.uBackdrop,1);this.draw(this.backdrop,transform(eye[0],eye[1]-100,eye[2]));gl.uniform1f(u.uBackdrop,0);
     gl.depthMask(true);gl.enable(gl.DEPTH_TEST);this.drawScene(view,projection,visibility.fromCar?[p.x,p.y,p.z]:eye,visibility.far+2,mirror);
-    const car=[p.x,p.y,p.z];
-    if(!mirror)this.warmRouteModels(race,car);
-    const detail=mirror?Math.min(1,this.environmentDetail):this.environmentDetail;
-    this.drawRouteLandmarks(view,projection,eye,{fog:sky,origin:visibility.fromCar?car:eye,car,
-      forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0},detail,mirror);
-    if(detail>0&&!mirror)this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
-    if(detail>0&&!mirror&&racing&&race?.wet)this.drawPuddles(eye,visibility.far);
-    if(!mirror&&racing&&this.skidCount&&this.roadEffectsLoaded){
-      gl.depthMask(false);this.draw(this.skidMesh);gl.depthMask(true);
+    if(this.detailedScenery){
+      const car=[p.x,p.y,p.z];
+      if(!mirror)this.warmRouteModels(race,car);
+      const detail=mirror?Math.min(1,this.environmentDetail):this.environmentDetail;
+      this.drawRouteLandmarks(view,projection,eye,{fog:sky,origin:visibility.fromCar?car:eye,car,
+        forward:[Math.sin(angle),Math.cos(angle)],near:visibility.near,far:visibility.far,day:day?(race?.wet?.78:.95):0,lamps:race?.headlights?1:0},detail,mirror);
+      if(detail>0&&!mirror)this.drawSpectators(view,projection,eye,visibility.far,racing&&race?.wet);
+      if(detail>0&&!mirror&&racing&&race?.wet)this.drawPuddles(eye,visibility.far);
+      if(!mirror&&racing&&this.skidCount&&this.roadEffectsLoaded){
+        gl.depthMask(false);this.draw(this.skidMesh);gl.depthMask(true);
+      }
     }
     if(!hidePlayer){this.draw(this.shadow,transform(p.x,p.y,p.z,angle),.45);gl.uniform1f(u.uLampState,!racing||race.headlights?1:0);gl.uniform1f(u.uBrake,race?.braking?1:0);this.drawCar(this.car.id,transform(p.x,p.y+.04,p.z,angle),{s:race?.s||0,steer:race?.steer,headlights:!racing||race.headlights});if(race?.focus?.remaining>0){gl.depthMask(false);this.draw(this.focusAuras[race.focus.type]||this.focusAuras.balance,transform(p.x,p.y+.08,p.z,angle),.19);gl.depthMask(true);}}
     gl.uniform1f(u.uLampState,1);gl.uniform1f(u.uBrake,race?.rivalBraking?1:0);
@@ -1051,7 +1213,7 @@ export class Renderer {
   render(race,mode,dt,options={}) {
     if(!this.track||!this.car)return;
     this.time+=dt;const gl=this.gl,u=this.uniforms,canvas=this.canvas;
-    this.showcaseActive=false;this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0,landmarkDraws:0};
+    this.showcaseActive=false;this.stats={drawCalls:0,vertices:0,chunks:0,totalChunks:0,mirrorPasses:0,landmarkDraws:0,foliageLodVerticesSaved:0};
     const dpr=Math.min(window.devicePixelRatio||1,this.quality)*this.resolutionScale,w=Math.max(1,Math.round(canvas.clientWidth*dpr)),h=Math.max(1,Math.round(canvas.clientHeight*dpr));
     Object.assign(this.stats,{width:w,height:h,scale:this.resolutionScale});
     if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}gl.viewport(0,0,w,h);
@@ -1060,9 +1222,12 @@ export class Renderer {
     const day=options.day?1:0,sky=raceVisibility(racing?race:null,day).color;
     gl.clearColor(...sky,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.program);gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.atlas);gl.uniform1i(u.uAtlas,1);gl.uniform1f(u.uAtlasReady,this.atlasLoaded?1:0);gl.activeTexture(gl.TEXTURE0);
     if(!racing&&mode!=='title'){this.renderMenu(mode,w,h);return;}
-    if(racing)this.loadRoadEffects();
-    if(mode==='race')this.updateTireMarks(race);
-    gl.uniform1f(u.uRoadEffectsReady,this.roadEffectsLoaded?1:0);
+    this.updateSceneryRange(dt);
+    if(this.detailedScenery){
+      this.loadRoadEffects();
+      if(mode==='race')this.updateTireMarks(race);
+      gl.uniform1f(u.uRoadEffectsReady,this.roadEffectsLoaded?1:0);
+    }
     const s=racing?race.s:340+(this.time*32)%Math.max(100,this.track.length-750),lat=racing?race.lateral:-1.7,p=visualRoadPose(this.track,s,lat),angle=p.heading+(racing?race.yaw:Math.sin(this.time*.5)*.025);
     let eye,target,driverPose,driverUp,cabinFov;
     if(shot){
@@ -1086,7 +1251,7 @@ export class Renderer {
     const shake=!replay&&racing&&this.cameraMode!==3&&options.shake!==false?race.collision*.12:0;
     const actualEye=this.eye.map((v,i)=>v+(i<2?Math.sin(this.time*95+i)*shake:0));
     const demo=mode==='title'?{s,speed:32,mode:'time',headlights:true,netOpponents:[{carId:'rx7',s:s+18,lateral:1.4,yaw:0,headlights:true},{carId:'r32',s:s+38,lateral:-1.5,yaw:0,headlights:true}]}:null;
-    this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,shot?.fov||(racing?(cabinFov||58+race.speed*.18):49),mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,!shot&&racing&&[1,3].includes(this.cameraMode),driverUp);
+    this.drawWorld(demo||race,racing||!!demo,p,angle,actualEye,this.target,w/h,shot?.fov||(racing?(cabinFov||58+race.speed*.18):49),mode==='title'?true:day,mode==='title'?[.12,.17,.24]:sky,options.hidePlayer||!shot&&racing&&[1,3].includes(this.cameraMode),driverUp);
     if(racing&&(mode==='race'||replay)){
       const emit=(q,a,wet,rate=wet?22:50,thin=false)=>{for(const side of [-1,1])if(this.particles.length<48&&Math.random()<1-Math.exp(-dt*rate))this.particles.push({x:q.x+Math.cos(a)*side*.8-Math.sin(a)*1.4,y:q.y+.25,z:q.z-Math.sin(a)*side*.8-Math.cos(a)*1.4,life:thin?.6:1,size:thin?.1+Math.random()*.08:.18+Math.random()*.16,wet,thin});};
       if(race.speed>12&&(race.wet||race.drift>.3))emit(p,angle,race.wet);
@@ -1109,10 +1274,37 @@ export class Renderer {
       if(this.routeLoading===model)this.routeLoading=null;
     }
   }
+  setDetailedScenery(enabled){
+    if(this.detailedScenery===enabled)return;
+    this.detailedScenery=enabled;
+    this.selectSceneProgram();
+    if(!enabled){
+      const gl=this.gl;
+      for(const entry of this.spectatorMeshes?.values()||[])if(entry.mesh)gl.deleteBuffer(entry.mesh.buffer);
+      this.spectatorMeshes?.clear();
+      this.puddleAssetRequest=null;
+      this.puddleShapes=null;
+      this.roadEffectsImage=null;
+      this.roadEffectsLoaded=false;
+      if(this.roadEffects)gl.deleteTexture(this.roadEffects);
+      this.roadEffects=null;
+      if(this.skidMesh)gl.deleteBuffer(this.skidMesh.buffer);
+      this.skidMesh=null;
+    }
+    if(this.track)this.setTrack(this.track);
+  }
   clearRouteModels(){
     for(const model of this.routeModels?.values()||[])model.dispose();
     this.routeModels?.clear();
     this.routeLoading=null;
+    this.routeWarmAt=-Infinity;
+  }
+  invalidateSceneryModel(key){
+    const model=this.routeModels?.get(key);
+    if(!model)return;
+    model.dispose();
+    if(this.routeLoading===model)this.routeLoading=null;
+    this.routeModels.delete(key);
     this.routeWarmAt=-Infinity;
   }
 }

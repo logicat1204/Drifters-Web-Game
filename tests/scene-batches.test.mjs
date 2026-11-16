@@ -10,6 +10,17 @@ test('distance fades are continuous and terrain height never independently hides
  const origin=[0,0,0],chunk={kind:'foliage',min:[0,0,0],max:[1,10,1],distance:620};assert.equal(chunkOpacity(chunk,origin,500),1);assert.ok(chunkOpacity(chunk,origin,590)>0&&chunkOpacity(chunk,origin,590)<1);assert.equal(chunkOpacity(chunk,origin,620),0);
  const upper={...chunk,min:[0,50,0]};assert.equal(chunkOpacity(upper,origin,150),1);assert.equal(chunkOpacity({...chunk,min:[0,8,0]},origin,50),1);assert.equal(chunkOpacity({...chunk,kind:'road',distance:Infinity,baseY:8},origin,50),1);
 });
+test('far foliage is linked only to its original sector and height band',()=>{
+ const data=Array(84).fill(0),spans=[];
+ for(const [kind,sector,baseY,count] of [['foliage',1,2,6],['foliage',1,20,6],['foliage',2,2,6],['foliage-far',1,20,3]]){
+  spans.push({kind,sector,baseY,first:data.length/14,count});
+  for(let i=0;i<count;i++)data.push(sector,baseY,i,...Array(11).fill(0));
+ }
+ const [low,high,other,far]=packScene(data,spans);
+ assert.equal(high.farLod,far);
+ assert.equal(low.farLod,undefined);
+ assert.equal(other.farLod,undefined);
+});
 test('selected second-pack assets have bounded finite meshes without runtime textures',()=>{
  for(const [name,model]of Object.entries(PART2_MODELS)){assert.equal(model.data.length%42,0,name);assert.ok(model.data.every(Number.isFinite));assert.ok(model.data.every((v,i)=>i%14<12||v===-1));}assert.ok(PART2_MODELS.bg_hills_ring_low.data.length/14<5000);
 });

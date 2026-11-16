@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Editor de mapas · Touge After Hours</title>
+  <link rel="stylesheet" href="/editor/style.css">
+  <script type="module" src="/editor/editor.js"></script>
+</head>
+<body>
+  <header>
+    <div class="identity"><span>TOUGE AFTER HOURS</span><h1>Editor de mapas</h1></div>
+    <label>Trayecto<select id="track"></select></label>
+    <button id="save" type="button" class="primary" disabled>Guardar trayecto</button>
+  </header>
+  <main>
+    <div class="view-workspace">
+      <div id="preview">
+        <canvas id="world" aria-label="Vista 3D del trayecto"></canvas>
+        <canvas id="terrain-overlay" aria-hidden="true" hidden></canvas>
+        <div id="markers"></div>
+        <p id="view-help" class="view-help">Arrastra para orbitar · Rueda para acercar · Selecciona un marcador</p>
+      </div>
+      <div class="navigation">
+        <canvas id="overview" aria-label="Mapa del trayecto. Haz clic para navegar o arrastra un objeto." tabindex="0"></canvas>
+        <div class="seek">
+          <div class="seek-title"><label for="station">Posición de cámara</label><output id="station-output"></output></div>
+          <input id="station" type="range" min="0" max="1" step="1" value="0">
+          <div class="inline">
+            <button type="button" id="back">−50 m</button><button type="button" id="forward">+50 m</button>
+            <button type="button" id="day" aria-pressed="true">Día</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <aside>
+      <nav class="editor-tabs" aria-label="Herramientas del editor">
+        <button id="objects-mode" type="button" aria-pressed="true">Objetos</button>
+        <button id="terrain-mode" type="button" aria-pressed="false">Terreno</button>
+      </nav>
+      <section data-objects-panel aria-labelledby="assets-heading">
+        <h2 id="assets-heading">Catálogo</h2>
+        <label>Paquete<select id="scope">
+          <option value="route">Este trayecto</option>
+          <option value="all">Todo el catálogo</option>
+          <optgroup label="Touge City">
+            <option value="city-1">Touge City · Parte 1</option><option value="city-2">Touge City · Parte 2</option>
+            <option value="city-3">Touge City · Parte 3</option><option value="city-4">Touge City · Parte 4</option>
+            <option value="city-5">Touge City · Parte 5</option>
+          </optgroup>
+          <option value="custom">Modelos propios</option>
+        </select></label>
+        <label>Buscar modelo<input id="asset-search" type="search" placeholder="Nombre o archivo"></label>
+        <label>Modelo<select id="asset"></select></label>
+        <output id="asset-info"></output>
+        <output id="custom-models-status" role="status"></output>
+        <button id="add" class="primary" type="button">Añadir en la posición de cámara</button>
+      </section>
+      <section data-objects-panel aria-labelledby="objects-heading">
+        <h2 id="objects-heading">Objetos <output id="object-count"></output></h2>
+        <div id="objects"></div>
+        <button type="button" id="restore">Copiar distribución automática</button>
+      </section>
+      <section data-objects-panel aria-labelledby="transform-heading">
+        <h2 id="transform-heading">Transformación</h2>
+        <fieldset id="transform" disabled>
+          <div class="fields">
+            <label>Recorrido (m)<input type="number" data-field="s" step=".1"></label>
+            <label>Desplazamiento (m)<input type="number" data-field="lateral" min="-150" max="150" step=".1"></label>
+            <label>Elevación (m)<input type="number" data-field="lift" min="-40" max="80" step=".1"></label>
+          </div>
+          <div class="scales">
+            <label>Giro Y (°)<input type="number" data-field="yaw" min="-360" max="360" step="1"></label>
+            <label>Inclinación X (°)<input type="number" data-field="pitch" min="-360" max="360" step="1"></label>
+            <label>Balanceo Z (°)<input type="number" data-field="roll" min="-360" max="360" step="1"></label>
+          </div>
+          <label>Eje de giro rápido<select id="rotation-axis"><option value="yaw">Y · Giro</option><option value="pitch">X · Inclinación</option><option value="roll">Z · Balanceo</option></select></label>
+          <div class="rotation-buttons" aria-label="Giro rápido">
+            <button type="button" data-rotate="-90">−90°</button><button type="button" data-rotate="-15">−15°</button><button type="button" data-rotate="-5">−5°</button>
+            <button type="button" data-rotate="5">+5°</button><button type="button" data-rotate="15">+15°</button><button type="button" data-rotate="90">+90°</button>
+            <button type="button" data-rotate="0">Restablecer eje</button>
+          </div>
+          <div class="scales">
+            <label>Escala X<input type="number" data-axis="0" min=".02" max="8" step=".01"></label>
+            <label>Escala Y<input type="number" data-axis="1" min=".02" max="8" step=".01"></label>
+            <label>Escala Z<input type="number" data-axis="2" min=".02" max="8" step=".01"></label>
+          </div>
+          <output id="warning" role="status"></output>
+          <div class="inline"><button type="button" id="focus">Centrar</button><button type="button" id="duplicate">Duplicar</button><button type="button" id="remove" class="danger">Quitar</button></div>
+        </fieldset>
+      </section>
+      <section id="terrain-panel" aria-labelledby="terrain-heading" hidden>
+        <h2 id="terrain-heading">Relleno de terreno</h2>
+        <p class="terrain-help">Marca el contorno del hueco en la vista 3D o en el minimapa ampliado. El relleno se recorta alrededor de la calzada.</p>
+        <div class="inline">
+          <button id="scan-gaps" type="button" aria-pressed="false">Mostrar huecos del sector</button>
+          <button id="start-fill" type="button" class="primary">Dibujar relleno</button>
+        </div>
+        <div id="fill-draft" hidden>
+          <output id="fill-progress"></output>
+          <div class="inline">
+            <button id="commit-fill" type="button" class="primary">Aplicar relleno</button>
+            <button id="undo-fill" type="button">Quitar último vértice</button>
+            <button id="cancel-fill" type="button">Cancelar</button>
+          </div>
+        </div>
+        <div id="fills" aria-label="Rellenos del trayecto"></div>
+        <fieldset id="fill-controls" disabled>
+          <label>Altura del relleno (m)<input id="fill-lift" type="number" min="-10" max="10" step=".25" value="0"></label>
+          <div class="inline">
+            <button id="focus-fill" type="button">Centrar</button>
+            <button id="remove-fill" type="button" class="danger">Quitar relleno</button>
+          </div>
+        </fieldset>
+      </section>
+    </aside>
+  </main>
+  <footer><p id="status" role="status">Cargando recursos…</p></footer>
+</body>
+</html>

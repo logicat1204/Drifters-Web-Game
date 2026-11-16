@@ -1,5 +1,15 @@
 // Presentation only. Nothing here reads or advances the authoritative simulation.
 export const FRAME_BUDGET_MS=1000/60;
+export const SCENERY_DISTANCES=Object.freeze({
+  short:{detail:260,foliage:400,scale:.76},
+  normal:{detail:420,foliage:620,scale:1},
+  long:{detail:560,foliage:800,scale:1.24}
+});
+
+export function fadeBetween(distance,start,end){
+  const t=Math.max(0,Math.min(1,(distance-start)/(end-start)));
+  return t*t*(3-2*t);
+}
 
 export class FrameMonitor {
   constructor(capacity=180){this.intervals=new Float64Array(capacity);this.work=new Float64Array(capacity);this.reset();}

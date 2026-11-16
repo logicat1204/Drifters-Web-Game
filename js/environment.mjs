@@ -3,6 +3,7 @@ import {COMPLEMENT_MODELS} from './roadside-complements.mjs';
 import {PART2_MODELS} from './scenery-part2.mjs';
 import {TEXTURES as T,SCENERY_MODELS as BASE_MODELS} from './scenery-assets.mjs';
 import {planRouteLandmarks} from './route-landmarks.mjs';
+import {placementSpot} from './track-layout.mjs';
 
 const MODELS={...BASE_MODELS,...PART2_MODELS,...PART3_MODELS,...COMPLEMENT_MODELS};
 export const ENVIRONMENTS={
@@ -37,7 +38,7 @@ export function environmentZone(id,t){
  return t>.91?'village':'forest';
 }
 
-export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},ground=null}={}){
+export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},ground=null,detailed=false,farFoliage=null,layout=null}={}){
  const profile=ENVIRONMENTS[track.id]||ENVIRONMENTS.akina,counts={},props=[],surfaces=[],lights=[],tunnels=[],occupied=new Map();
  let seed=(track.seed*93407+731)>>>0,lastPole=null;
  const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
@@ -47,7 +48,7 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
  const neighbors=(p,r)=>{const result=[];for(let x=Math.floor((p[0]-r)/32);x<=Math.floor((p[0]+r)/32);x++)for(let z=Math.floor((p[2]-r)/32);z<=Math.floor((p[2]+r)/32);z++)result.push(...occupied.get(x+','+z)||[]);return result;};
  const place=(kind,p,r,solid=false)=>{
   if(!roadIndex.clear(p[0],p[2],r))return false;
-  if(ground&&!['dock','railway-bridge'].includes(kind)){const y=ground.groundAt(p[0],p[2]);if(y===null||ground.waterHeight!==null&&y<ground.waterHeight-.05)return false;p[1]=y+(kind==='bench'?.5:0);}
+  if(ground&&!['dock','railway-bridge'].includes(kind)){const y=ground.groundAt(p[0],p[2],false);if(y===null||ground.waterHeight!==null&&y<ground.waterHeight-.05)return false;p[1]=y+(kind==='bench'?.5:0);}
   if(neighbors(p,r+30).some(o=>!(o.reservation&&o.allow.includes(kind))&&(solid||o.solid)&&Math.hypot(o.x-p[0],o.z-p[2])<r+o.radius+.8))return false;
   const entry={kind,x:p[0],y:p[1],z:p[2],radius:r,solid};props.push(entry);sceneryBounds.push(entry);const key=Math.floor(p[0]/32)+','+Math.floor(p[2]/32);if(!occupied.has(key))occupied.set(key,[]);occupied.get(key).push(entry);inc(kind);return true;
  };
@@ -60,11 +61,21 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   for(let i=0;i<model.data.length;i+=14){const a=model.data,x=a[i]*sx,z=a[i+2]*sz,nx=a[i+3]/sx,ny=a[i+4]/sy,nz=a[i+5]/sz,n=Math.hypot(nx,ny,nz)||1;g.data.push(p[0]+x*c+z*s,p[1]+a[i+1]*sy,p[2]-x*s+z*c,(nx*c+nz*s)/n,ny/n,(-nx*s+nz*c)/n,...a.slice(i+6,i+14));}
   return true;
  }
+ const treeWidth=(height,type)=>height*(type==='cedar'?.38:type==='pine'?.48:.55);
+ function treeSprite(geometry,p,height,width,type,rotation,tint){
+  const tile=T['sprite_tree_'+type];
+  for(const angle of [rotation,rotation+Math.PI/2]){
+   const x=Math.cos(angle)*width/2,z=Math.sin(angle)*width/2;
+   geometry.surface([p[0]-x,p[1],p[2]-z],[p[0]+x,p[1],p[2]+z],[p[0]+x,p[1]+height,p[2]+z],[p[0]-x,p[1]+height,p[2]-z],tile,undefined,tint);
+  }
+ }
  function tree(p,height,type,rotation=0){
-  const width=height*(type==='cedar'?.38:type==='pine'?.48:.55),radius=width*.5;
-  if(!place('tree-'+type,p,radius))return;
-  const tile=T['sprite_tree_'+type],tint=[.88+rand()*.15,.88+rand()*.15,.84+rand()*.15,0];
-  for(const angle of [rotation,rotation+Math.PI/2]){const x=Math.cos(angle)*width/2,z=Math.sin(angle)*width/2;g.surface([p[0]-x,p[1],p[2]-z],[p[0]+x,p[1],p[2]+z],[p[0]+x,p[1]+height,p[2]+z],[p[0]-x,p[1]+height,p[2]-z],tile,undefined,tint);}
+  const width=treeWidth(height,type);
+  if(!place('tree-'+type,p,width*.5))return;
+  const tint=[.88+rand()*.15,.88+rand()*.15,.84+rand()*.15,0];
+  treeSprite(g,p,height,width,type,rotation,tint);
+  const seed=Math.imul(Math.round(p[0]*8),73856093)^Math.imul(Math.round(p[2]*8),19349663);
+  if(farFoliage&&(seed&3)<2)treeSprite(farFoliage,p,height,width,type,rotation,tint);
  }
  function house(p,heading,color){
   if(!place('house',p,6.8,true))return;
@@ -88,18 +99,19 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   for(let i=start;i<=end&&clear;i+=3)for(let j=0;j<(track.renderSegments??track.points.length);j++){if(j>=start-7&&j<=end+7)continue;if(Math.hypot(track.points[i].x-track.points[j].x,track.points[i].z-track.points[j].z)<25){clear=false;break;}}
   if(clear)tunnels.push({start:track.points[start].s,end:track.points[end].s,first:start,last:end,clearance:5.65});
  }
- function slopeAt(a,b,i){
-  const zone=environmentZone(track.id,Math.min(1,a.s/track.length));
-  if(['urban','village','lakeside'].includes(zone)||Math.floor(a.s/140)%5===4||tunnels.some(t=>i>=t.first&&i<=t.last))return null;
+ let bridgePlan=null;
+ function slopeAt(a,b,zone){
+  if(['urban','village','lakeside'].includes(zone)||Math.floor(a.s/140)%5===4)return null;
   const side=profile.uphill,height=3.6+Math.sin(a.s/100)*.8;
   const surface=(near,far,y0,y1)=>[point(a,side*near,y0),point(b,side*near,y0),point(b,side*far,y1),point(a,side*far,y1)];
   return {wall:surface(7.7,10.4,-.35,height),cap:surface(10.1,10.7,height+.05,height+.05),
-   wallBounds:surface(7.7,10.7,-.35,height+.05),rock:Math.floor(a.s/180)%4===2?surface(12,21,height,height+8):null};
+   wallBounds:detailed?surface(7.7,10.7,-.35,height+.05):null,rock:Math.floor(a.s/180)%4===2?surface(12,21,height,height+8):null};
  }
  const blockers=[],slopes=new Map();
  const block=vertices=>blockers.push({vertices,min:[0,1,2].map(axis=>Math.min(...vertices.map(p=>p[axis]))),max:[0,1,2].map(axis=>Math.max(...vertices.map(p=>p[axis])))});
- for(let i=0;i<(track.renderSegments??track.points.length-1);i++){
-  const slope=slopeAt(track.points[i],track.points[i+1],i);
+ if(detailed)for(let i=0;i<(track.renderSegments??track.points.length-1);i++){
+  if(tunnels.some(t=>i>=t.first&&i<=t.last))continue;
+  const a=track.points[i],slope=slopeAt(a,track.points[i+1],environmentZone(track.id,Math.min(1,a.s/track.length)));
   if(!slope)continue;
   if(roadIndex.polygonClear(slope.wall))block(slope.wallBounds);
   else slope.wall=null;
@@ -107,11 +119,13 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   else slope.rock=null;
   slopes.set(i,slope);
  }
- const landmarks=planRouteLandmarks(track,roadIndex,ground,tunnels,blockers);
+ const landmarks=detailed?(layout?layout.objects.map(object=>placementSpot(track,ground,object)):planRouteLandmarks(track,roadIndex,ground,tunnels,blockers)):[];
+ const isUsuiBridge=spot=>spot.pack===1&&spot.file==='usui/usui_megane_bridge';
+ if(track.id==='usui'&&!landmarks.some(isUsuiBridge)){const i=Math.floor(track.length*.27/track.step),a=track.points[i];for(const lateral of [58,-58,80,-80,110,-110]){const p=point(a,lateral,-17);if(roadIndex.clear(p[0],p[2],28)){p[1]=(ground?.groundAt(p[0],p[2])??ground?.heightAt(p[0],p[2])??p[1])+4;bridgePlan={i:Math.round(a.s/8),p};reserve(p,28,['railway-bridge']);break;}}}
  for(const spot of landmarks){
   if(spot.portal)continue;
   reserve([spot.x,spot.y,spot.z],spot.radius,[]);
-  if(track.id==='usui'&&spot.pack===1){
+  if(track.id==='usui'&&isUsuiBridge(spot)){
    const entry={kind:'railway-bridge',x:spot.x,y:spot.y,z:spot.z,radius:spot.radius,solid:true};
    props.push(entry);sceneryBounds.push(entry);inc(entry.kind);
   }
@@ -124,7 +138,7 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   for(let k=0;k<12;k++){const u=k/12*Math.PI,v=(k+1)/12*Math.PI,aa=point(a,Math.cos(u)*radius,Math.sin(u)*height),ab=point(b,Math.cos(u)*radius,Math.sin(u)*height),bb=point(b,Math.cos(v)*radius,Math.sin(v)*height),ba=point(a,Math.cos(v)*radius,Math.sin(v)*height);g.surface(aa,ab,bb,ba,T.tunnel_wall,[[a.s/4,k/3],[b.s/4,k/3],[b.s/4,(k+1)/3],[a.s/4,(k+1)/3]],[.8,.83,.85,0]);}
   for(const side of [-1,1]){g.surface(point(a,side*7.1,.1),point(b,side*7.1,.1),point(b,side*7.1,.6),point(a,side*7.1,.6),T.sign_chevron,[[0,0],[2,0],[2,1],[0,1]]);if(i%3===0){g.quad(point(a,side*2.8,5.7),point(b,side*2.8,5.7),point(b,side*3.05,5.7),point(a,side*3.05,5.7),[1,.86,.57,1]);}}
   if(i%3===0)lights.push({x:a.x,y:a.y,z:a.z,power:.5,s:a.s});
-  if(track.id!=='tsuchisaka'&&(i===zone.first||i===zone.last)){for(let k=0;k<12;k++){const u=k/12*Math.PI,v=(k+1)/12*Math.PI;g.quad(point(a,Math.cos(u)*radius,Math.sin(u)*height),point(a,Math.cos(u)*(radius+1.2),Math.sin(u)*(height+1)),point(a,Math.cos(v)*(radius+1.2),Math.sin(v)*(height+1)),point(a,Math.cos(v)*radius,Math.sin(v)*height),'#7b817a');}}
+  if((i===zone.first||i===zone.last)&&!landmarks.some(spot=>spot.portal&&spot.exit===(i===zone.last))){for(let k=0;k<12;k++){const u=k/12*Math.PI,v=(k+1)/12*Math.PI;g.quad(point(a,Math.cos(u)*radius,Math.sin(u)*height),point(a,Math.cos(u)*(radius+1.2),Math.sin(u)*(height+1)),point(a,Math.cos(v)*(radius+1.2),Math.sin(v)*(height+1)),point(a,Math.cos(v)*radius,Math.sin(v)*height),'#7b817a');}}
   inc('tunnel-segment');
  }
  return {profile,props,surfaces,ground,counts,tunnels,lights,landmarks,blockers,step(i,a,b){
@@ -133,9 +147,9 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   const landHeight=(side,distance)=>{if(city||village)return 0;const high=side===uphill,near=high?3.6+Math.sin(a.s/100)*.8:-3.5,mid=high?near+5:-3.5,far=high?18+Math.sin(a.s/120)*4:-19;if(distance<11&&high)return -.35+(distance-8)/3*(near+.35);if(distance<=30)return high?near+(distance-11)/19*(mid-near):-.35+(distance-8)/22*(mid+.35);return mid+(distance-30)/36*(far-mid);};
   layer('road');
   if(inside){tunnel(a,b,i,inside);return;}
-  const slope=slopes.get(i);
-  if(slope?.wall){patch('retaining-wall',slope.wall,'concrete_wall',[[a.s/4,0],[b.s/4,0],[b.s/4,1.5],[a.s/4,1.5]],undefined,true);g.quad(...slope.cap,'#7b8376');}
-  if(slope?.rock)patch('rock-face',slope.rock,'rock_cliff',[[a.s/7,0],[b.s/7,0],[b.s/7,2],[a.s/7,2]],[.85,.9,.82,0],true);
+  const slope=detailed?slopes.get(i):slopeAt(a,b,zone);
+  if(slope?.wall&&patch('retaining-wall',slope.wall,'concrete_wall',[[a.s/4,0],[b.s/4,0],[b.s/4,1.5],[a.s/4,1.5]],undefined,detailed))g.quad(...slope.cap,'#7b8376');
+  if(slope?.rock)patch('rock-face',slope.rock,'rock_cliff',[[a.s/4,0],[b.s/4,0],[b.s/4,2],[a.s/4,2]],[.85,.9,.82,0],detailed);
   // Preserve the previous 8m decoration spacing with denser road geometry.
   if(i%Math.max(1,Math.round(8/track.step))!==0)return;
   layer('detail');
@@ -158,6 +172,7 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   if(Math.abs(a.curve)>.008&&i%6===0)stamp('sign_chevron',point(a,-Math.sign(a.curve)*9.6),a.heading+Math.PI,.85,'chevron');
   if(i===12&&city)stamp('traffic_light',point(a,10),a.heading,1,'traffic-light');
   if((i===26||i===Math.round(track.length*.6/8))&&Math.abs(a.curve)<.006)restStop(a,-uphill,i===26&&!city&&!village);
+  if(bridgePlan?.i===i){const p=bridgePlan.p;if(place('railway-bridge',p,28,true)){for(const x of [-24,-8,8,24])g.box(p[0]+x,p[1]+5,p[2],3,18,5,'#946d50');g.box(p[0],p[1]+15,p[2],53,2.2,5,'#8e6a50');for(const x of [-16,0,16])for(let k=0;k<10;k++){const u=k/10*Math.PI,v=(k+1)/10*Math.PI;g.quad([p[0]+x+Math.cos(u)*6.5,p[1]+6+Math.sin(u)*6.5,p[2]-2.6],[p[0]+x+Math.cos(u)*8,p[1]+6+Math.sin(u)*8,p[2]-2.6],[p[0]+x+Math.cos(v)*8,p[1]+6+Math.sin(v)*8,p[2]-2.6],[p[0]+x+Math.cos(v)*6.5,p[1]+6+Math.sin(v)*6.5,p[2]-2.6],'#b28c69');}}}
   const dock=dockPlans.find(d=>d.i===i);if(dock&&place('dock',dock.p,12,true)){const p=dock.p;g.box(p[0],p[1],p[2],6,.3,17,'#857154');for(const dx of [-2.7,2.7])for(const dz of [-7,0,7])g.box(p[0]+dx,p[1]-1.7,p[2]+dz,.35,3.4,.35,'#5e5443');for(let n=-7;n<=7;n++)g.box(p[0],p[1]+.17,p[2]+n,6,.025,.06,'#544d3b');g.box(p[0],p[1]+1.4,p[2]+4,3.4,2.6,3,'#b9b59e');g.box(p[0],p[1]+2.8,p[2]+4,4,.2,3.6,'#3d5664');}
   if(!city&&!village&&i%48===0)stamp(i%96?'boulder_a':'boulder_b',point(a,uphill*17,landHeight(uphill,17)),a.heading,.8,'roadside-boulder');
   if(i===26)stamp('stone_lantern',point(a,-uphill*13),a.heading,1,'stone-lantern');
@@ -169,7 +184,13 @@ export function createEnvironment(track,g,roadIndex,sceneryBounds,{layer=()=>{},
   if(i%density===0)for(const side of [-1,1])for(let row=0;row<(city||village?1:3);row++){
    if(rand()>(profile.forest||1)*.86)continue;
    const lateral=side*(row===0?12+rand()*8:row===1?26+rand()*13:46+rand()*15),p=point(a,lateral,landHeight(side,Math.abs(lateral))-.25),height=7+rand()*9,type=rand()<.22?(profile.tree==='autumn'?'cedar':'green'):profile.tree;
-   if(row===0&&i%23===0&&!city)stamp(type==='autumn'?'tree_autumn':'tree_cedar',p,rand()*Math.PI,.8+rand()*.3,'tree-mesh');else tree(p,height,type,rand()*Math.PI);
+   if(row===0&&i%23===0&&!city){
+    const rotation=rand()*Math.PI,scale=.8+rand()*.3;
+    if(stamp(type==='autumn'?'tree_autumn':'tree_cedar',p,rotation,scale,'tree-mesh')&&farFoliage){
+     const model=MODELS[type==='autumn'?'tree_autumn':'tree_cedar'],spriteHeight=(model.max[1]-model.min[1])*scale;
+     treeSprite(farFoliage,p,spriteHeight,(model.max[0]-model.min[0])*scale,type,rotation,[1,1,.95,0]);
+    }
+   }else tree(p,height,type,rand()*Math.PI);
   }
   if(!city&&i%2===0)for(const side of [-1,1]){const p=point(a,side*(9.5+rand()*3),-.1);if(place('shrubs',p,1.4)){const angle=a.heading,c=Math.cos(angle)*1.4,s=Math.sin(angle)*1.4;g.surface([p[0]-c,p[1],p[2]+s],[p[0]+c,p[1],p[2]-s],[p[0]+c,p[1]+2.1,p[2]-s],[p[0]-c,p[1]+2.1,p[2]+s],T.sprite_tree_green,[[0,.36],[1,.36],[1,1],[0,1]],[.8,.9,.7,0]);}}
   if(zone==='orchard'&&i%4===0)for(const side of [-1,1])for(let row=0;row<2;row++)tree(point(a,side*(21+row*9),0),5.4,'green',a.heading);

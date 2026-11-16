@@ -1,4 +1,5 @@
 import {sample,worldAt} from './sim.mjs';
+import {sceneryAssetUrl} from './scenery-models.mjs';
 
 const SHORE = Math.PI / 2;
 // Target fractions, half extents (x, z), height, and model scale in metres.
@@ -41,7 +42,7 @@ const additions={
   yabitsu:[[2,'yabitsu/yabitsu_mountain_hut',.35,3.9,2.9,4.9],[3,'yabitsu/yabitsu_log_pile',.65,2.4,1.6,2.5]]
 };
 
-export const landmarkUrl=(file,pack=1)=>new URL(`../assets/routes_part${pack}/${file}.glb`,import.meta.url);
+export const landmarkUrl=(file,pack=1)=>sceneryAssetUrl(pack,file);
 export const TURBINE_ROTOR='sadamine/sadamine_turbine_rotor';
 
 function overlaps(a,b){

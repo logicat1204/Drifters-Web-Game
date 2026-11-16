@@ -46,7 +46,9 @@ try{
    const track=sim.makeTrack(sim.ALL_TRACKS.find(t=>t.id===id)),rival=CAMPAIGN_STAGES.find(s=>s.track===id)||CAMPAIGN_STAGES[0];renderer.setTrack(track);renderer.setRival(rival);renderer.cameraMode=camera;
    const r=sim.createRace(sim.CARS[0],track,{rival,night:!day,wet:!!fog,fog:!!fog});Object.assign(r,{s:track.length*.45,speed:35,countdown:0,rivalS:track.length*.45+25,rivalLateral:1.8});
    const render=culling=>{renderer.culling=culling;renderer.resetCamera=true;renderer.mirrorTime=-1;renderer.particles=[];renderer.render(r,'race',0,{day,shake:false});return {pixels:pixels(),vertices:renderer.stats.vertices};};
+   renderer.foliageLod=false;
    const full=render(false),culled=render(true);let difference=0;for(let i=0;i<full.pixels.length;i+=4)if(Math.max(Math.abs(full.pixels[i]-culled.pixels[i]),Math.abs(full.pixels[i+1]-culled.pixels[i+1]),Math.abs(full.pixels[i+2]-culled.pixels[i+2]))>4)difference++;
+   renderer.foliageLod=true;
    const total=renderer.scene.chunks.reduce((n,c)=>n+c.count,6);
    return {id,camera,ratio:difference/(full.pixels.length/4),full:full.vertices,culled:culled.vertices,total,scene:renderer.scene.count,error:gl.getError(),reads};
   };
