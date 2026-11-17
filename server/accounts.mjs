@@ -1,5 +1,6 @@
 import {UPGRADES,VEHICLE_PARTS,PAINTS} from '../js/tuning.mjs';
 import {timingSafeEqual} from 'node:crypto';
+import {gunzipSync} from 'node:zlib';
 import {AVATAR_VERSION,avatarOptions,defaultAvatar,COSMETICS,installCosmetics,validateAvatar} from '../js/avatar.mjs';
 import {avatarSvg} from './store.mjs';
 import {emailAddress} from './account-email.mjs';
@@ -33,10 +34,22 @@ function worldStory(world,season){
 import {sameOrigin,secureSession} from './origin.mjs';
 export {sameOrigin} from './origin.mjs';
 export const fail=(message,status=400)=>Object.assign(Error(message),{status});
-export async function jsonBody(req,max=12000){
+export async function jsonBody(req,max=12000,{allowGzip=false}={}){
   if(!String(req.headers['content-type']||'').startsWith('application/json'))throw fail('Se requiere JSON.',415);
   if(Number(req.headers['content-length'])>max){req.resume();throw fail('El archivo o la petición es demasiado grande.',413);}
-  const chunks=[];let size=0;for await(const chunk of req){size+=chunk.length;if(size>max)throw fail('El archivo o la petición es demasiado grande.',413);chunks.push(chunk);}try{return JSON.parse(Buffer.concat(chunks).toString());}catch{throw fail('JSON inválido.');}
+  const encoding=String(req.headers['content-encoding']||'identity').trim().toLowerCase();
+  if(encoding!=='identity'&&!(allowGzip&&encoding==='gzip')){req.resume();throw fail('Codificación de petición no admitida.',415);}
+  const chunks=[];let size=0;
+  for await(const chunk of req){size+=chunk.length;if(size>max)throw fail('El archivo o la petición es demasiado grande.',413);chunks.push(chunk);}
+  let body=Buffer.concat(chunks,size);
+  if(encoding==='gzip'){
+    try{body=gunzipSync(body,{maxOutputLength:max});}
+    catch(error){
+      if(error.code==='ERR_BUFFER_TOO_LARGE')throw fail('El archivo o la petición es demasiado grande.',413);
+      throw fail('Registro de controles comprimido inválido.');
+    }
+  }
+  try{return JSON.parse(body.toString());}catch{throw fail('JSON inválido.');}
 }
 export const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(value));};
 function sessionToken(req){const cookies=String(req.headers.cookie||'').split(';').map(v=>v.trim());return cookies.find(v=>v.startsWith('touge_session='))?.slice(14);}
@@ -171,7 +184,7 @@ export class Accounts {
       if(p==='/api/records'&&req.method==='GET'){const q=url.searchParams;json(res,200,{records:await this.store.records({track:q.get('track')||'akina',source:q.get('source')||'solo',car:q.get('car')||null,wet:q.get('wet')==='1',night:q.get('night')!=='0',manual:q.get('manual')==='1',userId:q.get('mine')==='1'?s.user.id:null})});return true;}
       if(p==='/api/rooms'&&req.method==='GET'){json(res,200,{rooms:online.rooms.publicRooms()});return true;}
       if(p==='/api/runs/start'&&req.method==='POST'){this.throttle(req,'start',40,60000);json(res,200,await this.runs.start(s.user.id,{...await jsonBody(req),campaignRules:true}));return true;}
-      if(p==='/api/runs/finish'&&req.method==='POST'){this.throttle(req,'finish',12,60000);const data=await jsonBody(req,4*1024*1024);json(res,200,await this.runs.submit(s.user.id,data.id,data.frames));return true;}
+      if(p==='/api/runs/finish'&&req.method==='POST'){this.throttle(req,'finish',12,60000);const data=await jsonBody(req,4*1024*1024,{allowGzip:true});json(res,200,await this.runs.submit(s.user.id,data.id,data.frames));return true;}
       throw fail('Método no permitido.',405);
     }catch(error){const unavailable=isMongoError(error);json(res,unavailable?503:error.status||400,{error:unavailable?databaseUnavailable:error.message});return true;}
   }

@@ -4,7 +4,7 @@ Implementado el 30 de octubre de 2026. Física `v8`.
 
 ## Uso en el juego
 
-El rebufo es automático. Sigue a otro coche a unos 8–35 metros, alineado con su estela. Una barra azul bajo la posición muestra su intensidad. Al acercarte, sal por un costado y aprovecha la velocidad ganada para adelantar. Permanecer en la misma línea termina en contacto: no permite atravesar al rival.
+El rebufo es automático. Sigue a otro coche a unos 8–35 metros, alineado con su estela. Al acercarte, sal por un costado y aprovecha la velocidad ganada para adelantar. Permanecer en la misma línea termina en contacto: no permite atravesar al rival.
 
 Funciona en campaña, duelos, arcade y online. Jugadores y rivales tienen las mismas reglas de rebufo. Un time attack en solitario no genera estelas. No requiere una tecla ni gasta superconcentración.
 

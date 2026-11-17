@@ -18,7 +18,7 @@ import {focusType,activateFocus} from './focus.mjs';
 import {AccountClient} from './account.js';
 import {ProgressionClient} from './progression.js';
 import {campaignEvent} from './campaign-events.mjs';
-import {RunRecorder} from './replay.mjs';
+import {RunRecorder,runSubmission} from './replay.mjs';
 import {RaceReplay,ReplayPlayer} from './race-replay.mjs';
 import {FrameMonitor,AdaptiveResolution,AdaptiveEnvironmentDetail,SCENERY_DISTANCES} from './render-performance.mjs';
 import {RacePresentation,PHYSICS_STEP,presentationPose} from './presentation.mjs';
@@ -518,10 +518,6 @@ function skillHud(){
 }
 function hud(){
   if(!race)return;
-  const draft=race.draft,strength=draft?.strength||0,visible=strength>.04;
-  $('draft-panel').classList.toggle('draft-active',visible);$('draft-panel').setAttribute('aria-hidden',String(!visible));
-  $('draft-fill').style.width=(strength*100).toFixed(1)+'%';$('draft-value').textContent=Math.round(strength*100)+'%';
-  $('draft-label').textContent=draft?.target>.03?'REBUFO':'IMPULSO DE SALIDA';
   driving.renderGear();
   $('speed').textContent=Math.round(race.speed*3.6);$('gear').textContent=race.gear;$('elapsed').textContent=fmtTime(race.elapsed);$('time-left').textContent=Math.max(0,Math.ceil(race.timeLeft));$('time-left').style.color=race.timeLeft<20?'#ef7955':'';$('checkpoint').textContent=`SECTION 0${race.checkpoints+1} / 04`;
   $('distance').textContent=(Math.min(race.s,track.length)/1000).toFixed(2);const gap=race.s-race.rivalS;$('position').innerHTML=race.mode==='time'?`<span>TIME</span>`:`${gap>=0?'1':'2'}<span>/ 2</span>`;$('advantage').textContent=race.mode==='time'?`DRIFT ${Math.floor(race.driftPoints).toLocaleString()}`:`${gap>=0?'+':'−'}${Math.abs(gap).toFixed(1)} m`;
@@ -555,8 +551,10 @@ async function saveRun(r){
     lockResult(r,true);$('retry-record').classList.add('hidden');
     $('record-save-status').textContent='Verificando tu conducción y guardando tu marca…';$('record-save-status').focus();
   }
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   try{
-    const saved=await account.request('/api/runs/finish',{method:'POST',body:JSON.stringify({id:r.attempt,frames:r.recorder.frames})});
+    const submission=await runSubmission(r.attempt,r.recorder.frames);
+    const saved=await account.request('/api/runs/finish',{method:'POST',...submission,signal:controller.signal});
     r.savedRecord=saved;account.accept({user:saved.user});
     if(race!==r)return;
     $('result-reward').textContent=saved.reward.coins?'◈ +'+saved.reward.coins+' MONEDAS':
@@ -568,9 +566,11 @@ async function saveRun(r){
     if(r.campaignStage&&saved.won&&saved.completed&&!r.endingShown){r.endingShown=true;progression.ending(r.campaignStage);}
   }catch(error){
     if(race!==r)return;
-    $('record-save-status').textContent='Guardado pendiente. '+error.message;
+    $('record-save-status').textContent=controller.signal.aborted
+      ?'El guardado tardó demasiado. Puedes reintentarlo con esta misma carrera.'
+      :'Guardado pendiente. '+error.message;
     $('retry-record').classList.remove('hidden');$('retry-record').focus();$('result-best').textContent='PENDIENTE';
-  }finally{r.saving=false;}
+  }finally{clearTimeout(timer);r.saving=false;}
 }
 $('retry-record').onclick=()=>race&&saveRun(race);
 

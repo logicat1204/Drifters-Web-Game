@@ -2,11 +2,16 @@
 // the browser sends the public HTTPS origin. All accounts are disposable.
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
+import {gzipSync} from 'node:zlib';
 import {WebSocket} from 'ws';
+import {campaignEvents} from '../js/campaign-events.mjs';
+import {RunRecorder,runSubmission} from '../js/replay.mjs';
+import {ALL_CARS,ALL_TRACKS,createRace,makeTrack,updateRace} from '../js/sim.mjs';
+import {driverInput} from './helpers/reference-driver.mjs';
 process.env.DB_PATH=':memory:';
 delete process.env.PUBLIC_URL;
 const renderOrigin=process.env.RENDER_EXTERNAL_URL='https://drifters-web-game.onrender.com';
-const {server,store,online}=await import('../server.mjs');
+const {server,store,online,accounts}=await import('../server.mjs');
 let base,nextUser=0;const sockets=[];
 before(async()=>{await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}`;});
 after(async()=>{for(const ws of sockets)ws.terminate();for(const ws of online.wss.clients)ws.terminate();await new Promise(resolve=>server.close(resolve));store.close();});
@@ -38,4 +43,46 @@ test('custom domains coexist with the Render domain and become the preferred inv
     assert.equal((await post('/api/profile',{displayName:'Render pilot'},renderOrigin,session)).status,200);
     assert.equal((await (await fetch(base+'/api/online')).json()).publicUrl,'https://race.example');
   }finally{delete process.env.PUBLIC_URL;}
+});
+
+test('a two-lap campaign grid can be saved with a compressed recording and safely retried',async()=>{
+  const session=await register(),id=session.user.id;
+  assert.equal((await post('/api/profile',{complete:true},renderOrigin,session)).status,200);
+  store.db.prepare('UPDATE wallets SET balance=100000 WHERE user_id=?').run(id);
+  for(const system of ['engine','chassis','brakes'])for(const tier of [1,2,3])store.upgradeVehicle(id,'ae86',system,tier);
+  const stage='odawara-grid',events=campaignEvents();
+  const seed=store.db.prepare('INSERT INTO campaign_progress(user_id,level_id,best_time,best_points,reward_coins,cleared_at) VALUES(?,?,120,0,0,0)');
+  for(const event of events.slice(0,events.findIndex(event=>event.id===stage)))seed.run(id,event.id);
+  const start=await post('/api/runs/start',{mode:'campaign',car:'ae86',campaignStage:stage},renderOrigin,session);
+  assert.equal(start.status,200,await start.clone().text());
+  const attempt=await start.json(),track=makeTrack(ALL_TRACKS.find(track=>track.id===attempt.track));
+  const race=createRace(ALL_CARS.find(car=>car.id==='ae86'),track,attempt.options),recorder=new RunRecorder();
+  for(let tick=0;tick<108400&&!race.finished;tick++){
+    const input=recorder.capture(race,driverInput(race,{line:-2.15,gripUse:.98}));
+    updateRace(race,input,1/120);
+  }
+  assert.equal(race.laps,2);assert.equal(race.won,true);
+  const submission=await runSubmission(attempt.id,recorder.frames);
+  assert.equal(submission.headers['Content-Encoding'],'gzip');
+  assert.ok(submission.body.size<JSON.stringify(recorder.frames).length);
+  const finish=(body,headers={})=>fetch(base+'/api/runs/finish',{method:'POST',body,headers:{
+    Origin:renderOrigin,Cookie:session.cookie,'X-CSRF-Token':session.csrf,'Content-Type':'application/json',...headers
+  }});
+  assert.equal((await finish('invalid gzip',submission.headers)).status,400);
+  assert.equal((await finish(gzipSync(Buffer.alloc(4*1024*1024+1)),submission.headers)).status,413);
+  const now=accounts.runs.now;
+  accounts.runs.now=()=>now()+1000000;
+  try{
+    const response=await finish(submission.body,submission.headers);
+    assert.equal(response.status,200,await response.clone().text());
+    const saved=await response.json();
+    assert.equal(saved.time,race.elapsed);
+    assert.ok(saved.completed&&saved.won&&saved.reward.coins>0);
+    assert.equal(saved.reward.stage,stage);
+    assert.ok(saved.user.campaign.some(event=>event.id===stage));
+    const retry=await finish(JSON.stringify({id:attempt.id,frames:recorder.frames}));
+    assert.equal(retry.status,200);
+    assert.deepEqual(await retry.json(),saved);
+    assert.equal(store.stats(id).races,1);
+  }finally{accounts.runs.now=now;}
 });

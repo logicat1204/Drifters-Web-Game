@@ -6,3 +6,16 @@ export class RunRecorder {
     const last=this.frames.at(-1);if(last&&!actions&&!last[4]&&last[1]===steer&&last[2]===flags&&last[3]===r.gear)last[0]++;else this.frames.push([1,steer,flags,r.gear,actions]);this.ticks++;return {...input,steer};
   }
 }
+
+export async function runSubmission(id,frames){
+  const body=JSON.stringify({id,frames});
+  if(body.length>=65536&&typeof CompressionStream==='function'){
+    try{
+      const compressed=new Blob([body]).stream().pipeThrough(new CompressionStream('gzip'));
+      return {body:await new Response(compressed).blob(),headers:{'Content-Encoding':'gzip'}};
+    }catch{
+      // Keep the JSON upload available on browsers with incomplete gzip support.
+    }
+  }
+  return {body};
+}

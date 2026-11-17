@@ -56,17 +56,34 @@ export class Runs {
     if(attempt.busy||this.busy>=2)throw Object.assign(Error('El servidor está verificando carreras. Intenta guardar de nuevo en unos segundos.'),{status:429});
     if(!Array.isArray(frames)||frames.length===0||frames.length>108400)throw Error('Registro de controles inválido.');
     let ticks=0;for(const f of frames){if(!Array.isArray(f)||f.length!==5||!Number.isInteger(f[0])||f[0]<1||f[0]>108400||!Number.isFinite(f[1])||f[1]<-1||f[1]>1||!Number.isInteger(f[2])||f[2]<0||f[2]>15||!Number.isInteger(f[3])||f[3]<1||f[3]>5||!Number.isInteger(f[4])||f[4]<0||f[4]>3||f[4]&&f[0]!==1)throw Error('Registro de controles inválido.');ticks+=f[0];}if(ticks>108400)throw Error('Carrera demasiado larga.');
+    const isGrid=attempt.options.eventKind==='grid',logGrid=isGrid&&process.env.NODE_ENV==='production';
+    const started=performance.now();let phase='verification';
     attempt.busy=true;this.busy++;try{
-      const r=createRace(attempt.car,makeTrack(attempt.track),attempt.options);let steps=0;
+      if(logGrid)console.info('[race-save] verifying grid',{event:attempt.options.campaignStage,ticks});
+      const track=isGrid?calibrationTrack(attempt.track):makeTrack(attempt.track);
+      const r=createRace(attempt.car,track,attempt.options);let steps=0,sliceStart=performance.now();
       for(const [n,steer,flags,gear,actions] of frames){
         if(r.finished)throw Error('Hay controles posteriores a la meta.');
         if(actions&1&&!activateFocus(r))throw Error('Activación de concentración inválida.');if(actions&2&&!repositionRace(r))throw Error('Recuperación inválida.');
         r.headlights=!!(flags&8);if(r.manual)r.gear=gear;
-        for(let i=0;i<n;i++){if(r.finished)throw Error('Hay controles posteriores a la meta.');updateRace(r,{steer,throttle:!!(flags&1),brake:!!(flags&2),handbrake:!!(flags&4)},1/120);if(++steps%6000===0)await setImmediate();}
+        const input={steer,throttle:!!(flags&1),brake:!!(flags&2),handbrake:!!(flags&4)};
+        for(let i=0;i<n;i++){
+          if(r.finished)throw Error('Hay controles posteriores a la meta.');
+          updateRace(r,input,1/120);
+          if(++steps%256===0&&performance.now()-sliceStart>=12){await setImmediate();sliceStart=performance.now();}
+        }
       }
       if(!r.finished)throw Error('El descenso no terminó.');
       if(this.now()-attempt.created+2000<r.elapsed*1000)throw Error('El tiempo de carrera no corresponde al reloj del servidor.');
-      const saved=await this.store.addRun(id,userId,r);this.pending.delete(id);return saved;
+      phase='database';
+      if(logGrid)console.info('[race-save] writing grid',{event:attempt.options.campaignStage,simulationMs:Math.round(performance.now()-started)});
+      const saved=await this.store.addRun(id,userId,r);this.pending.delete(id);
+      if(logGrid)console.info('[race-save] saved grid',{event:attempt.options.campaignStage,totalMs:Math.round(performance.now()-started)});
+      return saved;
+    }catch(error){
+      if(logGrid)console.warn('[race-save] grid failed',{event:attempt.options.campaignStage,phase,
+        error:error.name,code:typeof error.code==='number'?error.code:undefined});
+      throw error;
     }finally{attempt.busy=false;this.busy--;}
   }
 }

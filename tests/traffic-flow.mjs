@@ -25,9 +25,9 @@ try{
  // Place both on Akina's existing opening straight; no production cheat endpoint.
  for(const [p,s]of [[follower,70],[leader,92]])Object.assign(p.race,{s,lateral:0,speed:45,countdown:0,yaw:0,travelYaw:0});online.rooms.snapshot(room);
  for(const page of [host,guest])await page.keyboard.down('ArrowUp');
- await host.waitForFunction(()=>window.touge.state.race.draft.strength>.6);assert.equal(await host.locator('#draft-panel').getAttribute('aria-hidden'),'false');assert.equal(await host.locator('#draft-label').innerText(),'REBUFO');assert.ok(follower.race.draft.strength>.6);assert.equal(leader.race.draft.strength,0);
+ await host.waitForFunction(()=>window.touge.state.race.draft.strength>.6);assert.equal(await host.locator('#draft-panel').count(),0);assert.ok(follower.race.draft.strength>.6);assert.equal(leader.race.draft.strength,0);
  await host.screenshot({path:path.join(root,'screenshots/rebufo-online.png')});
  for(let i=0;i<3;i++)await host.keyboard.press('c');await host.waitForTimeout(200);await host.screenshot({path:path.join(root,'screenshots/rebufo-interior.png')});
  await host.setViewportSize({width:390,height:844});assert.equal(await host.evaluate(()=>document.documentElement.scrollWidth),390);await host.screenshot({path:path.join(root,'screenshots/rebufo-movil.png')});
- assert.deepEqual(errors,[]);console.log('TRAFFIC UI OK: rebufo online autoritativo, barra reactiva, cámara interior y móvil.');
+ assert.deepEqual(errors,[]);console.log('TRAFFIC UI OK: rebufo online autoritativo sin indicador, cámara interior y móvil.');
 }finally{for(const context of contexts)await context.close();await browser.close();for(const ws of online.wss.clients)ws.terminate();await new Promise(resolve=>server.close(resolve));store.close();}
