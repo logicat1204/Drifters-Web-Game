@@ -10,8 +10,11 @@ export const focusType=r=>FOCUS_TYPES[r.focus?.type]||FOCUS_TYPES.balance;
 export function createFocus(type='balance',enabled=true){return {type:FOCUS_TYPES[type]?type:'balance',enabled,charge:0,remaining:0,duration:0,cooldown:0,activations:0};}
 export function activateFocus(r){
   const f=r.focus;
-  if(!f||f.enabled===false||r.finished||r.countdown>0||r.resetHold>0||r.collision>0||r.wallTouch>0||f.remaining>0||f.cooldown>0||f.charge<FOCUS.minimum)return false;
-  f.duration=FOCUS.maxDuration*Math.min(1,f.charge/FOCUS.capacity);f.remaining=f.duration;f.charge=0;f.activations++;return true;
+  if(!f||f.enabled===false||r.finished||r.countdown>0||r.resetHold>0||r.collision>0||r.wallTouch>0||f.remaining>0||f.cooldown>0)return false;
+  // Both runtimes use the same precision when checking or spending charge.
+  const charge=Math.round(f.charge*1e7)/1e7;
+  if(charge<FOCUS.minimum)return false;
+  f.duration=FOCUS.maxDuration*Math.min(1,charge/FOCUS.capacity);f.remaining=f.duration;f.charge=0;f.activations++;return true;
 }
 export function cancelFocus(r){if(r.focus?.remaining>0){r.focus.remaining=0;r.focus.cooldown=FOCUS.cooldown;}}
 export function updateFocus(r,dt,curve,grip){

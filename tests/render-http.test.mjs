@@ -7,6 +7,7 @@ import {WebSocket} from 'ws';
 import {campaignEvents} from '../js/campaign-events.mjs';
 import {RunRecorder,runSubmission} from '../js/replay.mjs';
 import {ALL_CARS,ALL_TRACKS,createRace,makeTrack,updateRace} from '../js/sim.mjs';
+import {activateFocus,FOCUS} from '../js/focus.mjs';
 import {driverInput} from './helpers/reference-driver.mjs';
 process.env.DB_PATH=':memory:';
 delete process.env.PUBLIC_URL;
@@ -45,23 +46,34 @@ test('custom domains coexist with the Render domain and become the preferred inv
   }finally{delete process.env.PUBLIC_URL;}
 });
 
-test('a two-lap campaign grid can be saved with a compressed recording and safely retried',async()=>{
+test('Ashinoko saves a two-lap win with focus even when a recorded press has no effect',async()=>{
   const session=await register(),id=session.user.id;
   assert.equal((await post('/api/profile',{complete:true},renderOrigin,session)).status,200);
   store.db.prepare('UPDATE wallets SET balance=100000 WHERE user_id=?').run(id);
-  for(const system of ['engine','chassis','brakes'])for(const tier of [1,2,3])store.upgradeVehicle(id,'ae86',system,tier);
-  const stage='odawara-grid',events=campaignEvents();
+  const car='rx7amemiya';
+  store.buy(id,'car',car);
+  for(const system of ['engine','chassis','brakes'])for(const tier of [1,2,3])store.upgradeVehicle(id,car,system,tier);
+  const stage='ashinoko-grid',events=campaignEvents();
   const seed=store.db.prepare('INSERT INTO campaign_progress(user_id,level_id,best_time,best_points,reward_coins,cleared_at) VALUES(?,?,120,0,0,0)');
   for(const event of events.slice(0,events.findIndex(event=>event.id===stage)))seed.run(id,event.id);
-  const start=await post('/api/runs/start',{mode:'campaign',car:'ae86',campaignStage:stage},renderOrigin,session);
+  store.claimCampaignChest(id,'chest-akagi');
+  store.updateProfile(id,{focusType:'time'});
+  const start=await post('/api/runs/start',{mode:'campaign',car,campaignStage:stage},renderOrigin,session);
   assert.equal(start.status,200,await start.clone().text());
   const attempt=await start.json(),track=makeTrack(ALL_TRACKS.find(track=>track.id===attempt.track));
-  const race=createRace(ALL_CARS.find(car=>car.id==='ae86'),track,attempt.options),recorder=new RunRecorder();
+  const race=createRace(ALL_CARS.find(item=>item.id===car),track,attempt.options),recorder=new RunRecorder();
+  let repeatedPress=false;
   for(let tick=0;tick<108400&&!race.finished;tick++){
-    const input=recorder.capture(race,driverInput(race,{line:-2.15,gripUse:.98}));
+    if(tick===0||!repeatedPress&&race.focus.remaining>0){
+      assert.equal(activateFocus(race),false);
+      recorder.action(1);
+      repeatedPress||=tick>0;
+    }else if(race.focus.charge>=FOCUS.minimum&&activateFocus(race))recorder.action(1);
+    const input=recorder.capture(race,driverInput(race,{line:-2.15,gripUse:.97}));
     updateRace(race,input,1/120);
   }
-  assert.equal(race.laps,2);assert.equal(race.won,true);
+  assert.equal(race.laps,2);assert.equal(race.grid.length,3);assert.equal(race.won,true);
+  assert.ok(race.focus.activations>0&&repeatedPress);
   const submission=await runSubmission(attempt.id,recorder.frames);
   assert.equal(submission.headers['Content-Encoding'],'gzip');
   assert.ok(submission.body.size<JSON.stringify(recorder.frames).length);
@@ -77,6 +89,7 @@ test('a two-lap campaign grid can be saved with a compressed recording and safel
     assert.equal(response.status,200,await response.clone().text());
     const saved=await response.json();
     assert.equal(saved.time,race.elapsed);
+    assert.equal(saved.points,Math.floor(race.skill.points));
     assert.ok(saved.completed&&saved.won&&saved.reward.coins>0);
     assert.equal(saved.reward.stage,stage);
     assert.ok(saved.user.campaign.some(event=>event.id===stage));

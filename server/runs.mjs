@@ -7,6 +7,7 @@ import {campaignEvent,eventAvailable} from '../js/campaign-events.mjs';
 import {stockBuild,campaignPreparationIssue} from '../js/tuning.mjs';
 import {CampaignTargets} from './campaign-targets.mjs';
 import {calibrateRival,calibrationTrack} from './rival-calibration.mjs';
+const invalidReplay=message=>Object.assign(Error(message),{status:422});
 export class Runs {
   constructor(store,{now=()=>Date.now(),targets=new CampaignTargets()}={}){this.store=store;this.now=now;this.targets=targets;this.pending=new Map();this.starting=new Set();this.busy=0;}
   start(userId,data){
@@ -54,26 +55,37 @@ export class Runs {
     const existing=await this.store.runResult(id,userId);if(existing)return existing;
     const attempt=this.pending.get(id);if(!attempt||attempt.userId!==userId)throw Object.assign(Error('La carrera no existe, caducó o pertenece a otro piloto.'),{status:404});
     if(attempt.busy||this.busy>=2)throw Object.assign(Error('El servidor está verificando carreras. Intenta guardar de nuevo en unos segundos.'),{status:429});
-    if(!Array.isArray(frames)||frames.length===0||frames.length>108400)throw Error('Registro de controles inválido.');
-    let ticks=0;for(const f of frames){if(!Array.isArray(f)||f.length!==5||!Number.isInteger(f[0])||f[0]<1||f[0]>108400||!Number.isFinite(f[1])||f[1]<-1||f[1]>1||!Number.isInteger(f[2])||f[2]<0||f[2]>15||!Number.isInteger(f[3])||f[3]<1||f[3]>5||!Number.isInteger(f[4])||f[4]<0||f[4]>3||f[4]&&f[0]!==1)throw Error('Registro de controles inválido.');ticks+=f[0];}if(ticks>108400)throw Error('Carrera demasiado larga.');
+    if(!Array.isArray(frames)||frames.length===0||frames.length>108400)throw invalidReplay('Registro de controles inválido.');
+    let ticks=0;for(const f of frames){if(!Array.isArray(f)||f.length!==5||!Number.isInteger(f[0])||f[0]<1||f[0]>108400||!Number.isFinite(f[1])||f[1]<-1||f[1]>1||!Number.isInteger(f[2])||f[2]<0||f[2]>15||!Number.isInteger(f[3])||f[3]<1||f[3]>5||!Number.isInteger(f[4])||f[4]<0||f[4]>3||f[4]&&f[0]!==1)throw invalidReplay('Registro de controles inválido.');ticks+=f[0];}if(ticks>108400)throw invalidReplay('Carrera demasiado larga.');
     const isGrid=attempt.options.eventKind==='grid',logGrid=isGrid&&process.env.NODE_ENV==='production';
     const started=performance.now();let phase='verification';
     attempt.busy=true;this.busy++;try{
       if(logGrid)console.info('[race-save] verifying grid',{event:attempt.options.campaignStage,ticks});
       const track=isGrid?calibrationTrack(attempt.track):makeTrack(attempt.track);
-      const r=createRace(attempt.car,track,attempt.options);let steps=0,sliceStart=performance.now();
+      const r=createRace(attempt.car,track,attempt.options);let steps=0,sliceStart=performance.now(),loggedFocus=false;
       for(const [n,steer,flags,gear,actions] of frames){
-        if(r.finished)throw Error('Hay controles posteriores a la meta.');
-        if(actions&1&&!activateFocus(r))throw Error('Activación de concentración inválida.');if(actions&2&&!repositionRace(r))throw Error('Recuperación inválida.');
+        if(r.finished)throw invalidReplay('Hay controles posteriores a la meta.');
+        if(actions&1){
+          if(r.focus.enabled===false)throw invalidReplay('Activación de concentración inválida.');
+          // An enabled driver's press is a no-op if the authoritative car is not ready.
+          const activated=activateFocus(r);
+          if(!activated&&logGrid&&!loggedFocus){
+            loggedFocus=true;
+            console.info('[race-save] grid focus unavailable',{event:attempt.options.campaignStage,tick:steps,
+              charge:r.focus.charge,remaining:r.focus.remaining,cooldown:r.focus.cooldown,
+              collision:r.collision,wallTouch:r.wallTouch,resetHold:r.resetHold});
+          }
+        }
+        if(actions&2&&!repositionRace(r))throw invalidReplay('Recuperación inválida.');
         r.headlights=!!(flags&8);if(r.manual)r.gear=gear;
         const input={steer,throttle:!!(flags&1),brake:!!(flags&2),handbrake:!!(flags&4)};
         for(let i=0;i<n;i++){
-          if(r.finished)throw Error('Hay controles posteriores a la meta.');
+          if(r.finished)throw invalidReplay('Hay controles posteriores a la meta.');
           updateRace(r,input,1/120);
           if(++steps%256===0&&performance.now()-sliceStart>=12){await setImmediate();sliceStart=performance.now();}
         }
       }
-      if(!r.finished)throw Error('El descenso no terminó.');
+      if(!r.finished)throw invalidReplay('El descenso no terminó durante la verificación.');
       if(this.now()-attempt.created+2000<r.elapsed*1000)throw Error('El tiempo de carrera no corresponde al reloj del servidor.');
       phase='database';
       if(logGrid)console.info('[race-save] writing grid',{event:attempt.options.campaignStage,simulationMs:Math.round(performance.now()-started)});

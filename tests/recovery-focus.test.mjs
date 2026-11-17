@@ -42,6 +42,9 @@ test('charge determines a short duration, is consumed entirely, cannot stack or 
     updateFocus(r,.02,.015,19.44);assert.equal(r.focus.remaining,0);assert.equal(r.focus.cooldown,3);assert.equal(activateFocus(r),false);
   }
   const low=ready();low.focus.charge=29.9;assert.equal(activateFocus(low),false);
+  const near=ready();near.focus.charge=30-1e-10;
+  assert.equal(activateFocus(near),true);
+  assert.equal(near.focus.remaining,30/100*FOCUS.maxDuration);
 });
 test('focus gives a bounded real speed increase, more grip, and expires without auto-recharging',()=>{
   for(const car of CARS){const base=ready(car),boost=ready(car);base.track=boost.track=makeTrack({...TRACKS[0],layout:[[1,0]]});base.speed=boost.speed=car.max;boost.focus.charge=100;activateFocus(boost);run(base,{throttle:true},4);run(boost,{throttle:true},4);

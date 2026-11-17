@@ -381,7 +381,7 @@ async function startRace(){
 }
 function nextArcade(){
   if(race?.campaignStage){
-    if(race.awaitingRecord||!(race.savedRecord?.won??race.won))return;
+    if(race.awaitingRecord||!race.savedRecord?.won)return;
     const id=race.campaignStage;
     closeModal();sound.stop();race=null;keys.clear();driving.clear();
     progression.returnToRegion(id);
@@ -541,7 +541,7 @@ function lockResult(r,locked){
   const panel=$('results-panel');
   panel.classList.toggle('record-pending',locked);
   for(const button of panel.querySelectorAll('[data-action]'))button.disabled=locked||
-    (button.dataset.action==='next'&&!(r.savedRecord?.won??r.won))||
+    (button.dataset.action==='next'&&!(r.savedRecord?.won??(!r.campaignStage&&r.won)))||
     (button.dataset.action==='replay'&&!r.watchReplay?.duration);
 }
 async function saveRun(r){
@@ -557,6 +557,10 @@ async function saveRun(r){
     const saved=await account.request('/api/runs/finish',{method:'POST',...submission,signal:controller.signal});
     r.savedRecord=saved;account.accept({user:saved.user});
     if(race!==r)return;
+    if(r.campaignStage&&r.won&&!saved.won){
+      $('results-title').textContent='EVENTO PENDIENTE.';
+      $('result-message').textContent='El servidor registró la carrera como derrota.';
+    }
     $('result-reward').textContent=saved.reward.coins?'◈ +'+saved.reward.coins+' MONEDAS':
       r.campaignStage&&!saved.won?'Supera el objetivo para desbloquear el siguiente evento.':'';
     $('result-time').textContent=fmtTime(saved.time);$('result-best').textContent=saved.personalBest?fmtTime(saved.personalBest):'—';
@@ -566,6 +570,14 @@ async function saveRun(r){
     if(r.campaignStage&&saved.won&&saved.completed&&!r.endingShown){r.endingShown=true;progression.ending(r.campaignStage);}
   }catch(error){
     if(race!==r)return;
+    if(error.status===422||error.status===404){
+      lockResult(r,false);
+      $('results-title').textContent='VERIFICACIÓN RECHAZADA.';
+      $('record-save-status').textContent='No se pudo verificar esta carrera. '+error.message;
+      $('result-best').textContent='—';
+      $('results-panel').querySelector('[data-action=restart]').focus();
+      return;
+    }
     $('record-save-status').textContent=controller.signal.aborted
       ?'El guardado tardó demasiado. Puedes reintentarlo con esta misma carrera.'
       :'Guardado pendiente. '+error.message;
